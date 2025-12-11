@@ -1,3 +1,20 @@
 spring:
   application:
     name: book_review
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/book_review
+
+openai:
+  api-key: 
+  model: gpt-4o-mini
+
+currency:
+  api-url: https://api.exchangerate-api.com/v4/latest/USD
+  api-key: 
+
+google:
+  credentials-file: classpath:google-credentials.json
+  drive:
+    root-folder-id: 
+    review-folder-id: 

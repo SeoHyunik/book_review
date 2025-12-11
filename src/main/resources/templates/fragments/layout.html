@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${pageTitle} ?: 'Book Review'"></title>
+    <link rel="stylesheet" th:href="@{/css/styles.css}"/>
+</head>
+<body>
+<header>
+    <h1><a th:href="@{/reviews}">📚 Book Review</a></h1>
+    <nav>
+        <a th:href="@{/reviews}">목록</a>
+        <a th:href="@{/reviews/new}">새 리뷰</a>
+    </nav>
+    <hr/>
+</header>
+<div class="container" th:fragment="content">
+    <!-- 개별 페이지에서 내용이 삽입됩니다 -->
+</div>
+<footer>
+    <hr/>
+    <p>AI 기반 독후감 관리 서비스</p>
+</footer>
+</body>
+</html>
