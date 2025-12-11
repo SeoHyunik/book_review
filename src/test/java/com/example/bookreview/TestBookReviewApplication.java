@@ -1,4 +1,4 @@
-package com.example.book_review;
+package com.example.bookreview;
 
 import org.springframework.boot.SpringApplication;
 
