@@ -4,6 +4,10 @@ spring:
   data:
     mongodb:
       uri: mongodb://localhost:27017/book_review
+  security:
+    user:
+      name: user
+      password: pass123
 
 openai:
   api-key: 
