@@ -8,6 +8,10 @@ group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 description = 'AI-based book review operation service'
 
+springBoot {
+    mainClass = 'com.example.bookreview.BookReviewApplication'
+}
+
 // Java Toolchain 설정 (현재는 Java 25 사용)
 // 필요 시 21 등으로 낮추려면 JavaLanguageVersion.of(21)로 변경
 java {
