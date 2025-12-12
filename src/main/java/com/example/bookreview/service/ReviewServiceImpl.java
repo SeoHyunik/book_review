@@ -34,15 +34,15 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public Review createReview(ReviewRequest request) {
-        AiReviewResult aiResult = openAiService.generateImprovedReview(request.getTitle(), request.getOriginalContent());
+        AiReviewResult aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
         BigDecimal krwCost = currencyService.convertUsdToKrw(aiResult.usdCost());
 
-        String markdown = buildMarkdown(request.getTitle(), aiResult.improvedContent());
-        String fileId = googleDriveService.uploadMarkdown(request.getTitle() + ".md", markdown);
+        String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
+        String fileId = googleDriveService.uploadMarkdown(request.title() + ".md", markdown);
 
         Review review = Review.builder()
-                .title(request.getTitle())
-                .originalContent(request.getOriginalContent())
+                .title(request.title())
+                .originalContent(request.originalContent())
                 .improvedContent(aiResult.improvedContent())
                 .tokenCount(aiResult.tokenCount())
                 .usdCost(aiResult.usdCost())

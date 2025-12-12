@@ -38,7 +38,7 @@ public class ReviewController {
 
     @GetMapping("/new")
     public String createForm(Model model) {
-        model.addAttribute("reviewRequest", new ReviewRequest());
+        model.addAttribute("reviewRequest", ReviewRequest.empty());
         model.addAttribute("pageTitle", "새 리뷰 작성");
         return "reviews/form";
     }
