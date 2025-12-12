@@ -24,6 +24,7 @@ public class ReviewController {
     @GetMapping
     public String list(Model model) {
         model.addAttribute("reviews", reviewService.getReviews());
+        model.addAttribute("pageTitle", "리뷰 목록");
         return "reviews/list";
     }
 
@@ -31,12 +32,14 @@ public class ReviewController {
     public String detail(@PathVariable String id, Model model) {
         Review review = reviewService.getReview(id).orElse(null);
         model.addAttribute("review", review);
+        model.addAttribute("pageTitle", "리뷰 상세");
         return "reviews/detail";
     }
 
     @GetMapping("/new")
     public String createForm(Model model) {
-        model.addAttribute("reviewRequest", new ReviewRequest());
+        model.addAttribute("reviewRequest", ReviewRequest.empty());
+        model.addAttribute("pageTitle", "새 리뷰 작성");
         return "reviews/form";
     }
 

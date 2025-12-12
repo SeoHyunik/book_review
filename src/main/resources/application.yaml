@@ -1,20 +1,33 @@
+server:
+  port: 8081
+
 spring:
   application:
     name: book_review
+
   data:
     mongodb:
       uri: mongodb://localhost:27017/book_review
 
-openai:
-  api-key: 
-  model: gpt-4o-mini
+  # ✅ thymeleaf 수정 반영(캐시 OFF)
+  thymeleaf:
+    cache: false
 
-currency:
-  api-url: https://api.exchangerate-api.com/v4/latest/USD
-  api-key: 
+  # ✅ 정적 리소스(css/js 등)도 캐시 최소화(개발용)
+  web:
+    resources:
+      cache:
+        period: 0
 
-google:
-  credentials-file: classpath:google-credentials.json
-  drive:
-    root-folder-id: 
-    review-folder-id: 
+  # ✅ devtools(이미 적용되어 있다면 유지)
+  devtools:
+    restart:
+      additional-paths: src/main/resources
+      enabled: true
+    livereload:
+      enabled: true
+
+  security:
+    user:
+      name: user
+      password: pass123

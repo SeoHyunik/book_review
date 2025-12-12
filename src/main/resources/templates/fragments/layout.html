@@ -14,9 +14,11 @@
     </nav>
     <hr/>
 </header>
-<div class="container" th:fragment="content">
-    <!-- 개별 페이지에서 내용이 삽입됩니다 -->
+
+<div class="container" th:fragment="layout(content)">
+    <div th:replace="${content}"></div>
 </div>
+
 <footer>
     <hr/>
     <p>AI 기반 독후감 관리 서비스</p>
