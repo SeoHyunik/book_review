@@ -16,45 +16,46 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReviewServiceImpl implements ReviewService {
 
-    private final ReviewRepository reviewRepository;
-    private final OpenAiService openAiService;
-    private final CurrencyService currencyService;
-    private final GoogleDriveService googleDriveService;
+  private final ReviewRepository reviewRepository;
+  private final OpenAiService openAiService;
+  private final CurrencyService currencyService;
+  private final GoogleDriveService googleDriveService;
 
-    @Override
-    public List<Review> getReviews() {
-        return reviewRepository.findAll();
-    }
+  @Override
+  public List<Review> getReviews() {
+    return reviewRepository.findAll();
+  }
 
-    @Override
-    public Optional<Review> getReview(String id) {
-        return reviewRepository.findById(id);
-    }
+  @Override
+  public Optional<Review> getReview(String id) {
+    return reviewRepository.findById(id);
+  }
 
-    @Override
-    @Transactional
-    public Review createReview(ReviewRequest request) {
-        AiReviewResult aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
-        BigDecimal krwCost = currencyService.convertUsdToKrw(aiResult.usdCost());
+  @Override
+  @Transactional
+  public Review createReview(ReviewRequest request) {
+    AiReviewResult aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
+    BigDecimal krwCost = currencyService.convertUsdToKrw(aiResult.usdCost());
 
-        String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
-        String fileId = googleDriveService.uploadMarkdown(request.title() + ".md", markdown);
+    String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
+    String fileId = googleDriveService.uploadMarkdown(request.title() + ".md", markdown);
 
-        Review review = Review.builder()
-                .title(request.title())
-                .originalContent(request.originalContent())
-                .improvedContent(aiResult.improvedContent())
-                .tokenCount(aiResult.tokenCount())
-                .usdCost(aiResult.usdCost())
-                .krwCost(krwCost)
-                .googleFileId(fileId)
-                .createdAt(LocalDateTime.now())
-                .build();
+    Review review = new Review(
+        null,
+        request.title(),
+        request.originalContent(),
+        aiResult.improvedContent(),
+        aiResult.tokenCount(),
+        aiResult.usdCost(),
+        krwCost,
+        fileId,
+        LocalDateTime.now()
+    );
 
-        return reviewRepository.save(review);
-    }
+    return reviewRepository.save(review);
+  }
 
-    private String buildMarkdown(String title, String improvedContent) {
-        return "# " + title + "\n\n" + improvedContent + "\n";
-    }
+  private String buildMarkdown(String title, String improvedContent) {
+    return "# " + title + "\n\n" + improvedContent + "\n";
+  }
 }
