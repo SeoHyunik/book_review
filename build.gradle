@@ -113,3 +113,12 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+// JVM 동적 에이전트 로딩 경고 억제 (향후 JDK 기본값 변경 대비)
+tasks.withType(JavaExec).configureEach {
+    jvmArgs += '-XX:+EnableDynamicAgentLoading'
+}
+
+tasks.withType(Test).configureEach {
+    jvmArgs += '-XX:+EnableDynamicAgentLoading'
+}
