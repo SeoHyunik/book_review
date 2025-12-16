@@ -4,6 +4,16 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
+// 네트워크 차단 환경에서도 Gradle이 동작할 수 있도록 오프라인 모드를 기본값으로 전환할 수 있게 옵션 제공
+ext {
+    gradleForceOffline = project.hasProperty('forceOffline') || System.getenv('GRADLE_FORCE_OFFLINE') == 'true'
+}
+
+if (gradleForceOffline && !gradle.startParameter.offline) {
+    gradle.startParameter.offline = true
+    logger.lifecycle("Gradle offline mode enabled by GRADLE_FORCE_OFFLINE env or -PforceOffline")
+}
+
 group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 description = 'AI-based book review operation service'
@@ -25,6 +35,13 @@ configurations {
 }
 
 repositories {
+    // 1) 프로젝트 루트의 libs 디렉터리에 저장된 수동 설치 JAR 우선 사용
+    flatDir {
+        dirs 'libs'
+    }
+    // 2) 로컬 Maven 저장소(예: gradlew publishToMavenLocal) 우선 검색
+    mavenLocal()
+    // 3) 온라인 환경에서는 기존 중앙 저장소 사용
     mavenCentral()
 }
 
@@ -110,6 +127,12 @@ dependencies {
 
     // JUnit Platform 런처 (IDE/Gradle 연동용)
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // =========================
+    // Offline 대응을 위한 로컬 JAR 스캔 (libs/ 하위 모든 JAR)
+    // =========================
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    testImplementation fileTree(dir: 'libs', include: ['*.jar'])
 }
 
 // Test task 설정 - JUnit 6(Platform) 사용 & 타입 명시로 IDE 경고 해결
