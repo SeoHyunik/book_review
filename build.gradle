@@ -8,11 +8,10 @@ group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 description = 'AI-based book review operation service'
 
-// Java Toolchain 설정 (현재는 Java 25 사용)
-// 필요 시 21 등으로 낮추려면 JavaLanguageVersion.of(21)로 변경
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        // 로컬 빌드 환경에서 자동으로 받을 수 있는 안정 LTS 버전으로 지정
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 

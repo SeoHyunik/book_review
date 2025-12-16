@@ -1,26 +1,23 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<body>
-<div th:replace="~{fragments/layout :: content}">
-    <div>
-        <h2>새 리뷰 작성</h2>
-        <p id="form-message" hidden></p>
-        <form id="review-form" th:action="@{/reviews}" th:object="${reviewRequest}" method="post">
-            <div>
-                <label for="title">제목</label>
-                <input id="title" type="text" th:field="*{title}"/>
-                <div th:if="${#fields.hasErrors('title')}" th:errors="*{title}"></div>
-            </div>
-            <div>
-                <label for="originalContent">원본 독후감</label>
-                <textarea id="originalContent" th:field="*{originalContent}" rows="8"></textarea>
-                <div th:if="${#fields.hasErrors('originalContent')}" th:errors="*{originalContent}"></div>
-            </div>
-            <div>
-                <button type="submit">제출</button>
-            </div>
-        </form>
-    </div>
-</div>
-</body>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::section})}">
+<section>
+    <h2>새 리뷰 작성</h2>
+    <p id="form-message" hidden></p>
+    <form id="review-form" th:action="@{/reviews}" th:object="${reviewRequest}" method="post">
+        <div>
+            <label for="title">제목</label>
+            <input id="title" type="text" th:field="*{title}"/>
+            <div th:if="${#fields.hasErrors('title')}" th:errors="*{title}"></div>
+        </div>
+        <div>
+            <label for="originalContent">원본 독후감</label>
+            <textarea id="originalContent" th:field="*{originalContent}" rows="8"></textarea>
+            <div th:if="${#fields.hasErrors('originalContent')}" th:errors="*{originalContent}"></div>
+        </div>
+        <div>
+            <button type="submit">제출</button>
+        </div>
+    </form>
+</section>
 </html>

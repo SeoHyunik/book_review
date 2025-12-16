@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<body>
-<div th:replace="~{fragments/layout :: content}">
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::section})}">
+<section>
     <div id="review-detail" th:attr="data-review-id=${review != null ? review.id : ''}">
         <p id="detail-message" hidden></p>
         <div id="detail-content" hidden>
@@ -15,6 +15,5 @@
             <p id="detail-google" hidden><strong>Google Drive ID:</strong> <span id="detail-google-id"></span></p>
         </div>
     </div>
-</div>
-</body>
+</section>
 </html>
