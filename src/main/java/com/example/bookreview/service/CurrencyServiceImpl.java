@@ -1,14 +1,19 @@
 package com.example.bookreview.service;
 
 import java.math.BigDecimal;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class CurrencyServiceImpl implements CurrencyService {
 
     @Override
     public BigDecimal convertUsdToKrw(BigDecimal usdAmount) {
+        log.info("Converting USD to KRW for amount={}", usdAmount);
         // TODO: 환율 API 호출 및 캐싱 로직 구현
-        return usdAmount.multiply(BigDecimal.valueOf(1300));
+        BigDecimal result = usdAmount.multiply(BigDecimal.valueOf(1300));
+        log.debug("Converted USD {} to KRW {} using static rate", usdAmount, result);
+        return result;
     }
 }

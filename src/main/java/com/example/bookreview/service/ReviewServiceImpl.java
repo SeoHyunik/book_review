@@ -9,11 +9,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ReviewServiceImpl implements ReviewService {
 
   private final ReviewRepository reviewRepository;
@@ -23,22 +25,28 @@ public class ReviewServiceImpl implements ReviewService {
 
   @Override
   public List<Review> getReviews() {
+    log.debug("Fetching all reviews from repository");
     return reviewRepository.findAll();
   }
 
   @Override
   public Optional<Review> getReview(String id) {
+    log.debug("Fetching review by id={}", id);
     return reviewRepository.findById(id);
   }
 
   @Override
   @Transactional
   public Review createReview(ReviewRequest request) {
+    log.info("Starting review creation for title='{}'", request.title());
     AiReviewResult aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
+    log.debug("AI review generated with tokenCount={} and usdCost={}", aiResult.tokenCount(), aiResult.usdCost());
     BigDecimal krwCost = currencyService.convertUsdToKrw(aiResult.usdCost());
+    log.debug("Converted cost to KRW: {}", krwCost);
 
     String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
     String fileId = googleDriveService.uploadMarkdown(request.title() + ".md", markdown);
+    log.info("Markdown uploaded to Google Drive with fileId={}", fileId);
 
     Review review = new Review(
         null,
@@ -52,7 +60,9 @@ public class ReviewServiceImpl implements ReviewService {
         LocalDateTime.now()
     );
 
-    return reviewRepository.save(review);
+    Review saved = reviewRepository.save(review);
+    log.info("Review persisted with id={}", saved.id());
+    return saved;
   }
 
   private String buildMarkdown(String title, String improvedContent) {
