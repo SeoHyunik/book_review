@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<div th:replace="fragments/layout :: content">
-    <div th:if="${review != null}">
-        <h2 th:text="${review.title}"></h2>
-        <p><strong>생성 시각:</strong> <span th:text="${review.createdAt}"></span></p>
-        <p><strong>OpenAI 토큰:</strong> <span th:text="${review.tokenCount}"></span></p>
-        <p><strong>USD 비용:</strong> <span th:text="${review.usdCost}"></span></p>
-        <p><strong>KRW 비용:</strong> <span th:text="${review.krwCost}"></span></p>
-        <h3>개선된 독후감</h3>
-        <pre th:text="${review.improvedContent}"></pre>
-        <p th:if="${review.googleFileId}"><strong>Google Drive ID:</strong> <span th:text="${review.googleFileId}"></span></p>
-    </div>
-    <div th:unless="${review != null}">
-        <p>리뷰를 찾을 수 없습니다.</p>
+<div th:replace="~{fragments/layout :: content}">
+    <div id="review-detail" th:attr="data-review-id=${review != null ? review.id : ''}">
+        <p id="detail-message" hidden></p>
+        <div id="detail-content" hidden>
+            <h2 id="detail-title"></h2>
+            <p><strong>생성 시각:</strong> <span id="detail-created-at"></span></p>
+            <p><strong>OpenAI 토큰:</strong> <span id="detail-token"></span></p>
+            <p><strong>USD 비용:</strong> <span id="detail-usd"></span></p>
+            <p><strong>KRW 비용:</strong> <span id="detail-krw"></span></p>
+            <h3>개선된 독후감</h3>
+            <pre id="detail-improved"></pre>
+            <p id="detail-google" hidden><strong>Google Drive ID:</strong> <span id="detail-google-id"></span></p>
+        </div>
     </div>
 </div>
 </body>

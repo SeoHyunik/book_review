@@ -4,9 +4,9 @@
 <section>
     <h2>리뷰 목록</h2>
 
-    <p th:if="${#lists.isEmpty(reviews)}">등록된 리뷰가 없습니다.</p>
+    <p id="list-message" hidden>등록된 리뷰가 없습니다.</p>
 
-    <table th:if="${!#lists.isEmpty(reviews)}" border="1" cellpadding="8" cellspacing="0">
+    <table id="review-table" border="1" cellpadding="8" cellspacing="0" hidden>
         <thead>
         <tr>
             <th>제목</th>
@@ -14,12 +14,7 @@
             <th>OpenAI 토큰</th>
         </tr>
         </thead>
-        <tbody>
-        <tr th:each="review : ${reviews}">
-            <td><a th:href="@{'/reviews/' + ${review.id}}" th:text="${review.title}"></a></td>
-            <td th:text="${review.createdAt}"></td>
-            <td th:text="${review.tokenCount}"></td>
-        </tr>
+        <tbody id="review-table-body">
         </tbody>
     </table>
 
