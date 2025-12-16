@@ -50,6 +50,6 @@ public class ReviewController {
         }
 
         Review review = reviewService.createReview(reviewRequest);
-        return "redirect:/reviews/" + review.getId();
+        return "redirect:/reviews/" + review.id();
     }
 }
