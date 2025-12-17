@@ -6,8 +6,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -19,6 +19,7 @@ import reactor.core.publisher.Mono;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class OpenAiServiceImpl implements OpenAiService {
 
     private static final String DEFAULT_OPENAI_URL = "https://api.openai.com/v1/chat/completions";
@@ -26,17 +27,6 @@ public class OpenAiServiceImpl implements OpenAiService {
     private final Gson gson;
     private final String openAiApiKey;
     private final String openAiUrl;
-
-    public OpenAiServiceImpl(
-            ExternalApiUtils apiUtils,
-            Gson gson,
-            @Value("${openai.api-key}") String openAiApiKey,
-            @Value("${openai.api-url:" + DEFAULT_OPENAI_URL + "}") String openAiUrl) {
-        this.apiUtils = apiUtils;
-        this.gson = gson;
-        this.openAiApiKey = openAiApiKey;
-        this.openAiUrl = openAiUrl;
-    }
 
     @Override
     public Mono<OpenAiResponse> improveReview(String originalContent) {
