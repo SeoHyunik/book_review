@@ -40,7 +40,6 @@ repositories {
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
-    implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-log4j2")
@@ -60,12 +59,13 @@ dependencies {
     implementation("com.google.apis:google-api-services-drive:v3-rev197-1.25.0")
     implementation("com.google.auth:google-auth-library-oauth2-http:1.29.0")
 
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
+    implementation("com.google.code.gson:gson:2.11.0")
+
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("io.github.cdimascio:java-dotenv:5.2.2")
     implementation("org.jsoup:jsoup:1.18.3")
     implementation("jakarta.validation:jakarta.validation-api:3.1.0")
-
-    implementation("com.openai:openai:0.18.2")
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.79")
@@ -80,6 +80,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:mongodb")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
