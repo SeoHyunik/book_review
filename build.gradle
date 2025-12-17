@@ -1,6 +1,7 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.0'
+    // 4.0.0 라인은 아직 정식 배포본이 없어 의존성 해상도 실패 발생 → 안정판으로 변경
+    id 'org.springframework.boot' version '3.3.4'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -41,7 +42,9 @@ repositories {
     }
     // 2) 로컬 Maven 저장소(예: gradlew publishToMavenLocal) 우선 검색
     mavenLocal()
-    // 3) 온라인 환경에서는 기존 중앙 저장소 사용
+    // 3) Spring 공식 저장소(중앙 저장소에 아직 동기화되지 않은 경우 대비)
+    maven { url 'https://repo.spring.io/release' }
+    // 4) 온라인 환경에서는 기존 중앙 저장소 사용
     mavenCentral()
 }
 
