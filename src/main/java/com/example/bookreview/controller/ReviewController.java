@@ -31,7 +31,7 @@ public class ReviewController {
 
     @GetMapping(produces = MediaType.TEXT_HTML_VALUE)
     public String list(Model model) {
-        log.info("Rendering review list page");
+        log.info("[MVC] Rendering review list page");
         model.addAttribute("reviews", reviewService.getReviews());
         model.addAttribute("pageTitle", "리뷰 목록");
         return "reviews/list";
@@ -40,13 +40,13 @@ public class ReviewController {
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public List<Review> listJson() {
-        log.info("Fetching review list as JSON for API consumer");
+        log.info("[MVC] Fetching review list as JSON for API consumer");
         return reviewService.getReviews();
     }
 
     @GetMapping(value = "/{id}", produces = MediaType.TEXT_HTML_VALUE)
     public String detail(@PathVariable String id, Model model) {
-        log.info("Displaying review detail page for id={}", id);
+        log.info("[MVC] Displaying review detail page for id={}", id);
         Review review = reviewService.getReview(id).orElse(null);
         model.addAttribute("review", review);
         model.addAttribute("pageTitle", "리뷰 상세");
@@ -56,7 +56,7 @@ public class ReviewController {
     @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<Review> detailJson(@PathVariable String id) {
-        log.info("Fetching review detail as JSON for id={}", id);
+        log.info("[MVC] Fetching review detail as JSON for id={}", id);
         return reviewService.getReview(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -64,7 +64,7 @@ public class ReviewController {
 
     @GetMapping(value = "/new", produces = MediaType.TEXT_HTML_VALUE)
     public String createForm(Model model) {
-        log.info("Rendering review creation form");
+        log.info("[MVC] Rendering review creation form");
         model.addAttribute("reviewRequest", ReviewRequest.empty());
         model.addAttribute("pageTitle", "새 리뷰 작성");
         return "reviews/form";
@@ -72,23 +72,23 @@ public class ReviewController {
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
     public String create(@Valid @ModelAttribute("reviewRequest") ReviewRequest reviewRequest, BindingResult bindingResult) {
-        log.info("Received HTML form submission for new review: title='{}'", reviewRequest.title());
+        log.info("[MVC] Received HTML form submission for new review: title='{}'", reviewRequest.title());
         if (bindingResult.hasErrors()) {
-            log.warn("Validation errors while creating review via form: {}", bindingResult.getAllErrors());
+            log.warn("[MVC] Validation errors while creating review via form: {}", bindingResult.getAllErrors());
             return "reviews/form";
         }
 
         Review review = reviewService.createReview(reviewRequest);
-        log.info("Review created successfully via form with id={}", review.id());
+        log.info("[MVC] Review created successfully via form with id={}", review.id());
         return "redirect:/reviews/" + review.id();
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<Review> createJson(@Valid @RequestBody ReviewRequest reviewRequest) {
-        log.info("Received JSON request to create review: title='{}'", reviewRequest.title());
+        log.info("[MVC] Received JSON request to create review: title='{}'", reviewRequest.title());
         Review review = reviewService.createReview(reviewRequest);
-        log.info("Review created successfully via API with id={}", review.id());
+        log.info("[MVC] Review created successfully via API with id={}", review.id());
         return ResponseEntity.created(URI.create("/reviews/" + review.id())).body(review);
     }
 }

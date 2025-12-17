@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.bookreview.dto.OpenAiResult;
+import com.example.bookreview.dto.OpenAiResponse;
 import com.example.bookreview.domain.Review;
 import com.example.bookreview.repository.ReviewRepository;
 import com.example.bookreview.service.OpenAiService;
@@ -26,6 +26,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import reactor.core.publisher.Mono;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -59,7 +60,7 @@ class ReviewLoggingIntegrationTest {
         given(reviewRepository.save(any())).willReturn(saved);
         given(reviewRepository.findById(saved.id())).willReturn(Optional.of(saved));
         given(openAiService.improveReview("원본 내용"))
-                .willReturn(new OpenAiResult("개선된 독후감 예시", 2, 3));
+                .willReturn(Mono.just(new OpenAiResponse("개선된 독후감 예시", "gpt-4o", 2, 3)));
 
         mockMvc.perform(get("/reviews").accept(MediaType.TEXT_HTML))
                 .andExpect(status().isOk());
@@ -80,20 +81,20 @@ class ReviewLoggingIntegrationTest {
         String logs = output.getOut();
 
         assertThat(logs)
-                .contains("Rendering review list page")
-                .contains("Fetching all reviews from repository")
-                .contains("Rendering review creation form")
-                .contains("Received HTML form submission for new review: title='리뷰테스트'")
-                .contains("Starting review creation for title='리뷰테스트'")
-                .contains("Converting USD to KRW for amount=0")
-                .contains("Converted USD 0 to KRW 0 using static rate")
-                .contains("Converted cost to KRW: 0")
-                .contains("Uploading markdown to Google Drive mock: filename='리뷰테스트.md', contentLength=20")
-                .contains("Returning placeholder Google Drive fileId=fake-file-id")
-                .contains("Markdown uploaded to Google Drive with fileId=fake-file-id")
-                .contains("Review persisted with id=" + saved.id())
-                .contains("Review created successfully via form with id=" + saved.id())
-                .contains("Displaying review detail page for id=" + saved.id())
-                .contains("Fetching review by id=" + saved.id());
+                .contains("[MVC] Rendering review list page")
+                .contains("[SERVICE] Fetching all reviews from repository")
+                .contains("[MVC] Rendering review creation form")
+                .contains("[MVC] Received HTML form submission for new review: title='리뷰테스트'")
+                .contains("[SERVICE] Starting review creation for title='리뷰테스트'")
+                .contains("[CURRENCY] Converting USD to KRW for amount=0")
+                .contains("[CURRENCY] Converted USD 0 to KRW 0 using static rate")
+                .contains("[SERVICE] Converted cost to KRW: 0")
+                .contains("[DRIVE] Uploading markdown to Google Drive mock: filename='리뷰테스트.md', contentLength=20")
+                .contains("[DRIVE] Returning placeholder Google Drive fileId=fake-file-id")
+                .contains("[SERVICE] Markdown uploaded to Google Drive with fileId=fake-file-id")
+                .contains("[SERVICE] Review persisted with id=" + saved.id())
+                .contains("[MVC] Review created successfully via form with id=" + saved.id())
+                .contains("[MVC] Displaying review detail page for id=" + saved.id())
+                .contains("[SERVICE] Fetching review by id=" + saved.id());
     }
 }

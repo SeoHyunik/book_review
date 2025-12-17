@@ -25,33 +25,33 @@ public class ReviewServiceImpl implements ReviewService {
 
   @Override
   public List<Review> getReviews() {
-    log.debug("Fetching all reviews from repository");
+    log.debug("[SERVICE] Fetching all reviews from repository");
     return reviewRepository.findAll();
   }
 
   @Override
   public Optional<Review> getReview(String id) {
-    log.debug("Fetching review by id={}", id);
+    log.debug("[SERVICE] Fetching review by id={}", id);
     return reviewRepository.findById(id);
   }
 
     @Override
     @Transactional
     public Review createReview(ReviewRequest request) {
-        log.info("Starting review creation for title='{}'", request.title());
+        log.info("[SERVICE] Starting review creation for title='{}'", request.title());
         OpenAiResponse aiResult = openAiService.improveReview(request.originalContent()).block();
         if (aiResult == null) {
             throw new IllegalStateException("Failed to generate AI review content");
         }
         long tokenCount = (long) aiResult.inputTokens() + aiResult.outputTokens();
         BigDecimal usdCost = BigDecimal.ZERO;
-        log.debug("AI review generated with tokenCount={} and usdCost={}", tokenCount, usdCost);
+        log.debug("[SERVICE] AI review generated with tokenCount={} and usdCost={}", tokenCount, usdCost);
         BigDecimal krwCost = currencyService.convertUsdToKrw(usdCost);
-        log.debug("Converted cost to KRW: {}", krwCost);
+        log.debug("[SERVICE] Converted cost to KRW: {}", krwCost);
 
     String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
     String fileId = googleDriveService.uploadMarkdown(request.title() + ".md", markdown);
-    log.info("Markdown uploaded to Google Drive with fileId={}", fileId);
+    log.info("[SERVICE] Markdown uploaded to Google Drive with fileId={}", fileId);
 
         Review review = new Review(
             null,
@@ -66,7 +66,7 @@ public class ReviewServiceImpl implements ReviewService {
         );
 
     Review saved = reviewRepository.save(review);
-    log.info("Review persisted with id={}", saved.id());
+    log.info("[SERVICE] Review persisted with id={}", saved.id());
     return saved;
   }
 

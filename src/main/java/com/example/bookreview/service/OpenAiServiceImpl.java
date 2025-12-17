@@ -9,6 +9,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -26,11 +27,14 @@ public class OpenAiServiceImpl implements OpenAiService {
     private static final String DEFAULT_OPENAI_URL = "https://api.openai.com/v1/chat/completions";
     private final ExternalApiUtils apiUtils;
     private final Gson gson;
+    @Value("${openai.api-key:}")
     private final String openAiApiKey;
+    @Value("${openai.api-url:" + DEFAULT_OPENAI_URL + "}")
     private final String openAiUrl;
 
     @Override
     public Mono<OpenAiResponse> improveReview(String originalContent) {
+        log.info("[OPENAI] Received request to improve review content");
         return Mono.fromCallable(() -> executeImproveReview(originalContent));
     }
 
@@ -51,7 +55,7 @@ public class OpenAiServiceImpl implements OpenAiService {
 
         ParsedOpenAiResult parsedResult = callAndParse(apiRequest);
         if (!"stop".equalsIgnoreCase(parsedResult.finishReason())) {
-            log.warn("OpenAI response finish_reason was '{}', retrying once", parsedResult.finishReason());
+            log.warn("[OPENAI] OpenAI response finish_reason was '{}', retrying once", parsedResult.finishReason());
             parsedResult = callAndParse(apiRequest);
         }
 
@@ -59,10 +63,12 @@ public class OpenAiServiceImpl implements OpenAiService {
     }
 
     private ParsedOpenAiResult callAndParse(ExternalApiRequest apiRequest) {
+        log.debug("[OPENAI] Sending request to OpenAI endpoint: {}", openAiUrl);
         ResponseEntity<String> responseEntity = apiUtils.callAPI(apiRequest);
         if (responseEntity == null || !responseEntity.hasBody()) {
             throw new IllegalStateException("OpenAI API response body was empty");
         }
+        log.info("[OPENAI] Received response with status {}", responseEntity.getStatusCode());
         return parseResponse(responseEntity.getBody());
     }
 
