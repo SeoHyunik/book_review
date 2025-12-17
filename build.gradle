@@ -1,6 +1,7 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.0'
+    // 4.0.0 라인은 아직 정식 배포본이 없어 의존성 해상도 실패 발생 → 안정판으로 변경
+    id 'org.springframework.boot' version '3.3.4'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
