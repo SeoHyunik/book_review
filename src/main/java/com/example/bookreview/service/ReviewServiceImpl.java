@@ -1,7 +1,7 @@
 package com.example.bookreview.service;
 
 import com.example.bookreview.domain.Review;
-import com.example.bookreview.dto.OpenAiResult;
+import com.example.bookreview.dto.OpenAiResponse;
 import com.example.bookreview.dto.ReviewRequest;
 import com.example.bookreview.repository.ReviewRepository;
 import java.math.BigDecimal;
@@ -39,14 +39,17 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional
     public Review createReview(ReviewRequest request) {
         log.info("Starting review creation for title='{}'", request.title());
-        OpenAiResult aiResult = openAiService.improveReview(request.originalContent());
-        long tokenCount = (long) aiResult.getPromptTokens() + aiResult.getCompletionTokens();
+        OpenAiResponse aiResult = openAiService.improveReview(request.originalContent()).block();
+        if (aiResult == null) {
+            throw new IllegalStateException("Failed to generate AI review content");
+        }
+        long tokenCount = (long) aiResult.inputTokens() + aiResult.outputTokens();
         BigDecimal usdCost = BigDecimal.ZERO;
         log.debug("AI review generated with tokenCount={} and usdCost={}", tokenCount, usdCost);
         BigDecimal krwCost = currencyService.convertUsdToKrw(usdCost);
         log.debug("Converted cost to KRW: {}", krwCost);
 
-    String markdown = buildMarkdown(request.title(), aiResult.getImprovedContent());
+    String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
     String fileId = googleDriveService.uploadMarkdown(request.title() + ".md", markdown);
     log.info("Markdown uploaded to Google Drive with fileId={}", fileId);
 
@@ -54,7 +57,7 @@ public class ReviewServiceImpl implements ReviewService {
             null,
             request.title(),
             request.originalContent(),
-            aiResult.getImprovedContent(),
+            aiResult.improvedContent(),
             tokenCount,
             usdCost,
             krwCost,

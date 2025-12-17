@@ -1,74 +1,151 @@
 package com.example.bookreview.service;
 
-import com.example.bookreview.dto.OpenAiResult;
-import com.theokanning.openai.completion.chat.ChatCompletionRequest;
-import com.theokanning.openai.completion.chat.ChatCompletionResult;
-import com.theokanning.openai.completion.chat.ChatMessage;
-import com.theokanning.openai.completion.chat.ChatMessageRole;
-import com.theokanning.openai.usage.Usage;
-import java.util.List;
+import com.example.bookreview.dto.OpenAiRequest;
+import com.example.bookreview.dto.OpenAiResponse;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Mono;
 
 @Slf4j
 @Service
 public class OpenAiServiceImpl implements OpenAiService {
 
-    private final com.theokanning.openai.service.OpenAiService openAiClient;
+    private static final String DEFAULT_OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+    private final ExternalApiUtils apiUtils;
+    private final Gson gson;
     private final String openAiApiKey;
+    private final String openAiUrl;
 
     public OpenAiServiceImpl(
-            com.theokanning.openai.service.OpenAiService openAiClient,
-            @Value("${openai.api-key}") String openAiApiKey) {
-        this.openAiClient = openAiClient;
+            ExternalApiUtils apiUtils,
+            Gson gson,
+            @Value("${openai.api-key}") String openAiApiKey,
+            @Value("${openai.api-url:" + DEFAULT_OPENAI_URL + "}") String openAiUrl) {
+        this.apiUtils = apiUtils;
+        this.gson = gson;
         this.openAiApiKey = openAiApiKey;
+        this.openAiUrl = openAiUrl;
     }
 
     @Override
-    public OpenAiResult improveReview(String originalContent) {
-        if (!StringUtils.hasText(openAiApiKey)) {
-            throw new IllegalStateException("OpenAI API key is not configured");
-        }
-        if (!StringUtils.hasText(originalContent)) {
-            throw new IllegalArgumentException("Original review content must not be blank");
-        }
-
-        String prompt = buildPrompt(originalContent);
-        ChatMessage userMessage = new ChatMessage(ChatMessageRole.USER.value(), prompt);
-
-        ChatCompletionRequest request = ChatCompletionRequest.builder()
-                .model("gpt-4o")
-                .messages(List.of(userMessage))
-                .temperature(0.7)
-                .build();
-
-        try {
-            ChatCompletionResult response = openAiClient.createChatCompletion(request);
-            if (response == null || response.getChoices() == null || response.getChoices().isEmpty()) {
-                throw new IllegalStateException("OpenAI returned an empty response while improving review");
-            }
-
-            String improvedContent = response.getChoices().get(0).getMessage().getContent();
-            if (!StringUtils.hasText(improvedContent)) {
-                throw new IllegalStateException("OpenAI response did not contain improved content");
-            }
-
-            Usage usage = response.getUsage();
-            int promptTokens = usage != null && usage.getPromptTokens() != null ? usage.getPromptTokens() : 0;
-            int completionTokens = usage != null && usage.getCompletionTokens() != null ? usage.getCompletionTokens() : 0;
-
-            return new OpenAiResult(improvedContent.trim(), promptTokens, completionTokens);
-        } catch (Exception exception) {
-            log.error("Failed to call OpenAI Chat Completion API", exception);
-            throw new IllegalStateException("Failed to improve review with OpenAI", exception);
-        }
+    public Mono<OpenAiResponse> improveReview(String originalContent) {
+        return Mono.fromCallable(() -> executeImproveReview(originalContent));
     }
 
-    private String buildPrompt(String originalContent) {
-        return "You are an expert book review editor. Improve the following review by removing redundancies, "
-                + "enhancing coherence, and preserving the original meaning. Provide only the improved review text."
-                + "\n\nOriginal Review:\n" + originalContent + "\n\nImproved Review:";
+    private OpenAiResponse executeImproveReview(String originalContent) {
+        OpenAiRequest request = new OpenAiRequest(originalContent, openAiApiKey);
+        validateRequest(request);
+
+        String payload = buildChatCompletionPayload(request.prompt());
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(request.apiKey());
+
+        ExternalApiRequest apiRequest = new ExternalApiRequest(
+                HttpMethod.POST,
+                headers,
+                openAiUrl,
+                payload);
+
+        ParsedOpenAiResult parsedResult = callAndParse(apiRequest);
+        if (!"stop".equalsIgnoreCase(parsedResult.finishReason())) {
+            log.warn("OpenAI response finish_reason was '{}', retrying once", parsedResult.finishReason());
+            parsedResult = callAndParse(apiRequest);
+        }
+
+        return parsedResult.toResponse();
+    }
+
+    private ParsedOpenAiResult callAndParse(ExternalApiRequest apiRequest) {
+        ResponseEntity<String> responseEntity = apiUtils.callAPI(apiRequest);
+        if (responseEntity == null || !responseEntity.hasBody()) {
+            throw new IllegalStateException("OpenAI API response body was empty");
+        }
+        return parseResponse(responseEntity.getBody());
+    }
+
+    private void validateRequest(OpenAiRequest request) {
+        Assert.isTrue(StringUtils.hasText(request.apiKey()), "OpenAI API key is not configured");
+        Assert.isTrue(StringUtils.hasText(request.prompt()), "Original review content must not be blank");
+    }
+
+    private String buildChatCompletionPayload(String originalContent) {
+        JsonObject root = new JsonObject();
+        root.addProperty("model", "gpt-4o");
+        JsonArray messages = new JsonArray();
+
+        JsonObject systemMessage = new JsonObject();
+        systemMessage.addProperty("role", "system");
+        systemMessage.addProperty("content", "You are an assistant that improves user book reviews.");
+
+        JsonObject userMessage = new JsonObject();
+        userMessage.addProperty("role", "user");
+        userMessage.addProperty("content", originalContent);
+
+        messages.add(systemMessage);
+        messages.add(userMessage);
+        root.add("messages", messages);
+        root.addProperty("temperature", 0.7);
+
+        return gson.toJson(root);
+    }
+
+    private ParsedOpenAiResult parseResponse(String responseBody) {
+        JsonObject root = gson.fromJson(responseBody, JsonObject.class);
+        if (root == null) {
+            throw new IllegalStateException("Failed to parse OpenAI response body");
+        }
+
+        JsonArray choices = root.getAsJsonArray("choices");
+        if (choices == null || choices.isEmpty()) {
+            throw new IllegalStateException("OpenAI returned no choices");
+        }
+
+        JsonObject firstChoice = choices.get(0).getAsJsonObject();
+        JsonObject message = firstChoice.getAsJsonObject("message");
+        if (message == null || !message.has("content")) {
+            throw new IllegalStateException("OpenAI response did not include message content");
+        }
+
+        String improvedContent = message.get("content").getAsString();
+        String finishReason = firstChoice.has("finish_reason") ? firstChoice.get("finish_reason").getAsString() : "";
+
+        String model = root.has("model") ? root.get("model").getAsString() : "";
+        JsonObject usage = root.getAsJsonObject("usage");
+        int promptTokens = extractTokenCount(usage, "prompt_tokens");
+        int completionTokens = extractTokenCount(usage, "completion_tokens");
+
+        return new ParsedOpenAiResult(improvedContent.trim(), model, finishReason, promptTokens, completionTokens);
+    }
+
+    private int extractTokenCount(JsonObject usage, String field) {
+        if (usage == null) {
+            return 0;
+        }
+        JsonElement element = usage.get(field);
+        return element != null && element.isJsonPrimitive() ? element.getAsInt() : 0;
+    }
+
+    private record ParsedOpenAiResult(
+            String improvedContent,
+            String model,
+            String finishReason,
+            int inputTokens,
+            int outputTokens) {
+
+        OpenAiResponse toResponse() {
+            return new OpenAiResponse(improvedContent, model, inputTokens, outputTokens);
+        }
     }
 }
