@@ -40,6 +40,7 @@ repositories {
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-log4j2")
@@ -63,6 +64,8 @@ dependencies {
     implementation("io.github.cdimascio:java-dotenv:5.2.2")
     implementation("org.jsoup:jsoup:1.18.3")
     implementation("jakarta.validation:jakarta.validation-api:3.1.0")
+
+    implementation("com.openai:openai:0.18.2")
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.79")

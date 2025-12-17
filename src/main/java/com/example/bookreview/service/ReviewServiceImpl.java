@@ -1,9 +1,9 @@
 package com.example.bookreview.service;
 
 import com.example.bookreview.domain.Review;
+import com.example.bookreview.dto.OpenAiResult;
 import com.example.bookreview.dto.ReviewRequest;
 import com.example.bookreview.repository.ReviewRepository;
-import com.example.bookreview.service.model.AiReviewResult;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,30 +35,32 @@ public class ReviewServiceImpl implements ReviewService {
     return reviewRepository.findById(id);
   }
 
-  @Override
-  @Transactional
-  public Review createReview(ReviewRequest request) {
-    log.info("Starting review creation for title='{}'", request.title());
-    AiReviewResult aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
-    log.debug("AI review generated with tokenCount={} and usdCost={}", aiResult.tokenCount(), aiResult.usdCost());
-    BigDecimal krwCost = currencyService.convertUsdToKrw(aiResult.usdCost());
-    log.debug("Converted cost to KRW: {}", krwCost);
+    @Override
+    @Transactional
+    public Review createReview(ReviewRequest request) {
+        log.info("Starting review creation for title='{}'", request.title());
+        OpenAiResult aiResult = openAiService.improveReview(request.originalContent());
+        long tokenCount = (long) aiResult.getPromptTokens() + aiResult.getCompletionTokens();
+        BigDecimal usdCost = BigDecimal.ZERO;
+        log.debug("AI review generated with tokenCount={} and usdCost={}", tokenCount, usdCost);
+        BigDecimal krwCost = currencyService.convertUsdToKrw(usdCost);
+        log.debug("Converted cost to KRW: {}", krwCost);
 
-    String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
+    String markdown = buildMarkdown(request.title(), aiResult.getImprovedContent());
     String fileId = googleDriveService.uploadMarkdown(request.title() + ".md", markdown);
     log.info("Markdown uploaded to Google Drive with fileId={}", fileId);
 
-    Review review = new Review(
-        null,
-        request.title(),
-        request.originalContent(),
-        aiResult.improvedContent(),
-        aiResult.tokenCount(),
-        aiResult.usdCost(),
-        krwCost,
-        fileId,
-        LocalDateTime.now()
-    );
+        Review review = new Review(
+            null,
+            request.title(),
+            request.originalContent(),
+            aiResult.getImprovedContent(),
+            tokenCount,
+            usdCost,
+            krwCost,
+            fileId,
+            LocalDateTime.now()
+        );
 
     Review saved = reviewRepository.save(review);
     log.info("Review persisted with id={}", saved.id());

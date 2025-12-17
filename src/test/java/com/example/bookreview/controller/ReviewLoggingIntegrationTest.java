@@ -8,8 +8,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.bookreview.dto.OpenAiResult;
 import com.example.bookreview.domain.Review;
 import com.example.bookreview.repository.ReviewRepository;
+import com.example.bookreview.service.OpenAiService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,6 +38,9 @@ class ReviewLoggingIntegrationTest {
     @MockBean
     private ReviewRepository reviewRepository;
 
+    @MockBean
+    private OpenAiService openAiService;
+
     @Test
     void htmlFormFlow_logsKeyControllerAndServiceSteps(CapturedOutput output) throws Exception {
         Review saved = new Review(
@@ -53,6 +58,8 @@ class ReviewLoggingIntegrationTest {
         given(reviewRepository.findAll()).willReturn(List.of());
         given(reviewRepository.save(any())).willReturn(saved);
         given(reviewRepository.findById(saved.id())).willReturn(Optional.of(saved));
+        given(openAiService.improveReview("원본 내용"))
+                .willReturn(new OpenAiResult("개선된 독후감 예시", 2, 3));
 
         mockMvc.perform(get("/reviews").accept(MediaType.TEXT_HTML))
                 .andExpect(status().isOk());
@@ -78,8 +85,6 @@ class ReviewLoggingIntegrationTest {
                 .contains("Rendering review creation form")
                 .contains("Received HTML form submission for new review: title='리뷰테스트'")
                 .contains("Starting review creation for title='리뷰테스트'")
-                .contains("Generating improved review using OpenAI mock for title='리뷰테스트'")
-                .contains("Returning placeholder AI review result: AiReviewResult[improvedContent=개선된 독후감 예시, tokenCount=0, usdCost=0]")
                 .contains("Converting USD to KRW for amount=0")
                 .contains("Converted USD 0 to KRW 0 using static rate")
                 .contains("Converted cost to KRW: 0")

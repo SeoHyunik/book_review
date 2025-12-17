@@ -1,8 +1,8 @@
 package com.example.bookreview.service;
 
-import com.example.bookreview.service.model.AiReviewResult;
+import com.example.bookreview.dto.OpenAiResult;
 
 public interface OpenAiService {
 
-    AiReviewResult generateImprovedReview(String title, String originalContent);
+    OpenAiResult improveReview(String originalContent);
 }

@@ -31,3 +31,6 @@ spring:
     user:
       name: user
       password: pass123
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
