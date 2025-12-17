@@ -1,5 +1,6 @@
 package com.example.bookreview.service;
 
+import com.example.bookreview.dto.ExternalApiRequest;
 import com.example.bookreview.dto.OpenAiRequest;
 import com.example.bookreview.dto.OpenAiResponse;
 import com.google.gson.Gson;

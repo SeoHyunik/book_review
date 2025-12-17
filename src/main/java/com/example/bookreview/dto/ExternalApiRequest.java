@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.dto;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;

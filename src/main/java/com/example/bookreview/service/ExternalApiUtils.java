@@ -1,5 +1,6 @@
 package com.example.bookreview.service;
 
+import com.example.bookreview.dto.ExternalApiRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
