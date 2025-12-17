@@ -1,1 +1,13 @@
+pluginManagement {
+    repositories {
+        // 로컬에 미리 설치된 Spring Boot Gradle Plugin 우선 검색
+        mavenLocal()
+        // 표준 Gradle Plugin Portal 및 중앙 저장소 사용
+        gradlePluginPortal()
+        mavenCentral()
+        // Spring Boot Gradle 플러그인 해상도 보조
+        maven { url 'https://repo.spring.io/release' }
+    }
+}
+
 rootProject.name = 'book_review'
