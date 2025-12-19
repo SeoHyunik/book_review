@@ -102,8 +102,8 @@ async function loadReviewDetail() {
         document.getElementById('detail-title').textContent = review.title;
         document.getElementById('detail-created-at').textContent = review.createdAt;
         document.getElementById('detail-token').textContent = review.tokenCount;
-        document.getElementById('detail-usd').textContent = review.usdCost;
-        document.getElementById('detail-krw').textContent = review.krwCost;
+        document.getElementById('detail-usd').textContent = review.formattedUsdCost || review.usdCost;
+        document.getElementById('detail-krw').textContent = review.formattedKrwCost || review.krwCost;
         document.getElementById('detail-improved').textContent = review.improvedContent;
 
         const googleInfo = document.getElementById('detail-google');

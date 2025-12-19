@@ -7,7 +7,6 @@ import com.example.bookreview.repository.ReviewRepository;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -44,20 +43,19 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public Review createReview(ReviewRequest request) {
+        // NOTE: MongoDB multi-document transactions require a replica set. In single-node dev/test
+        // environments @Transactional will not enforce atomicity but still provides declarative intent.
         log.info("[SERVICE] Starting review creation for title='{}'", request.getTitle());
         validateTitleForUpload(request.getTitle());
 
-        AiReviewResult aiResult = openAiService.generateImprovedReview(request.getTitle(), request.getOriginalContent());
+        AiReviewResult aiResult = callOpenAi(request);
         long tokenCount = aiResult.totalTokens();
         BigDecimal usdCost = aiResult.usdCost();
-        log.debug("[SERVICE] AI review generated with tokenCount={} and usdCost={}", tokenCount, usdCost);
-        BigDecimal krwCost = currencyService.convertUsdToKrw(usdCost);
-        log.debug("[SERVICE] Converted cost to KRW: {}", krwCost);
+        BigDecimal krwCost = convertToKrw(usdCost);
 
         String markdown = buildMarkdown(request.getTitle(), aiResult.improvedContent());
         String filename = replaceExtension(slugify(request.getTitle()), ".md");
-        String fileId = googleDriveService.uploadMarkdown(filename, markdown);
-        log.info("[SERVICE] Markdown uploaded to Google Drive with fileId={}", fileId);
+        String fileId = uploadToDrive(filename, markdown);
 
         Review review = new Review(
                 null,
@@ -68,12 +66,62 @@ public class ReviewServiceImpl implements ReviewService {
                 usdCost,
                 krwCost,
                 fileId,
-                LocalDateTime.now()
+                null
         );
 
-        Review saved = reviewRepository.save(review);
-        log.info("[SERVICE] Review persisted with id={}", saved.id());
-        return saved;
+        try {
+            Review saved = reviewRepository.save(review);
+            log.info("[SERVICE] Review persisted with id={}", saved.id());
+            return saved;
+        } catch (RuntimeException ex) {
+            log.error("[SERVICE] Persisting review failed, initiating rollback for fileId={}", fileId, ex);
+            rollbackGoogleFile(fileId);
+            throw ex;
+        }
+    }
+
+    private AiReviewResult callOpenAi(ReviewRequest request) {
+        try {
+            AiReviewResult aiResult = openAiService.generateImprovedReview(request.getTitle(), request.getOriginalContent());
+            log.debug("[SERVICE] AI review generated with tokenCount={} and usdCost={}", aiResult.totalTokens(), aiResult.usdCost());
+            return aiResult;
+        } catch (Exception ex) {
+            log.error("[SERVICE] OpenAI content generation failed", ex);
+            throw new ReviewCreationException("OpenAI 호출에 실패했습니다. 잠시 후 다시 시도해주세요.", ex);
+        }
+    }
+
+    private BigDecimal convertToKrw(BigDecimal usdCost) {
+        try {
+            BigDecimal krwCost = currencyService.convertUsdToKrw(usdCost);
+            log.debug("[SERVICE] Converted cost to KRW: {}", krwCost);
+            return krwCost;
+        } catch (Exception ex) {
+            log.error("[SERVICE] Failed to convert USD cost to KRW", ex);
+            throw new ReviewCreationException("환율 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", ex);
+        }
+    }
+
+    private String uploadToDrive(String filename, String markdown) {
+        try {
+            String fileId = googleDriveService.uploadMarkdown(filename, markdown);
+            log.info("[SERVICE] Markdown uploaded to Google Drive with fileId={}", fileId);
+            return fileId;
+        } catch (Exception ex) {
+            log.error("[SERVICE] Google Drive upload failed", ex);
+            throw new ReviewCreationException("Google Drive 업로드에 실패했습니다.", ex);
+        }
+    }
+
+    private void rollbackGoogleFile(String fileId) {
+        if (fileId == null || fileId.isBlank()) {
+            return;
+        }
+        try {
+            googleDriveService.deleteFile(fileId);
+        } catch (Exception rollbackEx) {
+            log.warn("[SERVICE] Failed to rollback Google Drive file for id={}", fileId, rollbackEx);
+        }
     }
 
     private String buildMarkdown(String title, String improvedContent) {

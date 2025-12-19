@@ -34,6 +34,9 @@ class GoogleDriveServiceImplTest {
     private Drive.Files.Create create;
 
     @Mock
+    private Drive.Files.Delete delete;
+
+    @Mock
     private Drive.Files.Get get;
 
     @Mock
@@ -92,5 +95,16 @@ class GoogleDriveServiceImplTest {
 
         assertThatThrownBy(() -> googleDriveService.downloadFile("missing"))
                 .isInstanceOf(NoSuchFileException.class);
+    }
+
+    @Test
+    void deleteFile_silentlyLogsWhenFailed() throws Exception {
+        given(driveClientProvider.getDriveService()).willReturn(drive);
+        given(drive.files()).willReturn(files);
+        given(files.delete("file123")).willReturn(delete);
+
+        googleDriveService.deleteFile("file123");
+
+        verify(files).delete("file123");
     }
 }

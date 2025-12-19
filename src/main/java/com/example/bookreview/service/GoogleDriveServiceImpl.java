@@ -85,6 +85,18 @@ public class GoogleDriveServiceImpl implements GoogleDriveService {
         }
     }
 
+    @Override
+    public void deleteFile(String fileId) {
+        Assert.hasText(fileId, "File id must not be blank");
+        Drive drive = driveClientProvider.getDriveService();
+        log.info("[DRIVE] Rolling back Google Drive upload for fileId={}", fileId);
+        try {
+            drive.files().delete(fileId).execute();
+        } catch (IOException e) {
+            log.warn("[DRIVE] Failed to delete file {} during rollback", fileId, e);
+        }
+    }
+
     private String toSlug(String filename) {
         String baseName = filename.replaceAll("\\.md$", "");
         String sanitized = ALLOWED_CHARS.matcher(baseName.trim().replaceAll("\\s+", "-")).replaceAll("");

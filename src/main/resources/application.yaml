@@ -9,6 +9,10 @@ spring:
     mongodb:
       uri: mongodb://localhost:27017/book_review
 
+  mongodb:
+    transactions:
+      enabled: true # Replica set required in production for this to take effect
+
   # ✅ thymeleaf 수정 반영(캐시 OFF)
   thymeleaf:
     cache: false
