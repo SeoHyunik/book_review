@@ -72,7 +72,7 @@ public class ReviewController {
 
     @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
     public String create(@Valid @ModelAttribute("reviewRequest") ReviewRequest reviewRequest, BindingResult bindingResult) {
-        log.info("[MVC] Received HTML form submission for new review: title='{}'", reviewRequest.title());
+        log.info("[MVC] Received HTML form submission for new review: title='{}'", reviewRequest.getTitle());
         if (bindingResult.hasErrors()) {
             log.warn("[MVC] Validation errors while creating review via form: {}", bindingResult.getAllErrors());
             return "reviews/form";
@@ -86,7 +86,7 @@ public class ReviewController {
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<Review> createJson(@Valid @RequestBody ReviewRequest reviewRequest) {
-        log.info("[MVC] Received JSON request to create review: title='{}'", reviewRequest.title());
+        log.info("[MVC] Received JSON request to create review: title='{}'", reviewRequest.getTitle());
         Review review = reviewService.createReview(reviewRequest);
         log.info("[MVC] Review created successfully via API with id={}", review.id());
         return ResponseEntity.created(URI.create("/reviews/" + review.id())).body(review);
