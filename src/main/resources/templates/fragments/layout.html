@@ -7,22 +7,22 @@
     <script th:src="@{/js/reviews.js}" defer></script>
 </head>
 <body>
-<header>
-    <h1><a th:href="@{/reviews}">📚 Book Review</a></h1>
-    <nav>
-        <a th:href="@{/reviews}">목록</a>
-        <a th:href="@{/reviews/new}">새 리뷰</a>
-    </nav>
-    <hr/>
-</header>
-
 <div class="container" th:fragment="layout(content)">
-    <div th:replace="${content}"></div>
-</div>
+    <header>
+        <h1><a th:href="@{/reviews}">📚 Book Review</a></h1>
+        <nav>
+            <a th:href="@{/reviews}">목록</a>
+            <a th:href="@{/reviews/new}">새 리뷰</a>
+        </nav>
+        <hr/>
+    </header>
 
-<footer>
-    <hr/>
-    <p>AI 기반 독후감 관리 서비스</p>
-</footer>
+    <main th:replace="${content}"></main>
+
+    <footer>
+        <hr/>
+        <p>AI 기반 독후감 관리 서비스</p>
+    </footer>
+</div>
 </body>
 </html>

@@ -1,7 +1,4 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{fragments/layout :: layout(~{::section})}">
-<section>
+<section xmlns:th="http://www.thymeleaf.org" th:fragment="content">
     <div id="review-detail" th:attr="data-review-id=${review != null ? review.id : ''}">
         <p id="detail-message" hidden></p>
         <div id="detail-content" hidden>
@@ -16,4 +13,5 @@
         </div>
     </div>
 </section>
-</html>
+
+<div xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::content})}"></div>

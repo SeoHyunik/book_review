@@ -1,7 +1,4 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{fragments/layout :: layout(~{::section})}">
-<section>
+<section xmlns:th="http://www.thymeleaf.org" th:fragment="content">
     <h2>새 리뷰 작성</h2>
     <p id="form-message" hidden></p>
     <form id="review-form" th:action="@{/reviews}" th:object="${reviewRequest}" method="post">
@@ -20,4 +17,5 @@
         </div>
     </form>
 </section>
-</html>
+
+<div xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::content})}"></div>
