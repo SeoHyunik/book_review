@@ -1,7 +1,7 @@
 package com.example.bookreview.service;
 
+import com.example.bookreview.dto.AiReviewResult;
 import com.example.bookreview.dto.ExternalApiRequest;
-import com.example.bookreview.dto.OpenAiRequest;
 import com.example.bookreview.dto.OpenAiResponse;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -25,27 +25,54 @@ import reactor.core.publisher.Mono;
 public class OpenAiServiceImpl implements OpenAiService {
 
     private static final String DEFAULT_OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String DEFAULT_MODEL = "gpt-4o";
     private final ExternalApiUtils apiUtils;
     private final Gson gson;
+    private final TokenCostCalculator tokenCostCalculator;
     @Value("${openai.api-key:}")
-    private final String openAiApiKey;
+    private String openAiApiKey;
     @Value("${openai.api-url:" + DEFAULT_OPENAI_URL + "}")
-    private final String openAiUrl;
+    private String openAiUrl;
+    @Value("${openai.model:" + DEFAULT_MODEL + "}")
+    private String openAiModel;
+
+    @Override
+    public AiReviewResult generateImprovedReview(String title, String originalContent) {
+        log.info("[OPENAI] Received request to improve review content for title='{}'", title);
+        try {
+            ParsedOpenAiResult parsedResult = executeImproveReview(title, originalContent);
+            TokenCostCalculator.CostResult costResult = tokenCostCalculator.calculate(
+                    parsedResult.model(), parsedResult.inputTokens(), parsedResult.outputTokens());
+            return new AiReviewResult(
+                    parsedResult.improvedContent(),
+                    parsedResult.model(),
+                    parsedResult.inputTokens(),
+                    parsedResult.outputTokens(),
+                    costResult.totalTokens(),
+                    costResult.usdCost());
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("[OPENAI] Failed to generate improved review", e);
+            throw new RuntimeException("OpenAI API 호출 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
+    }
 
     @Override
     public Mono<OpenAiResponse> improveReview(String originalContent) {
-        log.info("[OPENAI] Received request to improve review content");
-        return Mono.fromCallable(() -> executeImproveReview(originalContent));
+        return Mono.fromCallable(() -> {
+            AiReviewResult result = generateImprovedReview("Untitled", originalContent);
+            return new OpenAiResponse(result.improvedContent(), result.model(), result.promptTokens(), result.completionTokens());
+        });
     }
 
-    private OpenAiResponse executeImproveReview(String originalContent) {
-        OpenAiRequest request = new OpenAiRequest(originalContent, openAiApiKey);
-        validateRequest(request);
+    private ParsedOpenAiResult executeImproveReview(String title, String originalContent) {
+        validateRequest(title, originalContent);
 
-        String payload = buildChatCompletionPayload(request.prompt());
+        String payload = buildChatCompletionPayload(title, originalContent);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(request.apiKey());
+        headers.setBearerAuth(openAiApiKey);
 
         ExternalApiRequest apiRequest = new ExternalApiRequest(
                 HttpMethod.POST,
@@ -59,7 +86,7 @@ public class OpenAiServiceImpl implements OpenAiService {
             parsedResult = callAndParse(apiRequest);
         }
 
-        return parsedResult.toResponse();
+        return parsedResult;
     }
 
     private ParsedOpenAiResult callAndParse(ExternalApiRequest apiRequest) {
@@ -72,23 +99,24 @@ public class OpenAiServiceImpl implements OpenAiService {
         return parseResponse(responseEntity.getBody());
     }
 
-    private void validateRequest(OpenAiRequest request) {
-        Assert.isTrue(StringUtils.hasText(request.apiKey()), "OpenAI API key is not configured");
-        Assert.isTrue(StringUtils.hasText(request.prompt()), "Original review content must not be blank");
+    private void validateRequest(String title, String originalContent) {
+        Assert.isTrue(StringUtils.hasText(openAiApiKey), "OpenAI API key is not configured");
+        Assert.isTrue(StringUtils.hasText(title), "Review title must not be blank");
+        Assert.isTrue(StringUtils.hasText(originalContent), "Original review content must not be blank");
     }
 
-    private String buildChatCompletionPayload(String originalContent) {
+    private String buildChatCompletionPayload(String title, String originalContent) {
         JsonObject root = new JsonObject();
-        root.addProperty("model", "gpt-4o");
+        root.addProperty("model", openAiModel);
         JsonArray messages = new JsonArray();
 
         JsonObject systemMessage = new JsonObject();
         systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", "You are an assistant that improves user book reviews.");
+        systemMessage.addProperty("content", "주어진 독후감을 더 매끄럽고 풍부한 문장으로 개선해 달라. 600~800자 분량으로 유지하고, 친근하고 설득력 있게 작성하며 결과는 마크다운이 아닌 순수 텍스트로 반환해 달라.");
 
         JsonObject userMessage = new JsonObject();
         userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", originalContent);
+        userMessage.addProperty("content", "제목: " + title + "\n원문: " + originalContent);
 
         messages.add(systemMessage);
         messages.add(userMessage);

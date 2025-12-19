@@ -2,7 +2,7 @@ package com.example.bookreview.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.bookreview.dto.OpenAiResponse;
+import com.example.bookreview.dto.AiReviewResult;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -22,7 +22,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
-        classes = {OpenAiServiceImpl.class, ExternalApiUtils.class, OpenAiServiceImplTest.TestConfig.class})
+        classes = {OpenAiServiceImpl.class, ExternalApiUtils.class, TokenCostCalculator.class, OpenAiServiceImplTest.TestConfig.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OpenAiServiceImplTest {
 
@@ -52,7 +52,7 @@ class OpenAiServiceImplTest {
     }
 
     @Test
-    void improveReviewParsesResponse() throws Exception {
+    void generateImprovedReviewParsesResponse() throws Exception {
         String firstResponse = """
                 {"id":"chatcmpl-1","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Partial"},"finish_reason":"length"}],"usage":{"prompt_tokens":11,"completion_tokens":7}}
                 """;
@@ -63,13 +63,13 @@ class OpenAiServiceImplTest {
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(firstResponse));
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(secondResponse));
 
-        OpenAiResponse response = openAiService.improveReview("Original review content").block();
+        AiReviewResult response = openAiService.generateImprovedReview("Title", "Original review content");
 
         assertThat(response).isNotNull();
         assertThat(response.improvedContent()).isEqualTo("Improved review text");
         assertThat(response.model()).isEqualTo("gpt-4o");
-        assertThat(response.inputTokens()).isEqualTo(13);
-        assertThat(response.outputTokens()).isEqualTo(9);
+        assertThat(response.promptTokens()).isEqualTo(13);
+        assertThat(response.completionTokens()).isEqualTo(9);
 
         RecordedRequest firstRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
         RecordedRequest secondRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
