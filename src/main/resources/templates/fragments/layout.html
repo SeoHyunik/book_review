@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:fragment="layout(content)">
 <head>
     <meta charset="UTF-8">
     <title th:text="${pageTitle} ?: 'Book Review'"></title>
@@ -7,7 +8,7 @@
     <script th:src="@{/js/reviews.js}" defer></script>
 </head>
 <body>
-<div class="container" th:fragment="layout(content)">
+<div class="container">
     <header>
         <h1><a th:href="@{/reviews}">📚 Book Review</a></h1>
         <nav>

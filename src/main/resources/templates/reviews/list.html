@@ -1,23 +1,25 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org"
-      th:replace="~{fragments/layout :: layout(~{::section})}">
-<section>
-    <h2>리뷰 목록</h2>
+<html xmlns:th="http://www.thymeleaf.org">
+<th:block th:fragment="content">
+    <section>
+        <h2>리뷰 목록</h2>
 
-    <p id="list-message" hidden>등록된 리뷰가 없습니다.</p>
+        <p id="list-message" hidden>등록된 리뷰가 없습니다.</p>
 
-    <table id="review-table" border="1" cellpadding="8" cellspacing="0" hidden>
-        <thead>
-        <tr>
-            <th>제목</th>
-            <th>작성 시각</th>
-            <th>OpenAI 토큰</th>
-        </tr>
-        </thead>
-        <tbody id="review-table-body">
-        </tbody>
-    </table>
+        <table id="review-table" border="1" cellpadding="8" cellspacing="0" hidden>
+            <thead>
+            <tr>
+                <th>제목</th>
+                <th>작성 시각</th>
+                <th>OpenAI 토큰</th>
+            </tr>
+            </thead>
+            <tbody id="review-table-body">
+            </tbody>
+        </table>
 
-    <p><a th:href="@{/reviews/new}">새 리뷰 작성</a></p>
-</section>
+        <p><a th:href="@{/reviews/new}">새 리뷰 작성</a></p>
+    </section>
+</th:block>
+<th:block th:replace="~{fragments/layout :: layout(~{::content})}"></th:block>
 </html>

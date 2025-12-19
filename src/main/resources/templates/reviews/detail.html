@@ -1,17 +1,21 @@
-<section xmlns:th="http://www.thymeleaf.org" th:fragment="content">
-    <div id="review-detail" th:attr="data-review-id=${review != null ? review.id : ''}">
-        <p id="detail-message" hidden></p>
-        <div id="detail-content" hidden>
-            <h2 id="detail-title"></h2>
-            <p><strong>생성 시각:</strong> <span id="detail-created-at"></span></p>
-            <p><strong>OpenAI 토큰:</strong> <span id="detail-token"></span></p>
-            <p><strong>USD 비용:</strong> <span id="detail-usd"></span></p>
-            <p><strong>KRW 비용:</strong> <span id="detail-krw"></span></p>
-            <h3>개선된 독후감</h3>
-            <pre id="detail-improved"></pre>
-            <p id="detail-google" hidden><strong>Google Drive ID:</strong> <span id="detail-google-id"></span></p>
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<th:block th:fragment="content">
+    <section>
+        <div id="review-detail" th:attr="data-review-id=${review != null ? review.id : ''}">
+            <p id="detail-message" hidden></p>
+            <div id="detail-content" hidden>
+                <h2 id="detail-title"></h2>
+                <p><strong>생성 시각:</strong> <span id="detail-created-at"></span></p>
+                <p><strong>OpenAI 토큰:</strong> <span id="detail-token"></span></p>
+                <p><strong>USD 비용:</strong> <span id="detail-usd"></span></p>
+                <p><strong>KRW 비용:</strong> <span id="detail-krw"></span></p>
+                <h3>개선된 독후감</h3>
+                <pre id="detail-improved"></pre>
+                <p id="detail-google" hidden><strong>Google Drive ID:</strong> <span id="detail-google-id"></span></p>
+            </div>
         </div>
-    </div>
-</section>
-
-<div xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::content})}"></div>
+    </section>
+</th:block>
+<th:block th:replace="~{fragments/layout :: layout(~{::content})}"></th:block>
+</html>
