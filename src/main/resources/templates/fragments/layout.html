@@ -1,27 +1,40 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <title th:text="${pageTitle} ?: 'Book Review'"></title>
     <link rel="stylesheet" th:href="@{/css/styles.css}"/>
+    <script th:src="@{/js/reviews.js}" defer></script>
 </head>
 <body>
-<header>
-    <h1><a th:href="@{/reviews}">📚 Book Review</a></h1>
-    <nav>
-        <a th:href="@{/reviews}">목록</a>
-        <a th:href="@{/reviews/new}">새 리뷰</a>
-    </nav>
-    <hr/>
-</header>
-
 <div class="container" th:fragment="layout(content)">
-    <div th:replace="${content}"></div>
-</div>
+    <header>
+        <h1><a th:href="@{/reviews}">📚 Book Review</a></h1>
+        <nav>
+            <a th:href="@{/reviews}">목록</a>
+            <sec:authorize access="isAuthenticated()">
+                <a th:href="@{/reviews/new}">새 리뷰</a>
+            </sec:authorize>
+            <sec:authorize access="!isAuthenticated()">
+                <a th:href="@{/login}">로그인</a>
+            </sec:authorize>
+            <sec:authorize access="isAuthenticated()">
+                <span class="welcome">안녕하세요, <span sec:authentication="name"></span> 님</span>
+                <form th:action="@{/logout}" method="post" class="logout-form">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button type="submit">로그아웃</button>
+                </form>
+            </sec:authorize>
+        </nav>
+        <hr/>
+    </header>
 
-<footer>
-    <hr/>
-    <p>AI 기반 독후감 관리 서비스</p>
-</footer>
+    <main th:replace="${content}"></main>
+
+    <footer>
+        <hr/>
+        <p>AI 기반 독후감 관리 서비스</p>
+    </footer>
+</div>
 </body>
 </html>

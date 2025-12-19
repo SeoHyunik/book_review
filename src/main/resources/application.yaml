@@ -9,6 +9,10 @@ spring:
     mongodb:
       uri: mongodb://localhost:27017/book_review
 
+  mongodb:
+    transactions:
+      enabled: true # Replica set required in production for this to take effect
+
   # ✅ thymeleaf 수정 반영(캐시 OFF)
   thymeleaf:
     cache: false
@@ -31,3 +35,17 @@ spring:
     user:
       name: user
       password: pass123
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: ${OPENAI_MODEL:gpt-4o}
+
+exchange-rate:
+  api-key: ${EXCHANGE_RATE_API_KEY:}
+  api-url: ${EXCHANGE_RATE_API_URL:https://v6.exchangerate-api.com/v6/%s/latest/USD}
+
+google:
+  drive:
+    credentials-path: ${GOOGLE_CREDENTIALS_PATH:}
+    tokens-directory: ${GOOGLE_TOKENS_DIR:tokens}
+    parent-folder-id: ${GOOGLE_DRIVE_PARENT_ID:}
