@@ -32,7 +32,6 @@ public class ReviewController {
     @GetMapping(produces = MediaType.TEXT_HTML_VALUE)
     public String list(Model model) {
         log.info("[MVC] Rendering review list page");
-        model.addAttribute("reviews", reviewService.getReviews());
         model.addAttribute("pageTitle", "리뷰 목록");
         return "reviews/list";
     }

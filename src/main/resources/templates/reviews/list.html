@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content">
     <section>
         <h2>리뷰 목록</h2>
@@ -14,12 +15,10 @@
                 <th>OpenAI 토큰</th>
             </tr>
             </thead>
-            <tbody id="review-table-body">
-            </tbody>
+            <tbody id="review-table-body"></tbody>
         </table>
 
         <p><a th:href="@{/reviews/new}">새 리뷰 작성</a></p>
     </section>
 </th:block>
-<th:block th:replace="~{fragments/layout :: layout(~{::content})}"></th:block>
 </html>
