@@ -69,8 +69,7 @@ public class ReviewController {
         return "reviews/form";
     }
 
-    @PostMapping(consumes = {MediaType.APPLICATION_FORM_URLENCODED_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE},
-            produces = MediaType.TEXT_HTML_VALUE)
+    @PostMapping(consumes = {MediaType.APPLICATION_FORM_URLENCODED_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
     public String create(@Valid @ModelAttribute("reviewRequest") ReviewRequest reviewRequest, BindingResult bindingResult,
                          Model model) {
         log.info("[MVC] Received HTML form submission for new review: title='{}'", reviewRequest.getTitle());
