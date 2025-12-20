@@ -69,11 +69,14 @@ public class ReviewController {
         return "reviews/form";
     }
 
-    @PostMapping(consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces = MediaType.TEXT_HTML_VALUE)
-    public String create(@Valid @ModelAttribute("reviewRequest") ReviewRequest reviewRequest, BindingResult bindingResult) {
+    @PostMapping(consumes = {MediaType.APPLICATION_FORM_URLENCODED_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE},
+            produces = MediaType.TEXT_HTML_VALUE)
+    public String create(@Valid @ModelAttribute("reviewRequest") ReviewRequest reviewRequest, BindingResult bindingResult,
+                         Model model) {
         log.info("[MVC] Received HTML form submission for new review: title='{}'", reviewRequest.getTitle());
         if (bindingResult.hasErrors()) {
             log.warn("[MVC] Validation errors while creating review via form: {}", bindingResult.getAllErrors());
+            model.addAttribute("pageTitle", "새 리뷰 작성");
             return "reviews/form";
         }
 
