@@ -60,7 +60,7 @@ async function loadReviewList() {
             titleCell.appendChild(link);
 
             const createdAtCell = document.createElement('td');
-            createdAtCell.textContent = review.createdAt;
+            createdAtCell.textContent = review.formattedCreatedAt || review.createdAt;
 
             const tokenCell = document.createElement('td');
             tokenCell.textContent = review.tokenCount;
@@ -100,7 +100,7 @@ async function loadReviewDetail() {
         message.hidden = true;
 
         document.getElementById('detail-title').textContent = review.title;
-        document.getElementById('detail-created-at').textContent = review.createdAt;
+        document.getElementById('detail-created-at').textContent = review.formattedCreatedAt || review.createdAt;
         document.getElementById('detail-token').textContent = review.tokenCount;
         document.getElementById('detail-usd').textContent = review.formattedUsdCost || review.usdCost;
         document.getElementById('detail-krw').textContent = review.formattedKrwCost || review.krwCost;

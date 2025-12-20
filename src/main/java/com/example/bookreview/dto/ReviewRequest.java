@@ -12,7 +12,7 @@ import lombok.Setter;
 @NoArgsConstructor
 public class ReviewRequest {
 
-    private static final String TITLE_FORBIDDEN_CHARS = "[^\\\\/:*?\"<>|#%]+";
+    private static final String TITLE_FORBIDDEN_CHARS = "^[^\\\\/:*?\"<>|#%]+$";
 
     @NotBlank(message = "{review.title.notBlank}")
     @Size(max = 100, message = "{review.title.size}")

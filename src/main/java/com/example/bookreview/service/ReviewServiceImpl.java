@@ -5,8 +5,6 @@ import com.example.bookreview.dto.AiReviewResult;
 import com.example.bookreview.dto.ReviewRequest;
 import com.example.bookreview.repository.ReviewRepository;
 import java.math.BigDecimal;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -21,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReviewServiceImpl implements ReviewService {
 
     private static final Pattern INVALID_FILE_CHARS = Pattern.compile("[\\\\/:*?\"<>|#%]");
-    private static final int MAX_FILENAME_BYTES = 255;
-
     private final ReviewRepository reviewRepository;
     private final OpenAiService openAiService;
     private final CurrencyService currencyService;
@@ -54,8 +50,7 @@ public class ReviewServiceImpl implements ReviewService {
         BigDecimal krwCost = convertToKrw(usdCost);
 
         String markdown = buildMarkdown(request.getTitle(), aiResult.improvedContent());
-        String filename = replaceExtension(slugify(request.getTitle()), ".md");
-        String fileId = uploadToDrive(filename, markdown);
+        String fileId = uploadToDrive(request.getTitle(), markdown);
 
         Review review = new Review(
                 null,
@@ -134,30 +129,4 @@ public class ReviewServiceImpl implements ReviewService {
         }
     }
 
-    private String slugify(String input) {
-        String normalized = Optional.ofNullable(input).orElse("").trim();
-        String withHyphens = normalized.replaceAll("\\s+", "-");
-        String encoded = URLEncoder.encode(withHyphens, StandardCharsets.UTF_8).replace("+", "-");
-        String safeEncoded = truncateEncoded(encoded);
-        return safeEncoded;
-    }
-
-    private String truncateEncoded(String encoded) {
-        if (encoded.length() <= MAX_FILENAME_BYTES) {
-            return encoded;
-        }
-        String truncated = encoded.substring(0, MAX_FILENAME_BYTES);
-        int percentIndex = truncated.lastIndexOf('%');
-        if (percentIndex != -1 && MAX_FILENAME_BYTES - percentIndex < 3) {
-            truncated = truncated.substring(0, percentIndex);
-        }
-        return truncated;
-    }
-
-    private String replaceExtension(String filename, String newExtension) {
-        String normalizedExtension = newExtension.startsWith(".") ? newExtension : "." + newExtension;
-        int lastDot = filename.lastIndexOf('.');
-        String basename = lastDot > 0 ? filename.substring(0, lastDot) : filename;
-        return basename + normalizedExtension;
-    }
 }
