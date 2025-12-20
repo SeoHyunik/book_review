@@ -40,7 +40,6 @@ public class SecurityConfig {
                         .loginPage("/login")
                         .defaultSuccessUrl("/reviews", true)
                         .permitAll())
-                .oauth2Login(oauth2 -> oauth2.loginPage("/login"))
                 .logout(logout -> logout.logoutSuccessUrl("/reviews"))
                 .exceptionHandling(exceptions -> exceptions.accessDeniedPage("/access-denied"));
         SecurityFilterChain chain = http.build();
