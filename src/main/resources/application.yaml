@@ -36,6 +36,10 @@ spring:
       name: user
       password: pass123
 
+  mvc:
+    problemdetails:
+      enabled: true
+
 openai:
   api-key: ${OPENAI_API_KEY:}
   model: ${OPENAI_MODEL:gpt-4o}
@@ -49,3 +53,7 @@ google:
     credentials-path: ${GOOGLE_CREDENTIALS_PATH:}
     tokens-directory: ${GOOGLE_TOKENS_DIR:tokens}
     parent-folder-id: ${GOOGLE_DRIVE_PARENT_ID:}
+
+logging:
+  pattern:
+    level: "[%X{loguuid}] %5p"
