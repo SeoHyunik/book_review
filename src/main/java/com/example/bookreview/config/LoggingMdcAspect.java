@@ -12,7 +12,7 @@ public class LoggingMdcAspect {
 
     @Around("@within(org.springframework.stereotype.Controller) || @within(org.springframework.web.bind.annotation.RestController)")
     public Object aroundController(ProceedingJoinPoint joinPoint) throws Throwable {
-        return withLayer("CONTROLLER", joinPoint);
+        return withLayer("MVC", joinPoint);
     }
 
     @Around("@within(org.springframework.stereotype.Service)")

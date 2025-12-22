@@ -4,18 +4,15 @@
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout
-              pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %c{1.}%notEmpty{ [%X{loguuid}]}%notEmpty{ [%X{layer}]}%notEmpty{ [trace_id=%X{trace_id}]}%notEmpty{ [span_id=%X{span_id}]} - %msg%n"/>
+                pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%level] %c{1}%notEmpty{ [%X{loguuid}]}%notEmpty{ [%X{layer}]}%notEmpty{ [trace_id=%X{trace_id}]}%notEmpty{ [span_id=%X{span_id}]} - %msg%n"/>
         </Console>
     </Appenders>
-
     <Loggers>
-
         <!-- 내 애플리케이션 -->
         <Logger name="com.example.bookreview" level="debug" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-
-        <!-- ✅ Spring Boot / Spring 잡로그 (네 로그에 실제로 찍힘) -->
+        <!--  Spring Boot / Spring 잡로그 (네 로그에 실제로 찍힘) -->
         <Logger name="org.springframework.boot.web.embedded.tomcat" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
@@ -28,18 +25,15 @@
         <Logger name="org.springframework.security" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-
-        <!-- ✅ Hibernate Validator 버전 로그 -->
+        <!--  Hibernate Validator 버전 로그 -->
         <Logger name="org.hibernate.validator" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-
-        <!-- ✅ DevTools LiveReload -->
+        <!--  DevTools LiveReload -->
         <Logger name="org.springframework.boot.devtools" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-
-        <!-- ✅ Tomcat / Catalina / Coyote (네 로그에 실제로 찍힘) -->
+        <!--  Tomcat / Catalina / Coyote (네 로그에 실제로 찍힘) -->
         <Logger name="org.apache.catalina" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
@@ -49,13 +43,11 @@
         <Logger name="org.apache.tomcat" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-
-        <!-- ✅ “대괄호 로거”는 정확히 찍어서 차단 (핵심) -->
+        <!--  “대괄호 로거”는 정확히 찍어서 차단 (핵심) -->
         <Logger name="org.apache.catalina.core.ContainerBase.[Tomcat].[localhost].[/]" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-
-        <!-- ✅ (혹시 class-name logger로 찍히는 케이스까지) -->
+        <!--  (혹시 class-name logger로 찍히는 케이스까지) -->
         <Logger name="org.apache.coyote.http11.Http11NioProtocol" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
@@ -65,17 +57,13 @@
         <Logger name="org.apache.catalina.core.StandardEngine" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-
-        <!-- ✅ Mongo 드라이버 -->
+        <!--  Mongo 드라이버 -->
         <Logger name="org.mongodb.driver" level="warn" additivity="false">
             <AppenderRef ref="Console"/>
         </Logger>
-
         <!-- Root -->
         <Root level="info">
             <AppenderRef ref="Console"/>
         </Root>
-
     </Loggers>
-
 </Configuration>
