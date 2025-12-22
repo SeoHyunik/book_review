@@ -13,17 +13,17 @@ spring:
     transactions:
       enabled: true # Replica set required in production for this to take effect
 
-  # ✅ thymeleaf 수정 반영(캐시 OFF)
+  # thymeleaf 수정 반영(캐시 OFF)
   thymeleaf:
     cache: false
 
-  # ✅ 정적 리소스(css/js 등)도 캐시 최소화(개발용)
+  # 정적 리소스(css/js 등)도 캐시 최소화(개발용)
   web:
     resources:
       cache:
         period: 0
 
-  # ✅ devtools(이미 적용되어 있다면 유지)
+  # devtools(이미 적용되어 있다면 유지)
   devtools:
     restart:
       additional-paths: src/main/resources
@@ -55,5 +55,5 @@ google:
     parent-folder-id: ${GOOGLE_DRIVE_PARENT_ID:}
 
 logging:
-  pattern:
-    level: "[%X{loguuid}] %5p"
+  # Spring Boot가 사용할 로깅 설정 파일을 명시적으로 고정 (log4j2-spring.xml 강제)
+  config: classpath:log4j2-spring.xml
