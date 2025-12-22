@@ -3,7 +3,7 @@
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout
-                pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %c{1.} [loguuid=%X{loguuid}] [layer=%X{layer}] [trace_id=%X{trace_id}] [span_id=%X{span_id}] - %msg%n"/>
+              pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %c{1.}%notEmpty{ [%X{loguuid}]}%notEmpty{ [%X{layer}]}%notEmpty{ [trace_id=%X{trace_id}]}%notEmpty{ [span_id=%X{span_id}]} - %msg%n"/>
         </Console>
     </Appenders>
     <Loggers>
