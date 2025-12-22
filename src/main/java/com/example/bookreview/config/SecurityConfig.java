@@ -28,32 +28,32 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         log.info("Configuring SecurityFilterChain with authentication, CSRF protection, and role-based access control");
         http
-                .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        PathPatternRequestMatcher.withDefaults().matcher("/api/**")
-                ))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/login", "/error", "/access-denied").permitAll()
-                        .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/reviews/**").permitAll()
-                        .requestMatchers("/api/**").authenticated()
-                        .requestMatchers("/reviews/new").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/reviews").permitAll()
-                        .requestMatchers(HttpMethod.PUT, "/reviews/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/reviews/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/reviews/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
-                .formLogin(form -> form
-                        .loginPage("/login")
-                        .defaultSuccessUrl("/reviews", true)
-                        .permitAll())
-                .logout(logout -> logout.logoutSuccessUrl("/reviews"))
-                .exceptionHandling(exceptions -> exceptions.accessDeniedHandler(customAccessDeniedHandler()));
+            .csrf(csrf -> csrf.ignoringRequestMatchers(
+                PathPatternRequestMatcher.withDefaults().matcher("/api/**")
+            ))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/", "/login", "/error", "/access-denied").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/reviews/**").permitAll()
+                .requestMatchers("/api/**").authenticated()
+                .requestMatchers("/reviews/new").permitAll()
+                .requestMatchers(HttpMethod.POST, "/reviews").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/reviews/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/reviews/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/reviews/**").hasRole("ADMIN")
+                .anyRequest().authenticated())
+            .formLogin(form -> form
+                .loginPage("/login")
+                .defaultSuccessUrl("/reviews", true)
+                .permitAll())
+            .logout(logout -> logout.logoutSuccessUrl("/reviews"))
+            .exceptionHandling(exceptions -> exceptions.accessDeniedHandler(customAccessDeniedHandler()));
         SecurityFilterChain chain = http.build();
         log.debug("SecurityFilterChain initialized: {}", chain);
         return chain;
     }
 
-    @Bean
+    @Bean(name = "customAccessDeniedHandlerBean")
     public AccessDeniedHandler customAccessDeniedHandler() {
         return new CustomAccessDeniedHandler();
     }
@@ -61,14 +61,14 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
         UserDetails user = User.withUsername("user")
-                .password(passwordEncoder.encode("password"))
-                .roles("USER")
-                .build();
+            .password(passwordEncoder.encode("password"))
+            .roles("USER")
+            .build();
 
         UserDetails admin = User.withUsername("admin")
-                .password(passwordEncoder.encode("password"))
-                .roles("USER", "ADMIN")
-                .build();
+            .password(passwordEncoder.encode("password"))
+            .roles("USER", "ADMIN")
+            .build();
 
         return new InMemoryUserDetailsManager(user, admin);
     }
