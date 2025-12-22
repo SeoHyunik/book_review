@@ -1,7 +1,7 @@
 package com.example.bookreview.service;
 
-import com.example.bookreview.dto.AiReviewResult;
-import com.example.bookreview.dto.OpenAiResponse;
+import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.dto.response.OpenAiResponse;
 import reactor.core.publisher.Mono;
 
 public interface OpenAiService {

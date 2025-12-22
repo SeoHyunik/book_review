@@ -7,8 +7,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.bookreview.domain.Review;
-import com.example.bookreview.dto.AiReviewResult;
-import com.example.bookreview.dto.ReviewRequest;
+import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.repository.ReviewRepository;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;

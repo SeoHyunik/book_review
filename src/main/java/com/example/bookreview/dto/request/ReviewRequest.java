@@ -1,4 +1,4 @@
-package com.example.bookreview.dto;
+package com.example.bookreview.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

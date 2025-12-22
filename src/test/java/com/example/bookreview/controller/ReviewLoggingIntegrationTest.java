@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.bookreview.domain.Review;
-import com.example.bookreview.dto.AiReviewResult;
+import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.repository.ReviewRepository;
 import com.example.bookreview.service.OpenAiService;
 import com.example.bookreview.service.GoogleDriveService;

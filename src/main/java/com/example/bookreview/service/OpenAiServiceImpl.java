@@ -1,8 +1,9 @@
 package com.example.bookreview.service;
 
-import com.example.bookreview.dto.AiReviewResult;
-import com.example.bookreview.dto.ExternalApiRequest;
-import com.example.bookreview.dto.OpenAiResponse;
+import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.dto.internal.CostResult;
+import com.example.bookreview.dto.internal.ExternalApiRequest;
+import com.example.bookreview.dto.response.OpenAiResponse;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -41,7 +42,7 @@ public class OpenAiServiceImpl implements OpenAiService {
         log.info("[OPENAI] Received request to improve review content for title='{}'", title);
         try {
             ParsedOpenAiResult parsedResult = executeImproveReview(title, originalContent);
-            TokenCostCalculator.CostResult costResult = tokenCostCalculator.calculate(
+            CostResult costResult = tokenCostCalculator.calculate(
                     parsedResult.model(), parsedResult.inputTokens(), parsedResult.outputTokens());
             return new AiReviewResult(
                     parsedResult.improvedContent(),
