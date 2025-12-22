@@ -2,7 +2,7 @@ package com.example.bookreview.service;
 
 import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.dto.internal.CostResult;
-import com.example.bookreview.dto.internal.ExternalApiRequest;
+import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.example.bookreview.dto.response.OpenAiResponse;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;

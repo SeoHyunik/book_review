@@ -1,6 +1,6 @@
 package com.example.bookreview.service;
 
-import com.example.bookreview.config.GoogleDriveProperties;
+import com.example.bookreview.dto.internal.GoogleDriveProperties;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.json.gson.GsonFactory;

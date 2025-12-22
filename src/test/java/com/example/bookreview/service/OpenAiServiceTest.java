@@ -6,7 +6,7 @@ import static org.mockito.BDDMockito.given;
 
 import com.example.bookreview.config.GsonConfig;
 import com.example.bookreview.dto.internal.AiReviewResult;
-import com.example.bookreview.dto.internal.ExternalApiRequest;
+import com.example.bookreview.dto.request.ExternalApiRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

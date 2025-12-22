@@ -1,4 +1,4 @@
-package com.example.bookreview.dto.internal;
+package com.example.bookreview.dto.request;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;

@@ -1,4 +1,4 @@
-package com.example.bookreview.config;
+package com.example.bookreview.dto.internal;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

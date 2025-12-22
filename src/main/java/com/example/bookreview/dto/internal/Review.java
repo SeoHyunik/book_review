@@ -1,4 +1,4 @@
-package com.example.bookreview.domain;
+package com.example.bookreview.dto.internal;
 
 import com.example.bookreview.util.CurrencyFormatter;
 import com.fasterxml.jackson.annotation.JsonGetter;

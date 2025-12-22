@@ -1,6 +1,6 @@
 package com.example.bookreview.service;
 
-import com.example.bookreview.domain.Review;
+import com.example.bookreview.dto.internal.Review;
 import com.example.bookreview.dto.request.ReviewRequest;
 import java.util.List;
 import java.util.Optional;
