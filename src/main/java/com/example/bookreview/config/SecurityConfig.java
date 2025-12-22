@@ -12,11 +12,13 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.http.HttpMethod;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
 import com.example.bookreview.filter.LogUuidFilter;
+import com.example.bookreview.security.CustomAccessDeniedHandler;
 
 @Slf4j
 @Configuration
@@ -45,10 +47,15 @@ public class SecurityConfig {
                         .defaultSuccessUrl("/reviews", true)
                         .permitAll())
                 .logout(logout -> logout.logoutSuccessUrl("/reviews"))
-                .exceptionHandling(exceptions -> exceptions.accessDeniedPage("/access-denied"));
+                .exceptionHandling(exceptions -> exceptions.accessDeniedHandler(customAccessDeniedHandler()));
         SecurityFilterChain chain = http.build();
         log.debug("SecurityFilterChain initialized: {}", chain);
         return chain;
+    }
+
+    @Bean
+    public AccessDeniedHandler customAccessDeniedHandler() {
+        return new CustomAccessDeniedHandler();
     }
 
     @Bean
