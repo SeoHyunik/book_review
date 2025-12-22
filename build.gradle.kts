@@ -46,9 +46,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-cache")
     implementation("org.springframework.boot:spring-boot-starter-log4j2")
-    implementation("org.springframework.boot:spring-boot-starter-aop")
-    implementation("org.aspectj:aspectjrt:1.9.22.1")
-    implementation("org.aspectj:aspectjweaver:1.9.22.1")
+    implementation("org.springframework:spring-aop")
+    implementation("org.aspectj:aspectjrt:1.9.25")
+    implementation("org.aspectj:aspectjweaver:1.9.25")
 
     implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
 
