@@ -10,13 +10,13 @@ public class AuthController {
 
     @GetMapping("/login")
     public String login() {
-        log.info("[AUTH] Rendering custom login page");
+        log.info("Rendering custom login page");
         return "auth/login";
     }
 
     @GetMapping("/access-denied")
     public String accessDenied() {
-        log.warn("[AUTH] Access denied page rendered due to insufficient privileges");
+        log.warn("Access denied page rendered due to insufficient privileges");
         return "error/403";
     }
 }

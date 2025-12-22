@@ -26,13 +26,13 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     public List<Review> getReviews() {
-        log.debug("[SERVICE] Fetching all reviews from repository");
+        log.debug("Fetching all reviews from repository");
         return reviewRepository.findAll();
     }
 
     @Override
     public Optional<Review> getReview(String id) {
-        log.debug("[SERVICE] Fetching review by id={}", id);
+        log.debug("Fetching review by id={}", id);
         return reviewRepository.findById(id);
     }
 
@@ -41,7 +41,7 @@ public class ReviewServiceImpl implements ReviewService {
     public Review createReview(ReviewRequest request) {
         // NOTE: MongoDB multi-document transactions require a replica set. In single-node dev/test
         // environments @Transactional will not enforce atomicity but still provides declarative intent.
-        log.info("[SERVICE] Starting review creation for title='{}'", request.title());
+        log.info("Starting review creation for title='{}'", request.title());
         validateTitleForUpload(request.title());
 
         AiReviewResult aiResult = callOpenAi(request);
@@ -66,10 +66,10 @@ public class ReviewServiceImpl implements ReviewService {
 
         try {
             Review saved = reviewRepository.save(review);
-            log.info("[SERVICE] Review persisted with id={}", saved.id());
+            log.info("Review persisted with id={}", saved.id());
             return saved;
         } catch (RuntimeException ex) {
-            log.error("[SERVICE] Persisting review failed, initiating rollback for fileId={}", fileId, ex);
+            log.error("Persisting review failed, initiating rollback for fileId={}", fileId, ex);
             rollbackGoogleFile(fileId);
             throw ex;
         }
@@ -78,10 +78,10 @@ public class ReviewServiceImpl implements ReviewService {
     private AiReviewResult callOpenAi(ReviewRequest request) {
         try {
             AiReviewResult aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
-            log.debug("[SERVICE] AI review generated with tokenCount={} and usdCost={}", aiResult.totalTokens(), aiResult.usdCost());
+            log.debug("AI review generated with tokenCount={} and usdCost={}", aiResult.totalTokens(), aiResult.usdCost());
             return aiResult;
         } catch (Exception ex) {
-            log.error("[SERVICE] OpenAI content generation failed", ex);
+            log.error("OpenAI content generation failed", ex);
             throw new ReviewCreationException("OpenAI 호출에 실패했습니다. 잠시 후 다시 시도해주세요.", ex);
         }
     }
@@ -89,10 +89,10 @@ public class ReviewServiceImpl implements ReviewService {
     private BigDecimal convertToKrw(BigDecimal usdCost) {
         try {
             BigDecimal krwCost = currencyService.convertUsdToKrw(usdCost);
-            log.debug("[SERVICE] Converted cost to KRW: {}", krwCost);
+            log.debug("Converted cost to KRW: {}", krwCost);
             return krwCost;
         } catch (Exception ex) {
-            log.error("[SERVICE] Failed to convert USD cost to KRW", ex);
+            log.error("Failed to convert USD cost to KRW", ex);
             throw new ReviewCreationException("환율 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", ex);
         }
     }
@@ -100,10 +100,10 @@ public class ReviewServiceImpl implements ReviewService {
     private String uploadToDrive(String filename, String markdown) {
         try {
             String fileId = googleDriveService.uploadMarkdown(filename, markdown);
-            log.info("[SERVICE] Markdown uploaded to Google Drive with fileId={}", fileId);
+            log.info("Markdown uploaded to Google Drive with fileId={}", fileId);
             return fileId;
         } catch (Exception ex) {
-            log.error("[SERVICE] Google Drive upload failed", ex);
+            log.error("Google Drive upload failed", ex);
             throw new ReviewCreationException("Google Drive 업로드에 실패했습니다.", ex);
         }
     }
@@ -115,7 +115,7 @@ public class ReviewServiceImpl implements ReviewService {
         try {
             googleDriveService.deleteFile(fileId);
         } catch (Exception rollbackEx) {
-            log.warn("[SERVICE] Failed to rollback Google Drive file for id={}", fileId, rollbackEx);
+            log.warn("Failed to rollback Google Drive file for id={}", fileId, rollbackEx);
         }
     }
 
