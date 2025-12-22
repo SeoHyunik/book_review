@@ -39,12 +39,16 @@ repositories {
 }
 
 dependencies {
+    implementation(platform("org.springframework.boot:spring-boot-dependencies:4.0.0-SNAPSHOT"))
+
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-cache")
     implementation("org.springframework.boot:spring-boot-starter-log4j2")
     implementation("org.springframework.boot:spring-boot-starter-aop")
+    implementation("org.aspectj:aspectjrt:1.9.22.1")
+    implementation("org.aspectj:aspectjweaver:1.9.22.1")
 
     implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
 
@@ -53,6 +57,8 @@ dependencies {
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+
+
 
     implementation("com.google.api-client:google-api-client:1.32.1")
     implementation("com.google.oauth-client:google-oauth-client:1.36.0")
