@@ -41,21 +41,21 @@ public class ReviewServiceImpl implements ReviewService {
     public Review createReview(ReviewRequest request) {
         // NOTE: MongoDB multi-document transactions require a replica set. In single-node dev/test
         // environments @Transactional will not enforce atomicity but still provides declarative intent.
-        log.info("[SERVICE] Starting review creation for title='{}'", request.getTitle());
-        validateTitleForUpload(request.getTitle());
+        log.info("[SERVICE] Starting review creation for title='{}'", request.title());
+        validateTitleForUpload(request.title());
 
         AiReviewResult aiResult = callOpenAi(request);
         long tokenCount = aiResult.totalTokens();
         BigDecimal usdCost = aiResult.usdCost();
         BigDecimal krwCost = convertToKrw(usdCost);
 
-        String markdown = buildMarkdown(request.getTitle(), aiResult.improvedContent());
-        String fileId = uploadToDrive(request.getTitle(), markdown);
+        String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
+        String fileId = uploadToDrive(request.title(), markdown);
 
         Review review = new Review(
                 null,
-                request.getTitle(),
-                request.getOriginalContent(),
+                request.title(),
+                request.originalContent(),
                 aiResult.improvedContent(),
                 tokenCount,
                 usdCost,
@@ -77,7 +77,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     private AiReviewResult callOpenAi(ReviewRequest request) {
         try {
-            AiReviewResult aiResult = openAiService.generateImprovedReview(request.getTitle(), request.getOriginalContent());
+            AiReviewResult aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
             log.debug("[SERVICE] AI review generated with tokenCount={} and usdCost={}", aiResult.totalTokens(), aiResult.usdCost());
             return aiResult;
         } catch (Exception ex) {
