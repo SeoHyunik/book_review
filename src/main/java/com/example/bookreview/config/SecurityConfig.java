@@ -28,6 +28,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         log.info("Configuring SecurityFilterChain with authentication, CSRF protection, and role-based access control");
         http
+            // CSRF는 기본 활성화 상태를 유지하고, 서버 간 API 호출로 설계된 "/api/**"만 예외로 둔다.
+            // HTML 폼(/reviews) 요청은 토큰을 포함해 전송하도록 유도해 CSRF 보호를 그대로 받는다.
             .csrf(csrf -> csrf.ignoringRequestMatchers(
                 PathPatternRequestMatcher.withDefaults().matcher("/api/**")
             ))
