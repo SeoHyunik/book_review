@@ -1,25 +1,41 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content">
-    <section>
-        <h2>로그인</h2>
-        <p>리뷰 작성과 외부 API 호출은 로그인한 사용자만 사용할 수 있습니다.</p>
-        <div th:if="${param.error}" class="error">아이디 또는 비밀번호가 올바르지 않습니다.</div>
-        <div th:if="${param.logout}" class="info">정상적으로 로그아웃되었습니다.</div>
-        <form th:action="@{/login}" method="post">
-            <div>
-                <label for="username">아이디</label>
-                <input id="username" name="username" type="text" required>
+    <section class="d-flex justify-content-center">
+        <div class="card shadow-sm border-0 w-100" style="max-width: 520px;">
+            <div class="card-body p-4 p-md-5">
+                <h1 class="h4 fw-bold mb-2 text-center">로그인</h1>
+                <p class="text-secondary text-center mb-4">리뷰 작성과 외부 API 호출은 로그인한 사용자만 사용할 수 있습니다.</p>
+
+                <div th:if="${param.error}" class="alert alert-danger" role="alert">
+                    아이디 또는 비밀번호가 올바르지 않습니다.
+                </div>
+                <div th:if="${param.logout}" class="alert alert-info" role="alert">
+                    정상적으로 로그아웃되었습니다.
+                </div>
+
+                <form th:action="@{/login}" method="post" class="d-flex flex-column gap-3">
+                    <div class="form-floating">
+                        <input id="username" name="username" type="text" class="form-control" placeholder="아이디" required>
+                        <label for="username">아이디</label>
+                    </div>
+                    <div class="form-floating">
+                        <input id="password" name="password" type="password" class="form-control" placeholder="비밀번호" required>
+                        <label for="password">비밀번호</label>
+                    </div>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <div class="card-footer bg-transparent border-0 px-0">
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary px-4">로그인</button>
+                        </div>
+                    </div>
+                </form>
+
+                <p class="text-secondary small mb-0 text-center mt-4">테스트 계정: user/password 또는 admin/password</p>
             </div>
-            <div>
-                <label for="password">비밀번호</label>
-                <input id="password" name="password" type="password" required>
-            </div>
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-            <button type="submit">로그인</button>
-        </form>
-        <p>테스트 계정: user/password 또는 admin/password</p>
+        </div>
     </section>
 </th:block>
-<th:block th:replace="~{fragments/layout :: layout(~{::content})}"></th:block>
 </html>

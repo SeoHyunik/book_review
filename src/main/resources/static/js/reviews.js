@@ -212,76 +212,7 @@ async function loadReviewDetail() {
     }
 }
 
-// 신규 리뷰 작성 폼을 AJAX 방식으로 제출한다
-function handleReviewForm() {
-    const form = document.getElementById('review-form');
-    const message = document.getElementById('form-message');
-    const submitButton = document.getElementById('submit-btn');
-    const spinner = submitButton?.querySelector('.spinner-border');
-
-    if (!form || !message) {
-        return;
-    }
-
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        hideMessage(message);
-
-        const title = document.getElementById('title').value.trim();
-        const originalContent = document.getElementById('originalContent').value.trim();
-
-        if (submitButton) {
-            submitButton.disabled = true;
-            spinner?.classList.remove('d-none');
-        }
-
-        if (!title || !originalContent) {
-            displayMessage(message, '제목과 원본 독후감을 모두 입력해주세요.', 'warning');
-            if (submitButton) {
-                submitButton.disabled = false;
-                spinner?.classList.add('d-none');
-            }
-            return;
-        }
-
-        try {
-            const review = await fetchJson('/reviews', {
-                method: 'POST',
-                body: JSON.stringify({ title, originalContent }),
-            });
-
-            if (typeof review === 'object' && review?.savedReviewId) {
-                if (review.message) {
-                    displayMessage(message, review.message, 'success');
-                }
-                window.location.href = `/reviews/${review.savedReviewId}`;
-                return;
-            }
-
-            // HTML 응답(로그인 페이지 등)이 돌아온 경우 사용자에게 안내하고 필요 시 리다이렉트
-            if (typeof review === 'string') {
-                const redirectToLogin = review.toLowerCase().includes('login');
-                displayMessage(message, redirectToLogin ? '로그인이 필요합니다. 로그인 페이지로 이동합니다.' : '응답을 처리할 수 없습니다. 다시 시도해주세요.', redirectToLogin ? 'warning' : 'danger');
-                if (redirectToLogin) {
-                    window.location.href = '/login';
-                }
-                return;
-            }
-
-            displayMessage(message, '응답을 처리할 수 없습니다. 다시 시도해주세요.', 'danger');
-        } catch (error) {
-            displayMessage(message, `등록에 실패했습니다: ${error.message}`, 'danger');
-        } finally {
-            if (submitButton) {
-                submitButton.disabled = false;
-                spinner?.classList.add('d-none');
-            }
-        }
-    });
-}
-
 window.addEventListener('DOMContentLoaded', () => {
     loadReviewList();
     loadReviewDetail();
-    handleReviewForm();
 });

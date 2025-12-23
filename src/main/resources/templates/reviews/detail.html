@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content">
     <section class="mb-4">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
@@ -77,5 +78,4 @@
         </div>
     </section>
 </th:block>
-<th:block th:replace="~{fragments/layout :: layout(~{::content})}"></th:block>
 </html>
