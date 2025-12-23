@@ -2,8 +2,10 @@ package com.example.bookreview.service;
 
 import com.example.bookreview.dto.internal.Review;
 import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.dto.internal.IntegrationStatus;
 import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.repository.ReviewRepository;
+import com.example.bookreview.service.MissingApiKeyException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -44,14 +46,48 @@ public class ReviewServiceImpl implements ReviewService {
         log.info("Starting review creation for title='{}'", request.title());
         validateTitleForUpload(request.title());
 
-        AiReviewResult aiResult = callOpenAi(request);
+        IntegrationStatus.Status openAiStatus = IntegrationStatus.Status.SUCCESS;
+        IntegrationStatus.Status currencyStatus = IntegrationStatus.Status.SUCCESS;
+        IntegrationStatus.Status driveStatus = IntegrationStatus.Status.SUCCESS;
+        StringBuilder warnings = new StringBuilder();
+
+        AiReviewResult aiResult = fallbackAiResult(request);
+        try {
+            aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
+            log.debug("AI review generated with tokenCount={} and usdCost={}", aiResult.totalTokens(), aiResult.usdCost());
+        } catch (MissingApiKeyException ex) {
+            openAiStatus = IntegrationStatus.Status.SKIPPED;
+            appendWarning(warnings, "OpenAI key missing: " + ex.getMessage());
+            log.warn("OpenAI key missing, skipping AI improvement and using fallback content");
+        } catch (Exception ex) {
+            openAiStatus = IntegrationStatus.Status.FAILED;
+            appendWarning(warnings, "OpenAI failed: " + ex.getMessage());
+            log.warn("OpenAI content generation failed, continuing with fallback content", ex);
+        }
+
         long tokenCount = aiResult.totalTokens();
-        BigDecimal usdCost = aiResult.usdCost();
-        BigDecimal krwCost = convertToKrw(usdCost);
+        BigDecimal usdCost = aiResult.usdCost() == null ? BigDecimal.ZERO : aiResult.usdCost();
+        BigDecimal krwCost = null;
+        try {
+            krwCost = convertToKrw(usdCost);
+        } catch (Exception ex) {
+            currencyStatus = IntegrationStatus.Status.FAILED;
+            appendWarning(warnings, "Currency conversion failed: " + ex.getMessage());
+            log.warn("Currency conversion failed, continuing without KRW cost", ex);
+        }
 
         String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
-        String fileId = uploadToDrive(request.title(), markdown);
+        String fileId = null;
+        try {
+            fileId = uploadToDrive(request.title(), markdown);
+        } catch (Exception ex) {
+            driveStatus = IntegrationStatus.Status.FAILED;
+            appendWarning(warnings, "Google Drive upload failed: " + ex.getMessage());
+            log.warn("Google Drive upload failed, continuing without file link", ex);
+        }
 
+        IntegrationStatus integrationStatus = new IntegrationStatus(openAiStatus, currencyStatus, driveStatus,
+                warnings.toString());
         Review review = new Review(
                 null,
                 request.title(),
@@ -61,6 +97,7 @@ public class ReviewServiceImpl implements ReviewService {
                 usdCost,
                 krwCost,
                 fileId,
+                integrationStatus,
                 null
         );
 
@@ -75,37 +112,34 @@ public class ReviewServiceImpl implements ReviewService {
         }
     }
 
-    private AiReviewResult callOpenAi(ReviewRequest request) {
-        try {
-            AiReviewResult aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
-            log.debug("AI review generated with tokenCount={} and usdCost={}", aiResult.totalTokens(), aiResult.usdCost());
-            return aiResult;
-        } catch (Exception ex) {
-            log.error("OpenAI content generation failed", ex);
-            throw new ReviewCreationException("OpenAI 호출에 실패했습니다. 잠시 후 다시 시도해주세요.", ex);
-        }
-    }
-
     private BigDecimal convertToKrw(BigDecimal usdCost) {
-        try {
-            BigDecimal krwCost = currencyService.convertUsdToKrw(usdCost);
-            log.debug("Converted cost to KRW: {}", krwCost);
-            return krwCost;
-        } catch (Exception ex) {
-            log.error("Failed to convert USD cost to KRW", ex);
-            throw new ReviewCreationException("환율 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.", ex);
+        if (usdCost == null) {
+            return null;
         }
+        BigDecimal krwCost = currencyService.convertUsdToKrw(usdCost);
+        log.debug("Converted cost to KRW: {}", krwCost);
+        return krwCost;
     }
 
     private String uploadToDrive(String filename, String markdown) {
-        try {
-            String fileId = googleDriveService.uploadMarkdown(filename, markdown);
-            log.info("Markdown uploaded to Google Drive with fileId={}", fileId);
-            return fileId;
-        } catch (Exception ex) {
-            log.error("Google Drive upload failed", ex);
-            throw new ReviewCreationException("Google Drive 업로드에 실패했습니다.", ex);
+        String fileId = googleDriveService.uploadMarkdown(filename, markdown);
+        log.info("Markdown uploaded to Google Drive with fileId={}", fileId);
+        return fileId;
+    }
+
+    private AiReviewResult fallbackAiResult(ReviewRequest request) {
+        String content = "[IMPROVEMENT_SKIPPED]\n" + request.originalContent();
+        return new AiReviewResult(content, "skipped", 0, 0, 0, BigDecimal.ZERO);
+    }
+
+    private void appendWarning(StringBuilder warnings, String message) {
+        if (message == null || message.isBlank()) {
+            return;
         }
+        if (!warnings.isEmpty()) {
+            warnings.append(" | ");
+        }
+        warnings.append(message);
     }
 
     private void rollbackGoogleFile(String fileId) {

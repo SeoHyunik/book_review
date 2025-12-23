@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <title th:text="${pageTitle} ?: 'Book Review'"></title>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
     <link rel="stylesheet" th:href="@{/css/styles.css}"/>
     <script th:src="@{/js/reviews.js}" defer></script>
 </head>
@@ -28,6 +30,7 @@
             </sec:authorize>
         </nav>
         <hr/>
+        <div th:if="${warningMessage}" class="alert warning" th:text="${warningMessage}"></div>
     </header>
 
     <main th:replace="${content}"></main>

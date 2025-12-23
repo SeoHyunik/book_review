@@ -10,6 +10,7 @@ import java.time.format.DateTimeFormatter;
 import lombok.Builder;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import com.example.bookreview.dto.internal.IntegrationStatus;
 
 @Document(collection = "reviews")
 @Builder
@@ -22,15 +23,15 @@ public record Review(
         BigDecimal usdCost,
         BigDecimal krwCost,
         String googleFileId,
+        IntegrationStatus integrationStatus,
         LocalDateTime createdAt) {
 
     private static final DateTimeFormatter CREATED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final ZoneId ASIA_SEOUL = ZoneId.of("Asia/Seoul");
 
     public Review {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
+        createdAt = createdAt == null ? LocalDateTime.now() : createdAt;
+        integrationStatus = integrationStatus == null ? new IntegrationStatus(null, null, null, null) : integrationStatus;
     }
 
     @JsonGetter("formattedUsdCost")

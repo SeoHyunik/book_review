@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.bookreview.dto.internal.Review;
 import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.dto.internal.IntegrationStatus;
 import com.example.bookreview.repository.ReviewRepository;
 import com.example.bookreview.service.OpenAiService;
 import com.example.bookreview.service.GoogleDriveService;
@@ -56,6 +57,8 @@ class ReviewLoggingIntegrationTest {
                 BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 "fake-file-id",
+                new IntegrationStatus(IntegrationStatus.Status.SUCCESS, IntegrationStatus.Status.SUCCESS,
+                        IntegrationStatus.Status.SUCCESS, null),
                 LocalDateTime.parse("2025-12-16T14:36:57")
         );
 

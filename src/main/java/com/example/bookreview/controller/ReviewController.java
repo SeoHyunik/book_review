@@ -3,6 +3,7 @@ package com.example.bookreview.controller;
 import com.example.bookreview.dto.internal.Review;
 import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.service.ReviewService;
+import com.example.bookreview.dto.response.ReviewCreationResponse;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequestMapping("/reviews")
@@ -71,7 +73,7 @@ public class ReviewController {
 
     @PostMapping(consumes = {MediaType.APPLICATION_FORM_URLENCODED_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
     public String create(@Valid @ModelAttribute("reviewRequest") ReviewRequest reviewRequest, BindingResult bindingResult,
-        Model model) {
+        Model model, RedirectAttributes redirectAttributes) {
         log.info("Received HTML form submission for new review: title='{}'", reviewRequest.title());
         if (bindingResult.hasErrors()) {
             log.warn("Validation errors while creating review via form: {}", bindingResult.getAllErrors());
@@ -80,16 +82,28 @@ public class ReviewController {
         }
 
         Review review = reviewService.createReview(reviewRequest);
+        if (review.integrationStatus() != null && review.integrationStatus().warningMessage() != null) {
+            redirectAttributes.addFlashAttribute("warningMessage", "Saved with warnings: " + review.integrationStatus().warningMessage());
+        }
         log.info("Review created successfully via form with id={}", review.id());
         return "redirect:/reviews/" + review.id();
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public ResponseEntity<Review> createJson(@Valid @RequestBody ReviewRequest reviewRequest) {
+    public ResponseEntity<ReviewCreationResponse> createJson(@Valid @RequestBody ReviewRequest reviewRequest) {
         log.info("Received JSON request to create review: title='{}'", reviewRequest.title());
         Review review = reviewService.createReview(reviewRequest);
         log.info("Review created successfully via API with id={}", review.id());
-        return ResponseEntity.created(URI.create("/reviews/" + review.id())).body(review);
+        String message = review.integrationStatus() != null && review.integrationStatus().warningMessage() != null
+                ? "Saved with warnings: " + review.integrationStatus().warningMessage()
+                : "Saved successfully";
+        ReviewCreationResponse response = new ReviewCreationResponse(
+                review.id(),
+                review.integrationStatus(),
+                message,
+                review
+        );
+        return ResponseEntity.created(URI.create("/reviews/" + review.id())).body(response);
     }
 }

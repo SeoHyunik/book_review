@@ -7,10 +7,14 @@ function displayMessage(element, message) {
 
 // 공통 JSON fetch 래퍼: 적절한 헤더를 세팅하고 에러 응답을 예외로 변환
 async function fetchJson(url, options = {}) {
+    const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+    const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+
     const response = await fetch(url, {
         headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
+            ...(csrfToken && csrfHeader ? { [csrfHeader]: csrfToken } : {}),
             ...(options.headers || {}),
         },
         ...options,
@@ -25,7 +29,12 @@ async function fetchJson(url, options = {}) {
         return null;
     }
 
-    return response.json();
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+        return response.json();
+    }
+
+    return response.text();
 }
 
 // 리뷰 목록 페이지에서 테이블 데이터를 API로부터 채워 넣는다
@@ -114,6 +123,22 @@ async function loadReviewDetail() {
         } else {
             googleInfo.hidden = true;
         }
+
+        const statusWrapper = document.getElementById('detail-status');
+        const integrationStatus = review.integrationStatus || {};
+        if (statusWrapper) {
+            document.getElementById('detail-openai-status').textContent = integrationStatus.openAiStatus || '-';
+            document.getElementById('detail-currency-status').textContent = integrationStatus.currencyStatus || '-';
+            document.getElementById('detail-drive-status').textContent = integrationStatus.driveStatus || '-';
+            const warningBlock = document.getElementById('detail-warning');
+            if (integrationStatus.warningMessage) {
+                document.getElementById('detail-warning-message').textContent = integrationStatus.warningMessage;
+                warningBlock.hidden = false;
+            } else if (warningBlock) {
+                warningBlock.hidden = true;
+            }
+            statusWrapper.hidden = false;
+        }
     } catch (error) {
         content.hidden = true;
         displayMessage(message, `리뷰를 불러오는 데 실패했습니다: ${error.message}`);
@@ -147,7 +172,25 @@ function handleReviewForm() {
                 body: JSON.stringify({ title, originalContent }),
             });
 
-            window.location.href = `/reviews/${review.id}`;
+            if (typeof review === 'object' && review?.savedReviewId) {
+                if (review.message) {
+                    displayMessage(message, review.message);
+                }
+                window.location.href = `/reviews/${review.savedReviewId}`;
+                return;
+            }
+
+            // HTML 응답(로그인 페이지 등)이 돌아온 경우 사용자에게 안내하고 필요 시 리다이렉트
+            if (typeof review === 'string') {
+                const redirectToLogin = review.toLowerCase().includes('login');
+                displayMessage(message, redirectToLogin ? '로그인이 필요합니다. 로그인 페이지로 이동합니다.' : '응답을 처리할 수 없습니다. 다시 시도해주세요.');
+                if (redirectToLogin) {
+                    window.location.href = '/login';
+                }
+                return;
+            }
+
+            displayMessage(message, '응답을 처리할 수 없습니다. 다시 시도해주세요.');
         } catch (error) {
             displayMessage(message, `등록에 실패했습니다: ${error.message}`);
         }

@@ -4,11 +4,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.bookreview.dto.internal.Review;
+import com.example.bookreview.dto.internal.IntegrationStatus;
 import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.service.ReviewService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +24,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 @WebMvcTest(ReviewController.class)
 class ReviewControllerTest {
@@ -45,6 +48,8 @@ class ReviewControllerTest {
                 new BigDecimal("0.12"),
                 new BigDecimal("150.0"),
                 "drive-file-id",
+                new IntegrationStatus(IntegrationStatus.Status.SUCCESS, IntegrationStatus.Status.SUCCESS,
+                        IntegrationStatus.Status.SUCCESS, null),
                 LocalDateTime.parse("2024-01-01T10:00:00")
         );
     }
@@ -70,16 +75,53 @@ class ReviewControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "user", roles = {"USER"})
     void createJson_savesReviewAndReturnsLocation() throws Exception {
         when(reviewService.createReview(any())).thenReturn(sampleReview());
 
         ReviewRequest request = new ReviewRequest("새 제목", "새 내용");
 
-        mockMvc.perform(post("/reviews")
+        mockMvc.perform(post("/reviews").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/reviews/r1"))
-                .andExpect(jsonPath("$.title").value("샘플 제목"));
+                .andExpect(jsonPath("$.savedReviewId").value("r1"))
+                .andExpect(jsonPath("$.integrationStatus.openAiStatus").value("SUCCESS"));
+    }
+
+    @Test
+    @WithMockUser(username = "user", roles = {"USER"})
+    void createForm_withCsrf_redirectsToDetail() throws Exception {
+        when(reviewService.createReview(any())).thenReturn(sampleReview());
+
+        mockMvc.perform(post("/reviews")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("title", "새 제목")
+                        .param("originalContent", "내용"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", "/reviews/r1"));
+    }
+
+    @Test
+    @WithMockUser(username = "user", roles = {"USER"})
+    void createForm_missingCsrf_returnsForbidden() throws Exception {
+        mockMvc.perform(post("/reviews")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("title", "새 제목")
+                        .param("originalContent", "내용"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createForm_anonymous_redirectsToLogin() throws Exception {
+        mockMvc.perform(post("/reviews")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("title", "새 제목")
+                        .param("originalContent", "내용"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", "http://localhost/login"));
     }
 }
