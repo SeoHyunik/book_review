@@ -1,98 +1,136 @@
+:root {
+    --brand-gradient: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    --card-shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
+    --soft-border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f7f7f7;
-    color: #333;
-}
-
-.container {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: 1.5rem;
-    background-color: #fff;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-image: radial-gradient(circle at 10% 20%, rgba(124, 58, 237, 0.08), transparent 25%),
+    radial-gradient(circle at 90% 10%, rgba(37, 99, 235, 0.08), transparent 30%);
     min-height: 100vh;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
-header,
-footer {
-    margin-bottom: 1.5rem;
+.navbar-brand {
+    letter-spacing: -0.4px;
 }
 
-nav a {
-    margin-right: 1rem;
-    text-decoration: none;
-    color: #1a73e8;
+main section {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    padding: 1.75rem;
+    border: var(--soft-border);
 }
 
-nav a:hover {
-    text-decoration: underline;
+.hero-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    border: var(--soft-border);
+    box-shadow: var(--card-shadow);
 }
 
-section {
-    margin-top: 1rem;
+.card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-form div {
-    margin-bottom: 1rem;
+.card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 35px rgba(17, 24, 39, 0.12);
 }
 
-input,
-textarea {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 1rem;
+.badge-soft-success {
+    color: #15803d;
+    background-color: rgba(34, 197, 94, 0.12);
 }
 
-button {
-    background-color: #1a73e8;
-    color: #fff;
-    border: none;
-    padding: 0.6rem 1.2rem;
-    border-radius: 4px;
-    cursor: pointer;
+.badge-soft-danger {
+    color: #b91c1c;
+    background-color: rgba(248, 113, 113, 0.15);
 }
 
-button:hover {
-    background-color: #0f5bb5;
+.badge-soft-warning {
+    color: #b45309;
+    background-color: rgba(251, 191, 36, 0.18);
 }
 
-.alert.warning {
-    padding: 0.75rem;
-    border-radius: 4px;
-    background-color: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeeba;
-    margin-top: 0.5rem;
+.badge-soft-info {
+    color: #2563eb;
+    background-color: rgba(59, 130, 246, 0.14);
+}
+
+.alert-icon {
+    font-size: 1.1rem;
 }
 
 pre {
-    background-color: #f1f1f1;
-    padding: 1rem;
-    border-radius: 4px;
-    overflow-x: auto;
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    border: none;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.status-tile {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    border: var(--soft-border);
+}
+
+.form-floating > label {
+    color: #6b7280;
+}
+
+.form-control:focus, .form-control:focus-visible, .form-control.is-valid, .form-control.is-invalid {
+    box-shadow: 0 0 0 0.15rem rgba(37, 99, 235, 0.15);
+}
+
+.form-control:invalid:not(:placeholder-shown) {
+    border-color: #f59e0b;
+}
+
+.btn-gradient {
+    background-image: var(--brand-gradient);
+    color: #fff;
+    border: none;
+    box-shadow: var(--card-shadow);
+}
+
+.btn-gradient:hover {
+    color: #fff;
+    box-shadow: 0 12px 30px rgba(79, 70, 229, 0.3);
+}
+
+#review-grid .card {
+    height: 100%;
+}
+
+#review-grid .card-title {
+    font-weight: 700;
+    letter-spacing: -0.2px;
+}
+
+#review-grid .badge {
+    font-weight: 600;
 }
 
 #form-message,
 #detail-message,
 #list-message {
-    padding: 0.75rem;
-    border-radius: 4px;
-    background-color: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeeba;
+    display: none;
 }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-th,
-td {
-    text-align: left;
-    padding: 0.5rem;
+.spinner-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
 }

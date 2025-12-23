@@ -2,23 +2,19 @@
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content">
+    <section class="mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+            <div>
+                <h1 class="h3 fw-bold mb-1">리뷰 목록</h1>
+                <p class="text-secondary mb-0">AI가 개선한 독후감을 카드형 레이아웃으로 살펴보세요.</p>
+            </div>
+            <a class="btn btn-gradient shadow-sm" th:href="@{/reviews/new}"><i class="bi bi-plus-lg me-2"></i>새 리뷰 작성</a>
+        </div>
+    </section>
+
     <section>
-        <h2>리뷰 목록</h2>
-
-        <p id="list-message" hidden>등록된 리뷰가 없습니다.</p>
-
-        <table id="review-table" border="1" cellpadding="8" cellspacing="0" hidden>
-            <thead>
-            <tr>
-                <th>제목</th>
-                <th>작성 시각</th>
-                <th>OpenAI 토큰</th>
-            </tr>
-            </thead>
-            <tbody id="review-table-body"></tbody>
-        </table>
-
-        <p><a th:href="@{/reviews/new}">새 리뷰 작성</a></p>
+        <div id="list-message" class="alert alert-warning d-none" role="alert"></div>
+        <div id="review-grid" class="row g-4"></div>
     </section>
 </th:block>
 </html>
