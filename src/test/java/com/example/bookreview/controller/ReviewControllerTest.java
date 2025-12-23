@@ -23,6 +23,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 @WebMvcTest(ReviewController.class)
 class ReviewControllerTest {
@@ -71,6 +72,7 @@ class ReviewControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "user", roles = {"USER"})
     void createJson_savesReviewAndReturnsLocation() throws Exception {
         when(reviewService.createReview(any())).thenReturn(sampleReview());
 
@@ -85,6 +87,7 @@ class ReviewControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "user", roles = {"USER"})
     void createForm_withCsrf_redirectsToDetail() throws Exception {
         when(reviewService.createReview(any())).thenReturn(sampleReview());
 
@@ -95,5 +98,26 @@ class ReviewControllerTest {
                         .param("originalContent", "내용"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location", "/reviews/r1"));
+    }
+
+    @Test
+    @WithMockUser(username = "user", roles = {"USER"})
+    void createForm_missingCsrf_returnsForbidden() throws Exception {
+        mockMvc.perform(post("/reviews")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("title", "새 제목")
+                        .param("originalContent", "내용"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void createForm_anonymous_redirectsToLogin() throws Exception {
+        mockMvc.perform(post("/reviews")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("title", "새 제목")
+                        .param("originalContent", "내용"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", "http://localhost/login"));
     }
 }
