@@ -8,10 +8,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -61,7 +61,7 @@ public class CurrencyServiceImpl implements CurrencyService {
                     .get()
                     .uri(resolvedUrl)
                     .retrieve()
-                    .onStatus(HttpStatusCode::isError, clientResponse -> clientResponse.createException())
+                    .onStatus(HttpStatusCode::isError, ClientResponse::createException)
                     .bodyToMono(String.class)
                     .block();
 

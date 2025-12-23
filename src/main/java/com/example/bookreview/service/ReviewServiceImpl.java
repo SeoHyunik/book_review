@@ -5,7 +5,6 @@ import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.dto.internal.IntegrationStatus;
 import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.repository.ReviewRepository;
-import com.example.bookreview.service.MissingApiKeyException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
