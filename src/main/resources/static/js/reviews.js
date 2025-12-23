@@ -123,6 +123,22 @@ async function loadReviewDetail() {
         } else {
             googleInfo.hidden = true;
         }
+
+        const statusWrapper = document.getElementById('detail-status');
+        const integrationStatus = review.integrationStatus || {};
+        if (statusWrapper) {
+            document.getElementById('detail-openai-status').textContent = integrationStatus.openAiStatus || '-';
+            document.getElementById('detail-currency-status').textContent = integrationStatus.currencyStatus || '-';
+            document.getElementById('detail-drive-status').textContent = integrationStatus.driveStatus || '-';
+            const warningBlock = document.getElementById('detail-warning');
+            if (integrationStatus.warningMessage) {
+                document.getElementById('detail-warning-message').textContent = integrationStatus.warningMessage;
+                warningBlock.hidden = false;
+            } else if (warningBlock) {
+                warningBlock.hidden = true;
+            }
+            statusWrapper.hidden = false;
+        }
     } catch (error) {
         content.hidden = true;
         displayMessage(message, `리뷰를 불러오는 데 실패했습니다: ${error.message}`);
@@ -156,8 +172,11 @@ function handleReviewForm() {
                 body: JSON.stringify({ title, originalContent }),
             });
 
-            if (typeof review === 'object' && review?.id) {
-                window.location.href = `/reviews/${review.id}`;
+            if (typeof review === 'object' && review?.savedReviewId) {
+                if (review.message) {
+                    displayMessage(message, review.message);
+                }
+                window.location.href = `/reviews/${review.savedReviewId}`;
                 return;
             }
 

@@ -30,6 +30,7 @@
             </sec:authorize>
         </nav>
         <hr/>
+        <div th:if="${warningMessage}" class="alert warning" th:text="${warningMessage}"></div>
     </header>
 
     <main th:replace="${content}"></main>
