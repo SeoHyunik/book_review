@@ -31,11 +31,11 @@
                 <sec:authorize access="isAuthenticated()">
                     <li class="nav-item"><a class="btn btn-light text-primary fw-semibold ms-lg-2" th:href="@{/reviews/new}">New Review</a></li>
                 </sec:authorize>
-                <sec:authorize access="!isAuthenticated()">
+                <sec:authorize access="isAnonymous()">
                     <li class="nav-item"><a class="nav-link" th:href="@{/login}">Login</a></li>
                 </sec:authorize>
                 <sec:authorize access="isAuthenticated()">
-                    <li class="nav-item text-white-50 small ms-lg-3">안녕하세요, <span sec:authentication="name"></span> 님</li>
+                    <li class="nav-item text-white-50 small ms-lg-3">안녕하세요, <span th:text="${#authentication?.name}"></span> 님</li>
                     <li class="nav-item ms-lg-2">
                         <form th:action="@{/logout}" method="post" class="d-inline">
                             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
