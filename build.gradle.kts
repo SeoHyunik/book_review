@@ -13,7 +13,7 @@ if (gradleForceOffline && !gradle.startParameter.isOffline) {
 
 group = "com.example"
 version = "0.0.1-SNAPSHOT"
-description = "AI 기반 독후감 관리 서비스"
+description = "AI 독후감 관리 서비스"
 
 java {
     toolchain {

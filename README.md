@@ -1,4 +1,4 @@
-# 📚 Book Review – AI 기반 독후감 관리 서비스
+# 📚 Book Review – AI 독후감 관리 서비스
 
 > OpenAI + Google Drive + MongoDB를 활용한 **AI 독후감 생성·관리 토이 프로젝트**
 
