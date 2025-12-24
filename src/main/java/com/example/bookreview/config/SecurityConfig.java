@@ -51,7 +51,9 @@ public class SecurityConfig {
                 .anyRequest().authenticated())
             .formLogin(form -> form
                 .loginPage("/login")
+                .loginProcessingUrl("/login")
                 .defaultSuccessUrl("/reviews", true)
+                .failureUrl("/login?error")
                 .permitAll())
             .logout(logout -> logout.logoutSuccessUrl("/reviews"))
             // 로그인하지 않은 사용자는 /login 으로 이동시키고, 인증된 사용자 권한 부족만 AccessDeniedHandler가 처리한다.
