@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 import com.example.bookreview.filter.LogUuidFilter;
 import com.example.bookreview.security.CustomAccessDeniedHandler;
@@ -30,7 +31,9 @@ public class SecurityConfig {
         log.info("Configuring SecurityFilterChain with authentication, CSRF protection, and role-based access control");
         http
             // CSRF는 기본 활성화 상태를 유지한다. 클라이언트는 메타 태그를 이용해 토큰을 전송한다.
-            .csrf(csrf -> csrf)
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringRequestMatchers("/api/**"))
             // AccessDeniedException으로 HTML 에러 페이지가 반환되던 원인: anonymous 사용자가 AccessDeniedHandler로 위임됨.
             // 익명 인증을 비활성화해 인증되지 않은 사용자는 AccessDenied가 아닌 인증 진입점으로 흐른다.
             .anonymous(anon -> anon.disable())
