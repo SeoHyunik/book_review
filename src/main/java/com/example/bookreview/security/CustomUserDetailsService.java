@@ -27,10 +27,12 @@ public class CustomUserDetailsService implements UserDetailsService {
         log.debug("Loading user by username={}", username);
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-        return new org.springframework.security.core.userdetails.User(
-                user.getUsername(),
-                user.getPassword(),
-                mapAuthorities(user.getRoles()));
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(user.getUsername())
+                .password(user.getPasswordHash())
+                .disabled(!user.isEnabled())
+                .authorities(mapAuthorities(user.getRoles()))
+                .build();
     }
 
     private Collection<? extends GrantedAuthority> mapAuthorities(Set<String> roles) {

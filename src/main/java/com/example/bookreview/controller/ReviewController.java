@@ -2,8 +2,9 @@ package com.example.bookreview.controller;
 
 import com.example.bookreview.dto.internal.Review;
 import com.example.bookreview.dto.request.ReviewRequest;
-import com.example.bookreview.service.ReviewService;
 import com.example.bookreview.dto.response.ReviewCreationResponse;
+import com.example.bookreview.dto.response.DeleteReviewResponse;
+import com.example.bookreview.service.ReviewService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -110,9 +111,19 @@ public class ReviewController {
     }
 
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<Void> deleteReview(@PathVariable String id, Principal principal) {
+    public ResponseEntity<DeleteReviewResponse> deleteReview(@PathVariable String id, Principal principal) {
         log.info("Received request to delete review id={} by user={}", id, principal != null ? principal.getName() : "anonymous");
-        reviewService.deleteReview(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(DeleteReviewResponse.from(reviewService.deleteReview(id)));
+    }
+
+    @PostMapping(value = "/{id}/delete")
+    public String deleteReviewForm(@PathVariable String id, RedirectAttributes redirectAttributes) {
+        DeleteReviewResponse response = DeleteReviewResponse.from(reviewService.deleteReview(id));
+        if (!response.warnings().isEmpty()) {
+            redirectAttributes.addFlashAttribute("warningMessage", String.join("\n", response.warnings()));
+        } else {
+            redirectAttributes.addFlashAttribute("successMessage", "리뷰가 삭제되었습니다.");
+        }
+        return "redirect:/reviews";
     }
 }

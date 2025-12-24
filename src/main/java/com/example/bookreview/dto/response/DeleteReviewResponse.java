@@ -1,0 +1,11 @@
+package com.example.bookreview.dto.response;
+
+import com.example.bookreview.service.DeleteReviewResult;
+import java.util.List;
+
+public record DeleteReviewResponse(boolean deleted, boolean driveDeleted, List<String> warnings) {
+
+    public static DeleteReviewResponse from(DeleteReviewResult result) {
+        return new DeleteReviewResponse(result.isDeleted(), result.isDriveDeleted(), result.getWarnings());
+    }
+}

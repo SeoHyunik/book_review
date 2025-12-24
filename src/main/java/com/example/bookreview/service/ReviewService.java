@@ -13,5 +13,5 @@ public interface ReviewService {
 
     Review createReview(ReviewRequest request);
 
-    void deleteReview(String id);
+    DeleteReviewResult deleteReview(String id);
 }

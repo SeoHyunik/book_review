@@ -17,7 +17,7 @@ description = "AI 기반 독후감 관리 서비스"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(25))
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 

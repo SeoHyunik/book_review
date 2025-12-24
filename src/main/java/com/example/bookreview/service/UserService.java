@@ -31,7 +31,7 @@ public class UserService {
 
         User user = User.builder()
                 .username(request.username())
-                .password(passwordEncoder.encode(request.password()))
+                .passwordHash(passwordEncoder.encode(request.password()))
                 .roles(roles)
                 .build();
 
