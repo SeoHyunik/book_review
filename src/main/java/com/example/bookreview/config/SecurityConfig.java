@@ -13,7 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 import com.example.bookreview.filter.LogUuidFilter;
 import com.example.bookreview.security.CustomAccessDeniedHandler;
@@ -30,11 +29,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         log.info("Configuring SecurityFilterChain with authentication, CSRF protection, and role-based access control");
         http
-            // CSRF는 기본 활성화 상태를 유지하고, 서버 간 API 호출로 설계된 "/api/**"만 예외로 둔다.
-            // HTML 폼(/reviews) 요청은 토큰을 포함해 전송하도록 유도해 CSRF 보호를 그대로 받는다.
-            .csrf(csrf -> csrf.ignoringRequestMatchers(
-                PathPatternRequestMatcher.withDefaults().matcher("/api/**")
-            ))
+            // CSRF는 기본 활성화 상태를 유지한다. 클라이언트는 메타 태그를 이용해 토큰을 전송한다.
+            .csrf(csrf -> csrf)
             // AccessDeniedException으로 HTML 에러 페이지가 반환되던 원인: anonymous 사용자가 AccessDeniedHandler로 위임됨.
             // 익명 인증을 비활성화해 인증되지 않은 사용자는 AccessDenied가 아닌 인증 진입점으로 흐른다.
             .anonymous(anon -> anon.disable())

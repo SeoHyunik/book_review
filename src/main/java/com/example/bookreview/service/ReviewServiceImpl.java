@@ -115,22 +115,32 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
-    public void deleteReview(String id) {
+    public DeleteReviewResult deleteReview(String id) {
         log.info("Deleting review id={}", id);
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found"));
 
-        if (review.googleFileId() != null && !review.googleFileId().isBlank()) {
+        boolean driveDeleted = false;
+        String googleFileId = review.googleFileId();
+        StringBuilder warnings = new StringBuilder();
+
+        if (googleFileId != null && !googleFileId.isBlank()) {
             try {
-                googleDriveService.deleteFile(review.googleFileId());
+                googleDriveService.deleteFile(googleFileId);
+                driveDeleted = true;
             } catch (Exception ex) {
-                log.error("Failed to delete Google Drive file for review id={} fileId={}.", id, review.googleFileId(), ex);
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to delete linked Google Drive file");
+                log.warn("Failed to delete Google Drive file for review id={} fileId={}.", id, googleFileId, ex);
+                appendWarning(warnings, "Google Drive file could not be removed.");
             }
         }
 
         reviewRepository.deleteById(id);
         log.info("Review id={} deleted successfully", id);
+        return DeleteReviewResult.builder()
+                .deleted(true)
+                .driveDeleted(driveDeleted)
+                .warnings(warnings.isEmpty() ? List.of() : List.of(warnings.toString()))
+                .build();
     }
 
     private BigDecimal convertToKrw(BigDecimal usdCost) {

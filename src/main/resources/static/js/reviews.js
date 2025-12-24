@@ -153,12 +153,16 @@ async function loadReviewDetail() {
         document.getElementById('detail-improved').textContent = review.improvedContent;
 
         if (deleteButton) {
-            deleteButton.onclick = async () => {
+            deleteButton.onclick = async (event) => {
+                event.preventDefault();
                 const confirmed = confirm('Delete this review? This action will also remove the Google Drive file.');
                 if (!confirmed) return;
 
                 try {
-                    await fetchJson(`/reviews/${reviewId}`, { method: 'DELETE' });
+                    const response = await fetchJson(`/api/reviews/${reviewId}`, { method: 'DELETE' });
+                    if (response?.warnings?.length) {
+                        displayMessage(message, response.warnings.join('\n'), 'warning');
+                    }
                     window.location.href = '/reviews';
                 } catch (err) {
                     displayMessage(message, 'Failed to delete the review. Please try again later.', 'danger');
