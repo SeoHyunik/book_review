@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,9 +35,8 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .ignoringRequestMatchers("/api/**"))
-            // AccessDeniedException으로 HTML 에러 페이지가 반환되던 원인: anonymous 사용자가 AccessDeniedHandler로 위임됨.
-            // 익명 인증을 비활성화해 인증되지 않은 사용자는 AccessDenied가 아닌 인증 진입점으로 흐른다.
-            .anonymous(anon -> anon.disable())
+            // 익명 사용자를 명시적으로 활성화하여 템플릿에서 isAnonymous()/isAuthenticated() 분기를 올바르게 사용한다.
+            .anonymous(Customizer.withDefaults())
             .userDetailsService(customUserDetailsService)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/login", "/register", "/error", "/access-denied").permitAll()
