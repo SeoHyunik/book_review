@@ -18,10 +18,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import java.security.Principal;
 
 @Controller
 @RequestMapping("/reviews")
@@ -105,5 +107,12 @@ public class ReviewController {
                 review
         );
         return ResponseEntity.created(URI.create("/reviews/" + review.id())).body(response);
+    }
+
+    @DeleteMapping(value = "/{id}")
+    public ResponseEntity<Void> deleteReview(@PathVariable String id, Principal principal) {
+        log.info("Received request to delete review id={} by user={}", id, principal != null ? principal.getName() : "anonymous");
+        reviewService.deleteReview(id);
+        return ResponseEntity.noContent().build();
     }
 }

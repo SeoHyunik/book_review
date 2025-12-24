@@ -1,15 +1,17 @@
 // 상태 메시지 표시를 단순화하는 유틸 함수
 function displayMessage(element, message, type = 'warning') {
     if (!element) return;
-    element.textContent = message;
+    element.innerHTML = (message || '').toString().replace(/\n/g, '<br>');
     element.classList.remove('d-none', 'alert-warning', 'alert-danger', 'alert-success');
     element.classList.add('alert', `alert-${type}`);
     element.hidden = false;
+    element.style.display = 'block';
 }
 
 function hideMessage(element) {
     if (!element) return;
     element.classList.add('d-none');
+    element.style.display = 'none';
 }
 
 // 공통 JSON fetch 래퍼: 적절한 헤더를 세팅하고 에러 응답을 예외로 변환
@@ -124,6 +126,7 @@ async function loadReviewDetail() {
     const wrapper = document.getElementById('review-detail');
     const message = document.getElementById('detail-message');
     const content = document.getElementById('detail-content');
+    const deleteButton = document.getElementById('detail-delete');
 
     if (!wrapper || !message || !content) {
         return;
@@ -148,6 +151,20 @@ async function loadReviewDetail() {
         document.getElementById('detail-usd').textContent = review.formattedUsdCost || review.usdCost || '-';
         document.getElementById('detail-krw').textContent = review.formattedKrwCost || review.krwCost || '-';
         document.getElementById('detail-improved').textContent = review.improvedContent;
+
+        if (deleteButton) {
+            deleteButton.onclick = async () => {
+                const confirmed = confirm('Delete this review? This action will also remove the Google Drive file.');
+                if (!confirmed) return;
+
+                try {
+                    await fetchJson(`/reviews/${reviewId}`, { method: 'DELETE' });
+                    window.location.href = '/reviews';
+                } catch (err) {
+                    displayMessage(message, 'Failed to delete the review. Please try again later.', 'danger');
+                }
+            };
+        }
 
         const googleInfo = document.getElementById('detail-google');
         const googleId = document.getElementById('detail-google-id');
@@ -198,7 +215,7 @@ async function loadReviewDetail() {
             if (integrationStatus.warningMessage || hasSkipped) {
                 const warningMessage = integrationStatus.warningMessage
                     || '일부 외부 연동이 처리되지 않았습니다. 정보를 확인해주세요.';
-                document.getElementById('detail-warning-message').textContent = warningMessage;
+                document.getElementById('detail-warning-message').innerHTML = warningMessage.replace(/\n/g, '<br>');
                 warningBlock?.classList.remove('d-none');
                 warningBlock.hidden = false;
             } else if (warningBlock) {

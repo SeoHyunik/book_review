@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org"
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content">
     <section class="mb-4">
@@ -7,15 +7,20 @@
             <div>
                 <p class="text-uppercase text-secondary fw-semibold small mb-2">Review Detail</p>
                 <h1 class="h3 fw-bold mb-1" id="detail-title" th:text="${review?.title}"></h1>
-                <p class="text-secondary mb-0">개선된 독후감과 상태를 한 눈에 확인하세요.</p>
+                <p class="text-secondary mb-0">See the improved review and integration status at a glance.</p>
             </div>
-            <a class="btn btn-outline-primary" th:href="@{/reviews}"><i class="bi bi-arrow-left-short me-1"></i>목록으로</a>
+            <div class="d-flex gap-2 flex-wrap">
+                <a class="btn btn-outline-primary" th:href="@{/reviews}"><i class="bi bi-arrow-left-short me-1"></i>Back to list</a>
+                <button class="btn btn-outline-danger" id="detail-delete" type="button" sec:authorize="isAuthenticated()">
+                    <i class="bi bi-trash me-1"></i>Delete
+                </button>
+            </div>
         </div>
     </section>
 
     <section>
         <div id="review-detail" th:attr="data-review-id=${review != null ? review.id : ''}">
-            <div id="detail-message" class="alert alert-danger d-none" role="alert"></div>
+            <div id="detail-message" class="alert alert-warning d-none" role="alert"></div>
 
             <div id="detail-content" class="d-flex flex-column gap-4" hidden>
                 <div class="hero-card border-0" th:classappend="${review?.integrationStatus?.warningMessage} != null ? 'border-warning-subtle' : ''">
@@ -39,7 +44,8 @@
                             <div id="detail-warning" class="alert alert-warning mt-2 py-2 px-3 d-none" role="alert">
                                 <div class="d-flex align-items-center gap-2">
                                     <i class="bi bi-exclamation-triangle-fill alert-icon"></i>
-                                    <span id="detail-warning-message" th:text="${review?.integrationStatus?.warningMessage}"></span>
+                                    <span id="detail-warning-message"
+                                          th:utext="${#strings.replace(#strings.escapeXml(review?.integrationStatus?.warningMessage), '\\n', '<br/>')}"></span>
                                 </div>
                             </div>
                         </div>
@@ -66,12 +72,12 @@
                 </div>
 
                 <div class="card border-0 shadow-sm card-hover">
-                    <div class="card-body">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <span class="badge badge-soft-success">개선된 독후감</span>
-                            <span class="text-secondary small">고품질로 리라이팅된 결과입니다.</span>
+                    <div class="card-body d-flex flex-column gap-2">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="badge badge-soft-success">Improved Review</span>
+                            <span class="text-secondary small">AI-polished content ready to share.</span>
                         </div>
-                        <pre id="detail-improved" th:text="${review?.improvedContent}"></pre>
+                        <div id="detail-improved" class="improved-content" th:text="${review?.improvedContent}"></div>
                     </div>
                 </div>
             </div>

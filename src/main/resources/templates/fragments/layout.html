@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       th:fragment="layout(content)">
 <head>
     <meta charset="UTF-8">
@@ -58,15 +58,15 @@
 
             <div th:if="${successMessage}" class="alert alert-success d-flex align-items-center gap-2" role="alert">
                 <i class="bi bi-check-circle-fill"></i>
-                <div th:text="${successMessage}"></div>
+                <div th:utext="${#strings.replace(#strings.escapeXml(successMessage), '\\n', '<br/>')}"></div>
             </div>
             <div th:if="${warningMessage}" class="alert alert-warning d-flex align-items-center gap-2" role="alert">
                 <i class="bi bi-exclamation-triangle-fill"></i>
-                <div th:text="${warningMessage}"></div>
+                <div th:utext="${#strings.replace(#strings.escapeXml(warningMessage), '\\n', '<br/>')}"></div>
             </div>
             <div th:if="${errorMessage}" class="alert alert-danger d-flex align-items-center gap-2" role="alert">
                 <i class="bi bi-x-circle-fill"></i>
-                <div th:text="${errorMessage}"></div>
+                <div th:utext="${#strings.replace(#strings.escapeXml(errorMessage), '\\n', '<br/>')}"></div>
             </div>
 
             <main th:replace="${content}"></main>

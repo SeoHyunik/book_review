@@ -1,22 +1,62 @@
 package com.example.bookreview.controller;
 
+import com.example.bookreview.service.UserService;
+import com.example.bookreview.web.request.RegistrationRequest;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Slf4j
 @Controller
+@RequiredArgsConstructor
 public class AuthController {
 
-    @GetMapping("/login")
-    public String login() {
-        log.info("Rendering custom login page");
-        return "auth/login";
+    private final UserService userService;
+
+    @GetMapping("/register")
+    public String registerForm(Model model) {
+        log.info("Rendering registration page");
+        if (!model.containsAttribute("registrationRequest")) {
+            model.addAttribute("registrationRequest", RegistrationRequest.empty());
+        }
+        model.addAttribute("pageTitle", "Register");
+        return "auth/register";
     }
 
-    @GetMapping("/access-denied")
-    public String accessDenied() {
-        log.warn("Access denied page rendered due to insufficient privileges");
-        return "error/403";
+    @PostMapping("/register")
+    public String register(@Valid @ModelAttribute("registrationRequest") RegistrationRequest registrationRequest,
+                           BindingResult bindingResult,
+                           RedirectAttributes redirectAttributes,
+                           Model model) {
+        log.info("Attempting to register user '{}'", registrationRequest.username());
+
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("pageTitle", "Register");
+            return "auth/register";
+        }
+
+        try {
+            userService.registerUser(registrationRequest);
+        } catch (DuplicateKeyException ex) {
+            bindingResult.rejectValue("username", "username.duplicate", "This username is already taken.");
+        } catch (IllegalArgumentException ex) {
+            bindingResult.reject("registration.invalid", ex.getMessage());
+        }
+
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("pageTitle", "Register");
+            return "auth/register";
+        }
+
+        redirectAttributes.addFlashAttribute("successMessage", "Account created. Please sign in.");
+        return "redirect:/login";
     }
 }
