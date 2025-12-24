@@ -1,29 +1,30 @@
 package com.example.bookreview.config;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
-import org.springframework.http.HttpMethod;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
 import com.example.bookreview.filter.LogUuidFilter;
 import com.example.bookreview.security.CustomAccessDeniedHandler;
+import com.example.bookreview.security.CustomUserDetailsService;
 
 @Slf4j
 @Configuration
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final CustomUserDetailsService customUserDetailsService;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -37,15 +38,16 @@ public class SecurityConfig {
             // AccessDeniedException으로 HTML 에러 페이지가 반환되던 원인: anonymous 사용자가 AccessDeniedHandler로 위임됨.
             // 익명 인증을 비활성화해 인증되지 않은 사용자는 AccessDenied가 아닌 인증 진입점으로 흐른다.
             .anonymous(anon -> anon.disable())
+            .userDetailsService(customUserDetailsService)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/login", "/error", "/access-denied").permitAll()
+                .requestMatchers("/", "/login", "/register", "/error", "/access-denied").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/reviews/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/reviews").authenticated()
                 .requestMatchers("/api/**").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/reviews/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/reviews/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.DELETE, "/reviews/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/reviews/**").authenticated()
                 .anyRequest().authenticated())
             .formLogin(form -> form
                 .loginPage("/login")
@@ -67,23 +69,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        UserDetails user = User.withUsername("user")
-            .password(passwordEncoder.encode("password"))
-            .roles("USER")
-            .build();
-
-        UserDetails admin = User.withUsername("admin")
-            .password(passwordEncoder.encode("password"))
-            .roles("USER", "ADMIN")
-            .build();
-
-        return new InMemoryUserDetailsManager(user, admin);
-    }
-
-    @Bean
     public PasswordEncoder passwordEncoder() {
-        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        return new BCryptPasswordEncoder();
     }
 
     @Bean

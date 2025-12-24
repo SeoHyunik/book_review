@@ -11,8 +11,10 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 @RequiredArgsConstructor
@@ -56,11 +58,11 @@ public class ReviewServiceImpl implements ReviewService {
             log.debug("AI review generated with tokenCount={} and usdCost={}", aiResult.totalTokens(), aiResult.usdCost());
         } catch (MissingApiKeyException ex) {
             openAiStatus = IntegrationStatus.Status.SKIPPED;
-            appendWarning(warnings, "OpenAI key missing: " + ex.getMessage());
+            appendWarning(warnings, "OpenAI 설정을 찾을 수 없어 개선 단계를 건너뛰었습니다.");
             log.warn("OpenAI key missing, skipping AI improvement and using fallback content");
         } catch (Exception ex) {
             openAiStatus = IntegrationStatus.Status.FAILED;
-            appendWarning(warnings, "OpenAI failed: " + ex.getMessage());
+            appendWarning(warnings, "OpenAI 호출을 처리하지 못했습니다.");
             log.warn("OpenAI content generation failed, continuing with fallback content", ex);
         }
 
@@ -71,7 +73,7 @@ public class ReviewServiceImpl implements ReviewService {
             krwCost = convertToKrw(usdCost);
         } catch (Exception ex) {
             currencyStatus = IntegrationStatus.Status.FAILED;
-            appendWarning(warnings, "Currency conversion failed: " + ex.getMessage());
+            appendWarning(warnings, "환율 정보를 불러오지 못했습니다.");
             log.warn("Currency conversion failed, continuing without KRW cost", ex);
         }
 
@@ -81,7 +83,7 @@ public class ReviewServiceImpl implements ReviewService {
             fileId = uploadToDrive(request.title(), markdown);
         } catch (Exception ex) {
             driveStatus = IntegrationStatus.Status.FAILED;
-            appendWarning(warnings, "Google Drive upload failed: " + ex.getMessage());
+            appendWarning(warnings, "Google Drive 업로드에 실패했습니다.");
             log.warn("Google Drive upload failed, continuing without file link", ex);
         }
 
@@ -111,6 +113,26 @@ public class ReviewServiceImpl implements ReviewService {
         }
     }
 
+    @Override
+    @Transactional
+    public void deleteReview(String id) {
+        log.info("Deleting review id={}", id);
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found"));
+
+        if (review.googleFileId() != null && !review.googleFileId().isBlank()) {
+            try {
+                googleDriveService.deleteFile(review.googleFileId());
+            } catch (Exception ex) {
+                log.error("Failed to delete Google Drive file for review id={} fileId={}.", id, review.googleFileId(), ex);
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to delete linked Google Drive file");
+            }
+        }
+
+        reviewRepository.deleteById(id);
+        log.info("Review id={} deleted successfully", id);
+    }
+
     private BigDecimal convertToKrw(BigDecimal usdCost) {
         if (usdCost == null) {
             return null;
@@ -136,7 +158,7 @@ public class ReviewServiceImpl implements ReviewService {
             return;
         }
         if (!warnings.isEmpty()) {
-            warnings.append(" | ");
+            warnings.append("\n");
         }
         warnings.append(message);
     }
