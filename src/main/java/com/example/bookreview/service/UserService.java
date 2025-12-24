@@ -22,16 +22,24 @@ public class UserService {
 
     public User registerUser(RegistrationRequest request) {
         validateRequest(request);
-        if (userRepository.findByUsername(request.username()).isPresent()) {
+
+        if (userRepository.existsByUsername(request.username())) {
             throw new DuplicateKeyException("Username already exists");
+        }
+
+        if (StringUtils.hasText(request.email()) && userRepository.existsByEmail(request.email())) {
+            throw new DuplicateKeyException("Email already exists");
         }
 
         Set<String> roles = new HashSet<>();
         roles.add("USER");
 
+        String email = StringUtils.hasText(request.email()) ? request.email() : null;
+
         User user = User.builder()
                 .username(request.username())
                 .passwordHash(passwordEncoder.encode(request.password()))
+                .email(email)
                 .roles(roles)
                 .build();
 
@@ -41,8 +49,15 @@ public class UserService {
     }
 
     private void validateRequest(RegistrationRequest request) {
-        if (request == null || !StringUtils.hasText(request.username()) || !StringUtils.hasText(request.password())) {
+        if (request == null
+                || !StringUtils.hasText(request.username())
+                || !StringUtils.hasText(request.password())
+                || !StringUtils.hasText(request.confirmPassword())) {
             throw new IllegalArgumentException("Username and password are required");
+        }
+
+        if (!request.password().equals(request.confirmPassword())) {
+            throw new IllegalArgumentException("Passwords do not match");
         }
     }
 }

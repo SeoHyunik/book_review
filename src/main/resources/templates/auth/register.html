@@ -8,11 +8,11 @@
                 <h1 class="h4 fw-bold mb-2 text-center">Create Account</h1>
                 <p class="text-secondary text-center mb-4">Register to create and manage your AI-powered reviews.</p>
 
-                <div th:if="${#fields.hasGlobalErrors()}" class="alert alert-danger" role="alert"
-                     th:text="${#fields.errors().get(0)}"></div>
-
                 <form th:action="@{/register}" method="post" th:object="${registrationRequest}"
                       class="d-flex flex-column gap-3">
+                    <div th:if="${#fields.hasGlobalErrors()}" class="alert alert-danger" role="alert">
+                        <p class="mb-0" th:each="err: ${#fields.globalErrors()}" th:text="${err}"></p>
+                    </div>
                     <div class="form-floating">
                         <input id="username" name="username" type="text" class="form-control"
                                placeholder="Username" th:field="*{username}" required
@@ -26,6 +26,20 @@
                                th:classappend="${#fields.hasErrors('password')}? ' is-invalid'">
                         <label for="password">Password</label>
                         <div class="invalid-feedback" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></div>
+                    </div>
+                    <div class="form-floating">
+                        <input id="confirmPassword" name="confirmPassword" type="password" class="form-control"
+                               placeholder="Confirm Password" th:field="*{confirmPassword}" required
+                               th:classappend="${#fields.hasErrors('confirmPassword')}? ' is-invalid'">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <div class="invalid-feedback" th:if="${#fields.hasErrors('confirmPassword')}" th:errors="*{confirmPassword}"></div>
+                    </div>
+                    <div class="form-floating">
+                        <input id="email" name="email" type="email" class="form-control"
+                               placeholder="Email (optional)" th:field="*{email}"
+                               th:classappend="${#fields.hasErrors('email')}? ' is-invalid'">
+                        <label for="email">Email (optional)</label>
+                        <div class="invalid-feedback" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></div>
                     </div>
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
 

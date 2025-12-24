@@ -30,6 +30,9 @@ public class User {
     @NotBlank
     private String passwordHash;
 
+    @Indexed(unique = true, sparse = true)
+    private String email;
+
     @Builder.Default
     private Set<String> roles = new HashSet<>();
 

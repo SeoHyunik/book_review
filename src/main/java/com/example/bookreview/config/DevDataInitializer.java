@@ -21,25 +21,22 @@ public class DevDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (userRepository.count() > 0) {
-            log.info("User collection already populated; skipping seed data.");
-            return;
-        }
+        seedUser("admin", Set.of("ADMIN", "USER"));
+        seedUser("user", Set.of("USER"));
+    }
 
-        User admin = User.builder()
-                .username("admin")
-                .passwordHash(passwordEncoder.encode("password"))
-                .roles(Set.of("ADMIN", "USER"))
-                .build();
+    private void seedUser(String username, Set<String> roles) {
+        userRepository.findByUsername(username).ifPresentOrElse(existing -> {
+            log.debug("User '{}' already exists; skipping creation.", username);
+        }, () -> {
+            User user = User.builder()
+                    .username(username)
+                    .passwordHash(passwordEncoder.encode("password"))
+                    .roles(roles)
+                    .build();
 
-        User user = User.builder()
-                .username("user")
-                .passwordHash(passwordEncoder.encode("password"))
-                .roles(Set.of("USER"))
-                .build();
-
-        userRepository.save(admin);
-        userRepository.save(user);
-        log.info("Seeded default users: admin/password and user/password");
+            userRepository.save(user);
+            log.info("Seeded default user: {}/password", username);
+        });
     }
 }

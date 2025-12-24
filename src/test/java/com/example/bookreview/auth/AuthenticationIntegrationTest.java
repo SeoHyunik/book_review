@@ -1,13 +1,17 @@
 package com.example.bookreview.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.bookreview.domain.User;
 import com.example.bookreview.repository.UserRepository;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -50,19 +54,51 @@ class AuthenticationIntegrationTest {
     void canRegisterNewUserAndLogin() throws Exception {
         mockMvc.perform(post("/register")
                         .with(csrf())
-                        .param("username", "newuser")
-                        .param("password", "newpass"))
+                        .param("username", "newuser1")
+                        .param("password", "newpass123")
+                        .param("confirmPassword", "newpass123")
+                        .param("email", "newuser1@example.com"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login"));
+                .andExpect(redirectedUrl("/login?registered"));
 
-        assertThat(userRepository.findByUsername("newuser")).isPresent();
+        assertThat(userRepository.findByUsername("newuser1")).isPresent();
 
         mockMvc.perform(post("/login")
                         .with(csrf())
-                        .param("username", "newuser")
-                        .param("password", "newpass"))
+                        .param("username", "newuser1")
+                        .param("password", "newpass123"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/reviews"));
+    }
+
+    @Test
+    void duplicateUsernameShowsValidationError() throws Exception {
+        if (!userRepository.existsByUsername("duplicateUser")) {
+            userRepository.save(User.builder()
+                    .username("duplicateUser")
+                    .passwordHash("secret")
+                    .roles(Set.of("USER"))
+                    .build());
+        }
+
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("username", "duplicateUser")
+                        .param("password", "anotherpass")
+                        .param("confirmPassword", "anotherpass"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("This username is already taken.")));
+    }
+
+    @Test
+    void passwordMismatchReturnsToForm() throws Exception {
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("username", "mismatchUser")
+                        .param("password", "password123")
+                        .param("confirmPassword", "password124"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Passwords do not match")));
     }
 
     @Test

@@ -38,6 +38,10 @@ public class AuthController {
                            Model model) {
         log.info("Attempting to register user '{}'", registrationRequest.username());
 
+        if (!registrationRequest.password().equals(registrationRequest.confirmPassword())) {
+            bindingResult.rejectValue("confirmPassword", "password.mismatch", "Passwords do not match");
+        }
+
         if (bindingResult.hasErrors()) {
             model.addAttribute("pageTitle", "Register");
             return "auth/register";
@@ -46,7 +50,11 @@ public class AuthController {
         try {
             userService.registerUser(registrationRequest);
         } catch (DuplicateKeyException ex) {
-            bindingResult.rejectValue("username", "username.duplicate", "This username is already taken.");
+            if (ex.getMessage() != null && ex.getMessage().toLowerCase().contains("email")) {
+                bindingResult.rejectValue("email", "email.duplicate", "This email is already in use.");
+            } else {
+                bindingResult.rejectValue("username", "username.duplicate", "This username is already taken.");
+            }
         } catch (IllegalArgumentException ex) {
             bindingResult.reject("registration.invalid", ex.getMessage());
         }
@@ -57,6 +65,6 @@ public class AuthController {
         }
 
         redirectAttributes.addFlashAttribute("successMessage", "Account created. Please sign in.");
-        return "redirect:/login";
+        return "redirect:/login?registered";
     }
 }
