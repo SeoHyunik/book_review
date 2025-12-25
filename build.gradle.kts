@@ -1,10 +1,20 @@
+import org.gradle.internal.jvm.Jvm
+import org.gradle.api.tasks.compile.JavaCompile
+
 plugins {
     id("java")
     id("org.springframework.boot") version "4.0.0-SNAPSHOT"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
-val gradleForceOffline: Boolean = project.hasProperty("forceOffline") || System.getenv("GRADLE_FORCE_OFFLINE") == "true"
+/**
+ * Offline mode toggle
+ * - ./gradlew test --offline
+ * - GRADLE_FORCE_OFFLINE=true ./gradlew test
+ * - ./gradlew -PforceOffline test
+ */
+val gradleForceOffline: Boolean =
+    project.hasProperty("forceOffline") || System.getenv("GRADLE_FORCE_OFFLINE") == "true"
 
 if (gradleForceOffline && !gradle.startParameter.isOffline) {
     gradle.startParameter.isOffline = true
@@ -15,10 +25,33 @@ group = "com.example"
 version = "0.0.1-SNAPSHOT"
 description = "AI 독후감 관리 서비스"
 
+/**
+ * Java Toolchain (compile/runtime for tasks)
+ * - Using toolchain avoids “works on my machine” issues.
+ * - Keep Gradle JVM separate; IDE/CI should point Gradle JVM to JDK 25 if possible.
+ */
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
+}
+
+/**
+ * Ensure bytecode + standard library linkage matches Java 25 explicitly.
+ * (More reliable than source/targetCompatibility.)
+ */
+tasks.withType<JavaCompile>().configureEach {
+    options.release.set(25)
+}
+
+/**
+ * Compatibility guard for JVM args:
+ * -XX:+EnableDynamicAgentLoading is available/meaningful on newer JDKs.
+ * Guarding prevents failures if build runs with older JVMs in some environments.
+ */
+fun dynamicAgentArgs(): List<String> {
+    val major = Jvm.current().javaVersion.majorVersion.toInt()
+    return if (major >= 21) listOf("-XX:+EnableDynamicAgentLoading") else emptyList()
 }
 
 configurations {
@@ -31,14 +64,21 @@ configurations {
 }
 
 repositories {
+    // Scenario 2: local jars under /libs
     flatDir { dirs("libs") }
+
+    // Scenario 3: local maven repo first
     mavenLocal()
+
+    // Spring repos for snapshot/release
     maven(url = "https://repo.spring.io/release")
     maven(url = "https://repo.spring.io/snapshot")
+
     mavenCentral()
 }
 
 dependencies {
+    // Spring Boot 4 SNAPSHOT BOM
     implementation(platform("org.springframework.boot:spring-boot-dependencies:4.0.0-SNAPSHOT"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
@@ -57,8 +97,6 @@ dependencies {
     implementation("org.thymeleaf.extras:thymeleaf-extras-springsecurity6")
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-
-
 
     implementation("com.google.api-client:google-api-client:1.32.1")
     implementation("com.google.oauth-client:google-oauth-client:1.36.0")
@@ -93,6 +131,7 @@ dependencies {
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
+    // Scenario 2: pick up any jars placed in /libs
     implementation(fileTree("libs") { include("*.jar") })
     testImplementation(fileTree("libs") { include("*.jar") })
 }
@@ -102,9 +141,9 @@ tasks.test {
 }
 
 tasks.withType<JavaExec>().configureEach {
-    jvmArgs("-XX:+EnableDynamicAgentLoading")
+    jvmArgs(dynamicAgentArgs())
 }
 
 tasks.withType<Test>().configureEach {
-    jvmArgs("-XX:+EnableDynamicAgentLoading")
+    jvmArgs(dynamicAgentArgs())
 }
