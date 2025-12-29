@@ -23,6 +23,7 @@ public record Review(
         BigDecimal usdCost,
         BigDecimal krwCost,
         String googleFileId,
+        String ownerUserId,
         IntegrationStatus integrationStatus,
         LocalDateTime createdAt) {
 
@@ -32,6 +33,7 @@ public record Review(
     public Review {
         createdAt = createdAt == null ? LocalDateTime.now() : createdAt;
         integrationStatus = integrationStatus == null ? new IntegrationStatus(null, null, null, null) : integrationStatus;
+        // 기존 문서는 ownerUserId가 없을 수 있으므로 null을 그대로 유지한다(마이그레이션 단계).
     }
 
     @JsonGetter("formattedUsdCost")

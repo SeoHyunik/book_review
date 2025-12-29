@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.bookreview.dto.domain.User;
 import com.example.bookreview.repository.UserRepository;
 import java.util.Set;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -44,6 +45,9 @@ class AuthenticationIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @Test
     void loginAndRegisterPagesAreAccessible() throws Exception {
         mockMvc.perform(get("/login")).andExpect(status().isOk());
@@ -72,12 +76,31 @@ class AuthenticationIntegrationTest {
     }
 
     @Test
+    void loginFailsWithWrongPassword() throws Exception {
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("username", "badpassuser")
+                        .param("password", "rightpass123")
+                        .param("confirmPassword", "rightpass123"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?registered"));
+
+        mockMvc.perform(post("/login")
+                        .with(csrf())
+                        .param("username", "badpassuser")
+                        .param("password", "wrongpass"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?error"));
+    }
+
+    @Test
     void duplicateUsernameShowsValidationError() throws Exception {
         if (!userRepository.existsByUsername("duplicateUser")) {
             userRepository.save(User.builder()
                     .username("duplicateUser")
-                    .passwordHash("secret")
+                    .passwordHash(passwordEncoder.encode("secret"))
                     .roles(Set.of("USER"))
+                    .enabled(true)
                     .build());
         }
 
