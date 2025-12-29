@@ -1,12 +1,13 @@
 package com.example.bookreview.security;
 
-import com.example.bookreview.domain.User;
+import com.example.bookreview.dto.domain.User;
 import com.example.bookreview.repository.UserRepository;
 import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,15 +24,15 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    public @NonNull UserDetails loadUserByUsername(@NonNull String username) throws UsernameNotFoundException {
         log.debug("Loading user by username={}", username);
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
         return org.springframework.security.core.userdetails.User.builder()
-                .username(user.getUsername())
-                .password(user.getPasswordHash())
-                .disabled(!user.isEnabled())
-                .authorities(mapAuthorities(user.getRoles()))
+                .username(user.username())
+                .password(user.passwordHash())
+                .disabled(!user.enabled())
+                .authorities(mapAuthorities(user.roles()))
                 .build();
     }
 

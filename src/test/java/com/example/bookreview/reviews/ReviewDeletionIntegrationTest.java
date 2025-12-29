@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.bookreview.dto.internal.IntegrationStatus;
-import com.example.bookreview.dto.internal.Review;
+import com.example.bookreview.dto.domain.Review;
 import com.example.bookreview.repository.ReviewRepository;
 import com.example.bookreview.service.GoogleDriveService;
 import java.math.BigDecimal;

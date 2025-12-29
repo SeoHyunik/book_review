@@ -1,45 +1,42 @@
-package com.example.bookreview.domain;
+package com.example.bookreview.dto.domain;
 
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 @Document(collection = "users")
-public class User {
-
+@Builder
+public record User(
     @Id
-    private String id;
+    String id,
 
     @NotBlank
     @Indexed(unique = true)
-    private String username;
+    String username,
 
     @NotBlank
-    private String passwordHash;
+    String passwordHash,
 
     @Indexed(unique = true, sparse = true)
-    private String email;
+    String email,
 
-    @Builder.Default
-    private Set<String> roles = new HashSet<>();
+    Set<String> roles,
 
-    @Builder.Default
-    private boolean enabled = true;
+    boolean enabled,
 
     @CreatedDate
-    @Builder.Default
-    private Instant createdAt = Instant.now();
+    Instant createdAt
+) {
+
+    public User {
+        roles = roles == null ? new HashSet<>() : roles;
+        createdAt = createdAt == null ? Instant.now() : createdAt;
+        // enabled는 primitive → 기본 false지만, Builder에서 true 주면 OK
+    }
 }

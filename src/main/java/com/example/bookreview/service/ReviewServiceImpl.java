@@ -1,9 +1,10 @@
 package com.example.bookreview.service;
 
-import com.example.bookreview.dto.internal.Review;
+import com.example.bookreview.dto.domain.Review;
 import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.dto.internal.IntegrationStatus;
 import com.example.bookreview.dto.request.ReviewRequest;
+import com.example.bookreview.exception.MissingApiKeyException;
 import com.example.bookreview.repository.ReviewRepository;
 import java.math.BigDecimal;
 import java.util.List;

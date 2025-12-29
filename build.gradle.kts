@@ -1,5 +1,6 @@
-import org.gradle.internal.jvm.Jvm
+import org.gradle.api.JavaVersion
 import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.internal.jvm.Jvm
 
 plugins {
     id("java")
@@ -50,7 +51,11 @@ tasks.withType<JavaCompile>().configureEach {
  * Guarding prevents failures if build runs with older JVMs in some environments.
  */
 fun dynamicAgentArgs(): List<String> {
-    val major = Jvm.current().javaVersion.majorVersion.toInt()
+    // ✅ FIX: Jvm.current().javaVersion is nullable on some Gradle/Kotlin DSL combos
+    val major: Int = (Jvm.current().javaVersion ?: JavaVersion.current())
+        .majorVersion
+        .toInt()
+
     return if (major >= 21) listOf("-XX:+EnableDynamicAgentLoading") else emptyList()
 }
 

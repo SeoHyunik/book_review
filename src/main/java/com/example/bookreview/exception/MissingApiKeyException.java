@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.exception;
 
 /**
  * Signals that an OpenAI API key is missing. This is used to short-circuit outbound calls while

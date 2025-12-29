@@ -1,6 +1,6 @@
 package com.example.bookreview.config;
 
-import com.example.bookreview.domain.User;
+import com.example.bookreview.dto.domain.User;
 import com.example.bookreview.repository.UserRepository;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;

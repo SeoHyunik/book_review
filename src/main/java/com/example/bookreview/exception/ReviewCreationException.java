@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.exception;
 
 public class ReviewCreationException extends RuntimeException {
 

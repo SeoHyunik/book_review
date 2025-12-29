@@ -1,6 +1,6 @@
 package com.example.bookreview.service;
 
-import com.example.bookreview.domain.User;
+import com.example.bookreview.dto.domain.User;
 import com.example.bookreview.repository.UserRepository;
 import com.example.bookreview.web.request.RegistrationRequest;
 import java.util.HashSet;
@@ -44,7 +44,7 @@ public class UserService {
                 .build();
 
         User saved = userRepository.save(user);
-        log.info("Registered new user with username={}", saved.getUsername());
+        log.info("Registered new user with username={}", saved.username());
         return saved;
     }
 

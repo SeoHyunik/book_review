@@ -1,6 +1,6 @@
 package com.example.bookreview.repository;
 
-import com.example.bookreview.domain.User;
+import com.example.bookreview.dto.domain.User;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;

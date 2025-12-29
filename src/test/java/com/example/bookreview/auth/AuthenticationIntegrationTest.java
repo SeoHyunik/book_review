@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.bookreview.domain.User;
+import com.example.bookreview.dto.domain.User;
 import com.example.bookreview.repository.UserRepository;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
