@@ -41,6 +41,7 @@ public class UserService {
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .email(email)
                 .roles(roles)
+                .enabled(true)
                 .build();
 
         User saved = userRepository.save(user);

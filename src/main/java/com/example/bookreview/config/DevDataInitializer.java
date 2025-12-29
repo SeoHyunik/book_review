@@ -33,6 +33,7 @@ public class DevDataInitializer implements CommandLineRunner {
                     .username(username)
                     .passwordHash(passwordEncoder.encode("password"))
                     .roles(roles)
+                    .enabled(true)
                     .build();
 
             userRepository.save(user);
