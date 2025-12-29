@@ -41,7 +41,6 @@ public class SecurityConfig {
             // 익명 사용자를 명시적으로 활성화하여 템플릿에서 isAnonymous()/isAuthenticated() 분기를 올바르게 사용한다.
             .anonymous(Customizer.withDefaults())
             .authenticationProvider(daoAuthenticationProvider())
-            .userDetailsService(customUserDetailsService)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/login", "/register", "/error", "/access-denied").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
@@ -80,8 +79,7 @@ public class SecurityConfig {
 
     @Bean
     public DaoAuthenticationProvider daoAuthenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(customUserDetailsService);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(customUserDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
