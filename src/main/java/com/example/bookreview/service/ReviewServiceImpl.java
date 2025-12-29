@@ -6,6 +6,7 @@ import com.example.bookreview.dto.internal.IntegrationStatus;
 import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.exception.MissingApiKeyException;
 import com.example.bookreview.repository.ReviewRepository;
+import com.example.bookreview.security.CurrentUserService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -27,17 +28,28 @@ public class ReviewServiceImpl implements ReviewService {
     private final OpenAiService openAiService;
     private final CurrencyService currencyService;
     private final GoogleDriveService googleDriveService;
+    private final CurrentUserService currentUserService;
 
     @Override
     public List<Review> getReviews() {
-        log.debug("Fetching all reviews from repository");
-        return reviewRepository.findAll();
+        if (currentUserService.isAdmin()) {
+            log.debug("Fetching all reviews from repository as admin");
+            return reviewRepository.findAll();
+        }
+        String currentUserId = currentUserService.getCurrentUserIdOrThrow();
+        log.debug("Fetching reviews for ownerUserId={}", currentUserId);
+        return reviewRepository.findByOwnerUserId(currentUserId);
     }
 
     @Override
     public Optional<Review> getReview(String id) {
-        log.debug("Fetching review by id={}", id);
-        return reviewRepository.findById(id);
+        if (currentUserService.isAdmin()) {
+            log.debug("Fetching review by id={} as admin", id);
+            return reviewRepository.findById(id);
+        }
+        String currentUserId = currentUserService.getCurrentUserIdOrThrow();
+        log.debug("Fetching review by id={} for ownerUserId={}", id, currentUserId);
+        return reviewRepository.findByIdAndOwnerUserId(id, currentUserId);
     }
 
     @Override
@@ -90,6 +102,8 @@ public class ReviewServiceImpl implements ReviewService {
 
         IntegrationStatus integrationStatus = new IntegrationStatus(openAiStatus, currencyStatus, driveStatus,
                 warnings.toString());
+        String ownerUserId = currentUserService.getCurrentUserIdOrThrow();
+
         Review review = new Review(
                 null,
                 request.title(),
@@ -99,6 +113,7 @@ public class ReviewServiceImpl implements ReviewService {
                 usdCost,
                 krwCost,
                 fileId,
+                ownerUserId,
                 integrationStatus,
                 null
         );

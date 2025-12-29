@@ -48,6 +48,7 @@ class ReviewControllerTest {
                 new BigDecimal("0.12"),
                 new BigDecimal("150.0"),
                 "drive-file-id",
+                "user-1",
                 new IntegrationStatus(IntegrationStatus.Status.SUCCESS, IntegrationStatus.Status.SUCCESS,
                         IntegrationStatus.Status.SUCCESS, null),
                 LocalDateTime.parse("2024-01-01T10:00:00")
@@ -55,6 +56,7 @@ class ReviewControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "user", roles = {"USER"})
     void listJson_returnsMockData() throws Exception {
         when(reviewService.getReviews()).thenReturn(List.of(sampleReview()));
 
@@ -66,6 +68,7 @@ class ReviewControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "user", roles = {"USER"})
     void detailJson_returnsSingleMockReview() throws Exception {
         when(reviewService.getReview("r1")).thenReturn(Optional.of(sampleReview()));
 
