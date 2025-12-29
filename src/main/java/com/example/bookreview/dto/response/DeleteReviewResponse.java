@@ -6,6 +6,6 @@ import java.util.List;
 public record DeleteReviewResponse(boolean deleted, boolean driveDeleted, List<String> warnings) {
 
     public static DeleteReviewResponse from(DeleteReviewResult result) {
-        return new DeleteReviewResponse(result.isDeleted(), result.isDriveDeleted(), result.getWarnings());
+        return new DeleteReviewResponse(result.deleted(), result.driveDeleted(), result.getWarnings());
     }
 }
