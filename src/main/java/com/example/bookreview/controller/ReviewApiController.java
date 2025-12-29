@@ -1,8 +1,8 @@
 package com.example.bookreview.controller;
 
 import com.example.bookreview.dto.response.DeleteReviewResponse;
-import com.example.bookreview.service.DeleteReviewResult;
-import com.example.bookreview.service.ReviewService;
+import com.example.bookreview.dto.internal.DeleteReviewResult;
+import com.example.bookreview.service.review.ReviewService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

@@ -4,7 +4,7 @@ import com.example.bookreview.dto.domain.Review;
 import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.dto.response.ReviewCreationResponse;
 import com.example.bookreview.dto.response.DeleteReviewResponse;
-import com.example.bookreview.service.ReviewService;
+import com.example.bookreview.service.review.ReviewService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;

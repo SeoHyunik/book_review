@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.util;
 
 import com.example.bookreview.dto.request.ExternalApiRequest;
 import lombok.RequiredArgsConstructor;

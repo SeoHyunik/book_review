@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.service.currency;
 
 import java.math.BigDecimal;
 

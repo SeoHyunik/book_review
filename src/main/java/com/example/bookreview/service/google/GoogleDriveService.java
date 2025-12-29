@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.service.google;
 
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;

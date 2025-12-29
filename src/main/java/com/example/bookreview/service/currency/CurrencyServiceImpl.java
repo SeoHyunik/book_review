@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.service.currency;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;

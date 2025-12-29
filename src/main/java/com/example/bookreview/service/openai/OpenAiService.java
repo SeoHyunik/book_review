@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.service.openai;
 
 import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.dto.response.OpenAiResponse;

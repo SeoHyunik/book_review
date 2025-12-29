@@ -1,6 +1,6 @@
 package com.example.bookreview.controller;
 
-import com.example.bookreview.service.UserService;
+import com.example.bookreview.service.user.UserService;
 import com.example.bookreview.web.request.RegistrationRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

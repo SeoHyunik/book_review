@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.service.user;
 
 import com.example.bookreview.dto.domain.User;
 import com.example.bookreview.repository.UserRepository;

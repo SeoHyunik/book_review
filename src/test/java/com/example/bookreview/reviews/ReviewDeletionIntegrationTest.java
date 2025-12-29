@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.bookreview.dto.internal.IntegrationStatus;
 import com.example.bookreview.dto.domain.Review;
 import com.example.bookreview.repository.ReviewRepository;
-import com.example.bookreview.service.GoogleDriveService;
+import com.example.bookreview.service.google.GoogleDriveService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;

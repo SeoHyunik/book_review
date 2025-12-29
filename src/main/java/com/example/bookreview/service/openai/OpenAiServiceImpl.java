@@ -1,10 +1,12 @@
-package com.example.bookreview.service;
+package com.example.bookreview.service.openai;
 
 import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.dto.internal.CostResult;
 import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.example.bookreview.dto.response.OpenAiResponse;
 import com.example.bookreview.exception.MissingApiKeyException;
+import com.example.bookreview.util.ExternalApiUtils;
+import com.example.bookreview.util.TokenCostCalculator;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;

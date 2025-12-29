@@ -1,5 +1,6 @@
-package com.example.bookreview.service;
+package com.example.bookreview.service.google;
 
+import com.example.bookreview.util.GoogleDriveClientProvider;
 import com.google.api.client.http.ByteArrayContent;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;

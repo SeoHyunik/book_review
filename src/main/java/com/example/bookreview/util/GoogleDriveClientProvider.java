@@ -1,4 +1,4 @@
-package com.example.bookreview.service;
+package com.example.bookreview.util;
 
 import com.example.bookreview.dto.internal.GoogleDriveProperties;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;

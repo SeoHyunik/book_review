@@ -6,6 +6,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
+import com.example.bookreview.service.google.GoogleDriveService;
+import com.example.bookreview.service.google.GoogleDriveServiceImpl;
+import com.example.bookreview.util.GoogleDriveClientProvider;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import java.io.ByteArrayInputStream;

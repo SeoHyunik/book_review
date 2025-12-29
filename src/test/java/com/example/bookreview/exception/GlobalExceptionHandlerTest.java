@@ -1,7 +1,7 @@
 package com.example.bookreview.exception;
 
 import com.example.bookreview.controller.ReviewController;
-import com.example.bookreview.service.ReviewService;
+import com.example.bookreview.service.review.ReviewService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
