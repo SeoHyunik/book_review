@@ -44,6 +44,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/login", "/register", "/error", "/access-denied").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**").permitAll()
+                .requestMatchers("/api/users/check-username", "/api/users/check-email").permitAll()
                 .requestMatchers(HttpMethod.GET, "/reviews/**").authenticated()
                 .requestMatchers(HttpMethod.POST, "/reviews").authenticated()
                 .requestMatchers("/api/**").authenticated()

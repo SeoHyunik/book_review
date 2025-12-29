@@ -21,9 +21,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.containers.MongoDBContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.util.StringUtils;
 
 @Testcontainers
 @SpringBootTest
@@ -52,6 +54,15 @@ class AuthenticationIntegrationTest {
     void loginAndRegisterPagesAreAccessible() throws Exception {
         mockMvc.perform(get("/login")).andExpect(status().isOk());
         mockMvc.perform(get("/register")).andExpect(status().isOk());
+    }
+
+    @Test
+    void registerPageExposesSingleSubmitButton() throws Exception {
+        MvcResult result = mockMvc.perform(get("/register")).andExpect(status().isOk()).andReturn();
+        String content = result.getResponse().getContentAsString();
+
+        assertThat(StringUtils.countOccurrencesOf(content, "id=\"submit-btn\"")).isEqualTo(1);
+        assertThat(StringUtils.countOccurrencesOf(content, "type=\"submit\"")).isEqualTo(1);
     }
 
     @Test
