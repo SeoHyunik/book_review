@@ -9,6 +9,7 @@ import com.example.bookreview.dto.domain.Review;
 import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.exception.MissingApiKeyException;
 import com.example.bookreview.repository.ReviewRepository;
+import com.example.bookreview.security.CurrentUserService;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,11 +32,16 @@ class ReviewServiceImplTest {
     @Mock
     private GoogleDriveService googleDriveService;
 
+    @Mock
+    private CurrentUserService currentUserService;
+
     private ReviewServiceImpl reviewService;
 
     @BeforeEach
     void setUp() {
-        reviewService = new ReviewServiceImpl(reviewRepository, openAiService, currencyService, googleDriveService);
+        reviewService = new ReviewServiceImpl(reviewRepository, openAiService, currencyService, googleDriveService,
+                currentUserService);
+        when(currentUserService.getCurrentUserIdOrThrow()).thenReturn("user-1");
     }
 
     @Test
@@ -47,7 +53,7 @@ class ReviewServiceImplTest {
             Review incoming = invocation.getArgument(0);
             return new Review("id-1", incoming.title(), incoming.originalContent(), incoming.improvedContent(),
                     incoming.tokenCount(), incoming.usdCost(), incoming.krwCost(), incoming.googleFileId(),
-                    incoming.integrationStatus(), incoming.createdAt());
+                    incoming.ownerUserId(), incoming.integrationStatus(), incoming.createdAt());
         });
 
         Review saved = reviewService.createReview(new ReviewRequest("제목", "내용"));
@@ -67,7 +73,7 @@ class ReviewServiceImplTest {
             Review incoming = invocation.getArgument(0);
             return new Review("id-2", incoming.title(), incoming.originalContent(), incoming.improvedContent(),
                     incoming.tokenCount(), incoming.usdCost(), incoming.krwCost(), incoming.googleFileId(),
-                    incoming.integrationStatus(), incoming.createdAt());
+                    incoming.ownerUserId(), incoming.integrationStatus(), incoming.createdAt());
         });
 
         Review saved = reviewService.createReview(new ReviewRequest("제목", "내용"));

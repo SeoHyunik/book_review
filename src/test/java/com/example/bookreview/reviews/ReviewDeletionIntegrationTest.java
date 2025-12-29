@@ -114,6 +114,7 @@ class ReviewDeletionIntegrationTest {
                 new BigDecimal("1.23"),
                 new BigDecimal("1000"),
                 "drive-file-id",
+                "owner-1",
                 new IntegrationStatus(IntegrationStatus.Status.SUCCESS, IntegrationStatus.Status.SUCCESS,
                         IntegrationStatus.Status.SUCCESS, null),
                 LocalDateTime.now()
