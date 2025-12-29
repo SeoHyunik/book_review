@@ -1,40 +1,89 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security"
+      th:fragment="layout(content)">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="${pageTitle} ?: 'Book Review'"></title>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" th:href="@{/css/styles.css}"/>
     <script th:src="@{/js/reviews.js}" defer></script>
 </head>
-<body>
-<div class="container" th:fragment="layout(content)">
-    <header>
-        <h1><a th:href="@{/reviews}">📚 Book Review</a></h1>
-        <nav>
-            <a th:href="@{/reviews}">목록</a>
-            <sec:authorize access="isAuthenticated()">
-                <a th:href="@{/reviews/new}">새 리뷰</a>
-            </sec:authorize>
-            <sec:authorize access="!isAuthenticated()">
-                <a th:href="@{/login}">로그인</a>
-            </sec:authorize>
-            <sec:authorize access="isAuthenticated()">
-                <span class="welcome">안녕하세요, <span sec:authentication="name"></span> 님</span>
-                <form th:action="@{/logout}" method="post" class="logout-form">
-                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-                    <button type="submit">로그아웃</button>
-                </form>
-            </sec:authorize>
-        </nav>
-        <hr/>
-    </header>
+<body class="bg-body-tertiary">
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-semibold" th:href="@{/reviews}">📚 Book Review</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav"
+                aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="nav">
+            <ul class="navbar-nav ms-auto gap-lg-2 align-items-lg-center">
+                <li class="nav-item"><a class="nav-link" th:href="@{/reviews}">Reviews</a></li>
+                <li class="nav-item" sec:authorize="isAuthenticated()">
+                    <a class="btn btn-light text-primary fw-semibold ms-lg-2" th:href="@{/reviews/new}">New Review</a>
+                </li>
+                <li class="nav-item" sec:authorize="isAnonymous()">
+                    <a class="nav-link" th:href="@{/login}">Login</a>
+                </li>
+                <li class="nav-item" sec:authorize="isAnonymous()">
+                    <a class="btn btn-outline-light btn-sm ms-lg-1" th:href="@{/register}">Register</a>
+                </li>
+                <li class="nav-item" sec:authorize="isAuthenticated()">
+                    <span class="navbar-text text-white-50 small">Hello, <strong sec:authentication="name"></strong></span>
+                </li>
+                <li class="nav-item ms-lg-2" sec:authorize="isAuthenticated()">
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                        <button type="submit" class="btn btn-outline-light btn-sm">Logout</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
 
-    <main th:replace="${content}"></main>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10 col-xl-9">
+            <header class="mb-4 d-flex align-items-center gap-2">
+                <span class="badge bg-info-subtle text-info fw-semibold text-uppercase">AI Reviews</span>
+                <p class="mb-0 text-secondary">AI 독후감 관리 서비스</p>
+            </header>
 
-    <footer>
-        <hr/>
-        <p>AI 기반 독후감 관리 서비스</p>
-    </footer>
+            <div th:if="${successMessage}" class="alert alert-success d-flex align-items-center gap-2" role="alert">
+                <i class="bi bi-check-circle-fill"></i>
+                <div th:utext="${#strings.replace(#strings.escapeXml(successMessage), '\\n', '<br/>')}"></div>
+            </div>
+            <div th:if="${warningMessage}" class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <div th:utext="${#strings.replace(#strings.escapeXml(warningMessage), '\\n', '<br/>')}"></div>
+            </div>
+            <div th:if="${errorMessage}" class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+                <i class="bi bi-x-circle-fill"></i>
+                <div th:utext="${#strings.replace(#strings.escapeXml(errorMessage), '\\n', '<br/>')}"></div>
+            </div>
+
+            <main th:replace="${content}"></main>
+
+            <footer class="mt-5 text-center text-secondary small">
+                <p class="mb-1">AI 독후감 관리 서비스</p>
+                <p class="mb-0">Crafted with Spring Boot &amp; Thymeleaf</p>
+            </footer>
+        </div>
+    </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+        crossorigin="anonymous"></script>
 </body>
 </html>

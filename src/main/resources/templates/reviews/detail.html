@@ -1,17 +1,91 @@
-<section xmlns:th="http://www.thymeleaf.org" th:fragment="content">
-    <div id="review-detail" th:attr="data-review-id=${review != null ? review.id : ''}">
-        <p id="detail-message" hidden></p>
-        <div id="detail-content" hidden>
-            <h2 id="detail-title"></h2>
-            <p><strong>생성 시각:</strong> <span id="detail-created-at"></span></p>
-            <p><strong>OpenAI 토큰:</strong> <span id="detail-token"></span></p>
-            <p><strong>USD 비용:</strong> <span id="detail-usd"></span></p>
-            <p><strong>KRW 비용:</strong> <span id="detail-krw"></span></p>
-            <h3>개선된 독후감</h3>
-            <pre id="detail-improved"></pre>
-            <p id="detail-google" hidden><strong>Google Drive ID:</strong> <span id="detail-google-id"></span></p>
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <section class="mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+            <div>
+                <p class="text-uppercase text-secondary fw-semibold small mb-2">Review Detail</p>
+                <h1 class="h3 fw-bold mb-1" id="detail-title" th:text="${review?.title}"></h1>
+                <p class="text-secondary mb-0">See the improved review and integration status at a glance.</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a class="btn btn-outline-primary" th:href="@{/reviews}"><i class="bi bi-arrow-left-short me-1"></i>Back to list</a>
+                <form th:action="@{'/reviews/' + ${review?.id} + '/delete'}" method="post"
+                      class="d-inline" sec:authorize="isAuthenticated()" onsubmit="return confirm('Delete this review? This action will also remove the Google Drive file.');">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <button class="btn btn-outline-danger" id="detail-delete" type="submit">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </form>
+            </div>
         </div>
-    </div>
-</section>
+    </section>
 
-<div xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::content})}"></div>
+    <section>
+        <div id="review-detail" th:attr="data-review-id=${review != null ? review.id : ''}">
+            <div id="detail-message" class="alert alert-warning d-none" role="alert"></div>
+
+            <div id="detail-content" class="d-flex flex-column gap-4" hidden>
+                <div class="hero-card border-0" th:classappend="${review?.integrationStatus?.warningMessage} != null ? 'border-warning-subtle' : ''">
+                    <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
+                        <div class="d-flex flex-column gap-1">
+                            <div class="d-flex align-items-center gap-2 text-secondary small">
+                                <i class="bi bi-clock-history"></i><span id="detail-created-at" th:text="${review?.formattedCreatedAt}"></span>
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap align-items-center">
+                                <span class="badge bg-light text-primary border">토큰 <span id="detail-token" class="ms-1" th:text="${review?.tokenCount}"></span></span>
+                                <span class="badge bg-light text-success border">USD <span id="detail-usd" class="ms-1" th:text="${review?.formattedUsdCost}"></span></span>
+                                <span class="badge bg-light text-success border">KRW <span id="detail-krw" class="ms-1" th:text="${review?.formattedKrwCost}"></span></span>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="d-flex gap-2 justify-content-end flex-wrap" id="detail-status-badges">
+                                <span class="badge badge-soft-info">OpenAI: <span id="detail-openai-status" th:text="${review?.integrationStatus?.openAiStatus}"></span></span>
+                                <span class="badge badge-soft-info">Currency: <span id="detail-currency-status" th:text="${review?.integrationStatus?.currencyStatus}"></span></span>
+                                <span class="badge badge-soft-info">Drive: <span id="detail-drive-status" th:text="${review?.integrationStatus?.driveStatus}"></span></span>
+                            </div>
+                            <div id="detail-warning" class="alert alert-warning mt-2 py-2 px-3 d-none" role="alert">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-exclamation-triangle-fill alert-icon"></i>
+                                    <span id="detail-warning-message"
+                                          th:utext="${#strings.replace(#strings.escapeXml(review?.integrationStatus?.warningMessage), '\\n', '<br/>')}"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="status-grid" id="detail-status" hidden>
+                    <div class="status-tile">
+                        <p class="text-secondary mb-1">OpenAI</p>
+                        <p class="fw-semibold mb-0" id="detail-openai-status-tile"></p>
+                    </div>
+                    <div class="status-tile">
+                        <p class="text-secondary mb-1">Currency</p>
+                        <p class="fw-semibold mb-0" id="detail-currency-status-tile"></p>
+                    </div>
+                    <div class="status-tile">
+                        <p class="text-secondary mb-1">Drive</p>
+                        <p class="fw-semibold mb-0" id="detail-drive-status-tile"></p>
+                    </div>
+                    <div class="status-tile" id="detail-google" hidden>
+                        <p class="text-secondary mb-1">Google Drive ID</p>
+                        <p class="fw-semibold mb-0" id="detail-google-id" th:text="${review?.googleFileId}"></p>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm card-hover">
+                    <div class="card-body d-flex flex-column gap-2">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="badge badge-soft-success">Improved Review</span>
+                            <span class="text-secondary small">AI-polished content ready to share.</span>
+                        </div>
+                        <div id="detail-improved" class="improved-content" th:text="${review?.improvedContent}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</th:block>
+</html>

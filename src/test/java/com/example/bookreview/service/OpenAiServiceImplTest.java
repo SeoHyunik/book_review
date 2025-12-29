@@ -2,7 +2,11 @@ package com.example.bookreview.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.bookreview.dto.AiReviewResult;
+import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.service.openai.OpenAiService;
+import com.example.bookreview.service.openai.OpenAiServiceImpl;
+import com.example.bookreview.util.ExternalApiUtils;
+import com.example.bookreview.util.TokenCostCalculator;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;

@@ -5,8 +5,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 
 import com.example.bookreview.config.GsonConfig;
-import com.example.bookreview.dto.AiReviewResult;
-import com.example.bookreview.dto.ExternalApiRequest;
+import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.dto.request.ExternalApiRequest;
+import com.example.bookreview.service.openai.OpenAiService;
+import com.example.bookreview.service.openai.OpenAiServiceImpl;
+import com.example.bookreview.util.ExternalApiUtils;
+import com.example.bookreview.util.TokenCostCalculator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

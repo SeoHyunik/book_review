@@ -2,21 +2,24 @@ package com.example.bookreview.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.example.bookreview.domain.Review;
-import com.example.bookreview.dto.AiReviewResult;
-import com.example.bookreview.dto.ReviewRequest;
+import com.example.bookreview.dto.internal.IntegrationStatus;
+import com.example.bookreview.dto.domain.Review;
+import com.example.bookreview.dto.request.ReviewRequest;
+import com.example.bookreview.exception.MissingApiKeyException;
 import com.example.bookreview.repository.ReviewRepository;
+import com.example.bookreview.security.CurrentUserService;
+import com.example.bookreview.service.currency.CurrencyService;
+import com.example.bookreview.service.google.GoogleDriveService;
+import com.example.bookreview.service.openai.OpenAiService;
+import com.example.bookreview.service.review.ReviewServiceImpl;
 import java.math.BigDecimal;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.Mock;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewServiceImplTest {
@@ -33,38 +36,54 @@ class ReviewServiceImplTest {
     @Mock
     private GoogleDriveService googleDriveService;
 
-    @InjectMocks
+    @Mock
+    private CurrentUserService currentUserService;
+
     private ReviewServiceImpl reviewService;
 
-    @Test
-    void createReview_slugifiesTitleForFilename() {
-        ReviewRequest request = new ReviewRequest("파일 제목 예시", "본문 내용");
-        AiReviewResult aiResult = new AiReviewResult("개선된 본문", "gpt-4", 1, 1, 2, new BigDecimal("0.01"));
+    @BeforeEach
+    void setUp() {
+        reviewService = new ReviewServiceImpl(reviewRepository, openAiService, currencyService, googleDriveService,
+                currentUserService);
+        when(currentUserService.getCurrentUserIdOrThrow()).thenReturn("user-1");
+    }
 
-        when(openAiService.generateImprovedReview(anyString(), anyString())).thenReturn(aiResult);
-        when(currencyService.convertUsdToKrw(aiResult.usdCost())).thenReturn(new BigDecimal("13.00"));
-        when(googleDriveService.uploadMarkdown(anyString(), anyString())).thenReturn("drive-file");
+    @Test
+    void createReview_persistsWhenOpenAiMissingKey() {
+        when(openAiService.generateImprovedReview(any(), any())).thenThrow(new MissingApiKeyException("key missing"));
+        when(currencyService.convertUsdToKrw(any())).thenReturn(new BigDecimal("1500"));
+        when(googleDriveService.uploadMarkdown(any(), any())).thenReturn("file-123");
         when(reviewRepository.save(any())).thenAnswer(invocation -> {
-            Review review = invocation.getArgument(0);
-            return new Review(
-                    "saved-id",
-                    review.title(),
-                    review.originalContent(),
-                    review.improvedContent(),
-                    review.tokenCount(),
-                    review.usdCost(),
-                    review.krwCost(),
-                    review.googleFileId(),
-                    review.createdAt());
+            Review incoming = invocation.getArgument(0);
+            return new Review("id-1", incoming.title(), incoming.originalContent(), incoming.improvedContent(),
+                    incoming.tokenCount(), incoming.usdCost(), incoming.krwCost(), incoming.googleFileId(),
+                    incoming.ownerUserId(), incoming.integrationStatus(), incoming.createdAt());
         });
 
-        Review saved = reviewService.createReview(request);
+        Review saved = reviewService.createReview(new ReviewRequest("제목", "내용"));
 
-        ArgumentCaptor<String> filenameCaptor = ArgumentCaptor.forClass(String.class);
-        verify(googleDriveService).uploadMarkdown(filenameCaptor.capture(), anyString());
+        assertThat(saved.id()).isEqualTo("id-1");
+        assertThat(saved.integrationStatus().openAiStatus()).isEqualTo(IntegrationStatus.Status.SKIPPED);
+        assertThat(saved.improvedContent()).contains("[IMPROVEMENT_SKIPPED]");
+        assertThat(saved.tokenCount()).isZero();
+    }
 
-        assertThat(filenameCaptor.getValue()).isEqualTo("%ED%8C%8C%EC%9D%BC-%EC%A0%9C%EB%AA%A9-%EC%98%88%EC%8B%9C.md");
-        assertThat(saved.id()).isEqualTo("saved-id");
-        assertThat(saved.googleFileId()).isEqualTo("drive-file");
+    @Test
+    void createReview_stillSavesWhenGoogleDriveFails() {
+        when(openAiService.generateImprovedReview(any(), any())).thenThrow(new MissingApiKeyException("key missing"));
+        when(currencyService.convertUsdToKrw(any())).thenReturn(new BigDecimal("1500"));
+        when(googleDriveService.uploadMarkdown(any(), any())).thenThrow(new RuntimeException("drive down"));
+        when(reviewRepository.save(any())).thenAnswer(invocation -> {
+            Review incoming = invocation.getArgument(0);
+            return new Review("id-2", incoming.title(), incoming.originalContent(), incoming.improvedContent(),
+                    incoming.tokenCount(), incoming.usdCost(), incoming.krwCost(), incoming.googleFileId(),
+                    incoming.ownerUserId(), incoming.integrationStatus(), incoming.createdAt());
+        });
+
+        Review saved = reviewService.createReview(new ReviewRequest("제목", "내용"));
+
+        assertThat(saved.id()).isEqualTo("id-2");
+        assertThat(saved.googleFileId()).isNull();
+        assertThat(saved.integrationStatus().driveStatus()).isEqualTo(IntegrationStatus.Status.FAILED);
     }
 }

@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-<body>
-<div th:replace="fragments/layout :: layout(~{::section})">
+<th:block th:fragment="content">
     <section>
         <h2>접근이 거부되었습니다</h2>
         <p>요청하신 페이지에 대한 권한이 없습니다. 필요한 권한을 가진 계정으로 다시 시도해 주세요.</p>
         <a th:href="@{/reviews}">리뷰 목록으로 돌아가기</a>
     </section>
-</div>
-</body>
+</th:block>
+<th:block th:replace="~{fragments/layout :: layout(~{::content})}"></th:block>
 </html>

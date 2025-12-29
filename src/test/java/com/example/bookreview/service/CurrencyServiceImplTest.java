@@ -2,6 +2,8 @@ package com.example.bookreview.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.bookreview.service.currency.CurrencyService;
+import com.example.bookreview.service.currency.CurrencyServiceImpl;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.concurrent.TimeUnit;
