@@ -11,7 +11,7 @@ public class LoginController {
 
     @GetMapping("/login")
     public String login(Model model) {
-        log.info("Rendering login page");
+        log.debug("Rendering login page");
         model.addAttribute("pageTitle", "Login");
         return "auth/login";
     }

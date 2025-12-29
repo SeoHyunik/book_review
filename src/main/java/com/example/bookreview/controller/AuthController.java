@@ -23,7 +23,7 @@ public class AuthController {
 
     @GetMapping("/register")
     public String registerForm(Model model) {
-        log.info("Rendering registration page");
+        log.debug("Rendering registration page");
         if (!model.containsAttribute("registrationRequest")) {
             model.addAttribute("registrationRequest", RegistrationRequest.empty());
         }
