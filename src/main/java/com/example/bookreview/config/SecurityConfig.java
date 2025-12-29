@@ -31,7 +31,7 @@ public class SecurityConfig {
     private final LoggingAuthenticationFailureHandler loggingAuthenticationFailureHandler;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) {
         log.info("Configuring SecurityFilterChain with authentication, CSRF protection, and role-based access control");
         http
             // CSRF는 기본 활성화 상태를 유지한다. 클라이언트는 메타 태그를 이용해 토큰을 전송한다.
