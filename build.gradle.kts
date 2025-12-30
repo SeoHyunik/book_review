@@ -43,7 +43,6 @@ java {
  * Guarding prevents failures if build runs with older JVMs in some environments.
  */
 fun dynamicAgentArgs(): List<String> {
-    // ✅ FIX: Jvm.current().javaVersion is nullable on some Gradle/Kotlin DSL combos
     val major: Int = (Jvm.current().javaVersion ?: JavaVersion.current())
         .majorVersion
         .toInt()
