@@ -38,14 +38,6 @@ java {
 }
 
 /**
- * Ensure bytecode + standard library linkage matches Java 25 explicitly.
- * (More reliable than source/targetCompatibility.)
- */
-tasks.withType<JavaCompile>().configureEach {
-    options.release.set(25)
-}
-
-/**
  * Compatibility guard for JVM args:
  * -XX:+EnableDynamicAgentLoading is available/meaningful on newer JDKs.
  * Guarding prevents failures if build runs with older JVMs in some environments.
@@ -75,17 +67,13 @@ repositories {
     // Scenario 3: local maven repo first
     mavenLocal()
 
-    // Spring repos for snapshot/release
-    maven(url = "https://repo.spring.io/release")
-    maven(url = "https://repo.spring.io/snapshot")
-
     mavenCentral()
+
+    // Spring Boot 4.x snapshots (required for plugin and managed BOM)
+    maven(url = "https://repo.spring.io/snapshot")
 }
 
 dependencies {
-    // Spring Boot 4 SNAPSHOT BOM
-    implementation(platform("org.springframework.boot:spring-boot-dependencies:4.0.0-SNAPSHOT"))
-
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -128,7 +116,6 @@ dependencies {
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.19.0"))
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:mongodb")
@@ -151,4 +138,12 @@ tasks.withType<JavaExec>().configureEach {
 
 tasks.withType<Test>().configureEach {
     jvmArgs(dynamicAgentArgs())
+}
+
+tasks.register("printTestCompileClasspath") {
+    group = "Verification"
+    description = "Prints the resolved testCompileClasspath entries"
+    doLast {
+        configurations.testCompileClasspath.get().forEach { println(it) }
+    }
 }
