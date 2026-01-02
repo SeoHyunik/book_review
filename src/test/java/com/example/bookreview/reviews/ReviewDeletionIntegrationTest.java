@@ -65,7 +65,7 @@ class ReviewDeletionIntegrationTest {
     void anonymousDeleteIsRedirectedToLogin() throws Exception {
         Review review = reviewRepository.save(sampleReview("r-anon"));
 
-        mockMvc.perform(delete("/api/reviews/" + review.id()).with(csrf()))
+        mockMvc.perform(delete("/reviews/" + review.id()).with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("http://localhost/login"));
     }
@@ -74,7 +74,7 @@ class ReviewDeletionIntegrationTest {
     void authenticatedDeleteRemovesReviewAndDriveFile() throws Exception {
         Review review = reviewRepository.save(sampleReview("r-1"));
 
-        mockMvc.perform(delete("/api/reviews/" + review.id())
+        mockMvc.perform(delete("/reviews/" + review.id())
                         .with(user("admin").roles("ADMIN"))
                         .with(csrf())
                         .accept(MediaType.APPLICATION_JSON))
@@ -92,7 +92,7 @@ class ReviewDeletionIntegrationTest {
         Review review = reviewRepository.save(sampleReview("r-2"));
         doThrow(new RuntimeException("drive down")).when(googleDriveService).deleteFile(anyString());
 
-        mockMvc.perform(delete("/api/reviews/" + review.id())
+        mockMvc.perform(delete("/reviews/" + review.id())
                         .with(user("admin").roles("ADMIN"))
                         .with(csrf())
                         .accept(MediaType.APPLICATION_JSON))

@@ -21,7 +21,7 @@ function setupDeleteConfirmation(reviewId, messageElement) {
 
     const performDeletion = async () => {
         try {
-            const response = await fetchJson(`/api/reviews/${reviewId}`, { method: 'DELETE' });
+            const response = await fetchJson(`/reviews/${reviewId}`, { method: 'DELETE' });
             if (response?.warnings?.length) {
                 displayMessage(messageElement, response.warnings.join('\n'), 'warning');
             }

@@ -4,6 +4,7 @@ import com.example.bookreview.dto.domain.Review;
 import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.dto.response.ReviewCreationResponse;
 import com.example.bookreview.dto.response.DeleteReviewResponse;
+import com.example.bookreview.dto.internal.DeleteReviewResult;
 import com.example.bookreview.service.review.ReviewService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -26,7 +27,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.server.ResponseStatusException;
-import java.security.Principal;
 
 @Controller
 @RequestMapping("/reviews")
@@ -114,9 +114,10 @@ public class ReviewController {
     }
 
     @DeleteMapping(value = "/{id}")
-    public ResponseEntity<DeleteReviewResponse> deleteReview(@PathVariable String id, Principal principal) {
-        log.info("Received request to delete review id={} by user={}", id, principal != null ? principal.getName() : "anonymous");
-        return ResponseEntity.ok(DeleteReviewResponse.from(reviewService.deleteReview(id)));
+    public ResponseEntity<DeleteReviewResponse> deleteReview(@PathVariable String id) {
+        log.info("[API] Delete request for review id={}", id);
+        DeleteReviewResult result = reviewService.deleteReview(id);
+        return ResponseEntity.ok(DeleteReviewResponse.from(result));
     }
 
     @PostMapping(value = "/{id}/delete")
