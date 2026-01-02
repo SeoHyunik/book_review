@@ -115,7 +115,7 @@ public class ReviewController {
 
     @DeleteMapping(value = "/{id}")
     public ResponseEntity<DeleteReviewResponse> deleteReview(@PathVariable String id) {
-        log.info("[API] Delete request for review id={}", id);
+        log.info("Delete request for review id={}", id);
         DeleteReviewResult result = reviewService.deleteReview(id);
         return ResponseEntity.ok(DeleteReviewResponse.from(result));
     }
