@@ -1,5 +1,3 @@
-import org.gradle.api.JavaVersion
-import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.internal.jvm.Jvm
 
 plugins {
@@ -28,8 +26,7 @@ description = "AI 독후감 관리 서비스"
 
 /**
  * Java Toolchain (compile/runtime for tasks)
- * - Using toolchain avoids “works on my machine” issues.
- * - Keep Gradle JVM separate; IDE/CI should point Gradle JVM to JDK 25 if possible.
+ * - KEEP AS-IS (User requested)
  */
 java {
     toolchain {
@@ -40,7 +37,6 @@ java {
 /**
  * Compatibility guard for JVM args:
  * -XX:+EnableDynamicAgentLoading is available/meaningful on newer JDKs.
- * Guarding prevents failures if build runs with older JVMs in some environments.
  */
 fun dynamicAgentArgs(): List<String> {
     val major: Int = (Jvm.current().javaVersion ?: JavaVersion.current())
@@ -55,24 +51,34 @@ configurations {
         extendsFrom(configurations.annotationProcessor.get())
     }
     all {
+        // logback 제외하고 log4j2 사용
         exclude(group = "org.springframework.boot", module = "spring-boot-starter-logging")
     }
 }
 
 repositories {
-    // Scenario 2: local jars under /libs
+    // 사내망/오프라인 환경에서 libs 폴더로 수동 주입 가능
     flatDir { dirs("libs") }
 
-    // Scenario 3: local maven repo first
+    // 사내 Nexus/Artifactory를 mavenLocal로 미러링하는 경우가 있어 유지
     mavenLocal()
 
+    // 기본 공개 저장소
     mavenCentral()
 
-    // Spring Boot 4.x snapshots (required for plugin and managed BOM)
+    // Spring Boot 4.x SNAPSHOT 사용 중이므로 유지
     maven(url = "https://repo.spring.io/snapshot")
 }
 
+/**
+ * Versions (only where we must pin to fix resolution problems)
+ * - Spring/Java versions are kept unchanged.
+ * - Testcontainers version pinned via BOM so modules get versions.
+ */
+val testcontainersBomVersion = "1.21.4" // latest 1.x line (stable) :contentReference[oaicite:3]{index=3}
+
 dependencies {
+    // --- Spring Boot starters ---
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -90,6 +96,7 @@ dependencies {
 
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    // --- Google / etc ---
     implementation("com.google.api-client:google-api-client:1.32.1")
     implementation("com.google.oauth-client:google-oauth-client:1.36.0")
     implementation("com.google.oauth-client:google-oauth-client-jetty:1.36.0")
@@ -108,21 +115,30 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.79")
 
+    // --- Lombok ---
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
 
     developmentOnly("org.springframework.boot:spring-boot-devtools")
 
+    // --- Tests ---
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
+
+    /**
+     * ✅ Fix: Testcontainers version resolution
+     * - Without a BOM (or explicit versions), Gradle ends up with "org.testcontainers:junit-jupiter:" (blank version)
+     * - Pin via BOM so junit-jupiter/mongodb get versions consistently.
+     */
+    testImplementation(platform("org.testcontainers:testcontainers-bom:$testcontainersBomVersion"))
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:mongodb")
-    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
-    // Scenario 2: pick up any jars placed in /libs
+    // --- Local jars under /libs (manual injection scenario) ---
     implementation(fileTree("libs") { include("*.jar") })
     testImplementation(fileTree("libs") { include("*.jar") })
 }
