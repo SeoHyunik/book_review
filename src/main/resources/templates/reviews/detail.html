@@ -12,7 +12,7 @@
             <div class="d-flex gap-2 flex-wrap">
                 <a class="btn btn-outline-primary" th:href="@{/reviews}"><i class="bi bi-arrow-left-short me-1"></i>Back to list</a>
                 <form th:action="@{'/reviews/' + ${review?.id} + '/delete'}" method="post"
-                      class="d-inline" sec:authorize="isAuthenticated()" onsubmit="return confirm('Delete this review? This action will also remove the Google Drive file.');">
+                      class="d-inline" sec:authorize="isAuthenticated()">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                     <button class="btn btn-outline-danger" id="detail-delete" type="submit">
                         <i class="bi bi-trash me-1"></i>Delete
@@ -87,5 +87,39 @@
             </div>
         </div>
     </section>
+
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmTitle"
+         aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content delete-confirm-modal">
+                <div class="modal-header align-items-start">
+                    <div class="d-flex flex-column gap-1">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-danger-subtle text-danger fw-semibold text-uppercase">Delete</span>
+                            <p class="mb-0 text-white-50 small">Please confirm before proceeding</p>
+                        </div>
+                        <h2 class="modal-title h5 fw-bold text-white mb-0" id="deleteConfirmTitle">Delete review</h2>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex gap-3 align-items-start">
+                        <div class="rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center"
+                             style="width: 44px; height: 44px;">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        </div>
+                        <div class="d-flex flex-column gap-2">
+                            <p class="mb-0 fw-semibold text-dark">Delete this review?</p>
+                            <p class="mb-0 text-secondary small">This action will also remove the Google Drive file.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="delete-cancel-btn">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="delete-confirm-btn">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </th:block>
 </html>

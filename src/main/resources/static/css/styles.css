@@ -110,6 +110,36 @@ pre {
     box-shadow: 0 12px 30px rgba(79, 70, 229, 0.3);
 }
 
+.delete-confirm-modal {
+    border-radius: 18px;
+    box-shadow: var(--card-shadow);
+    border: var(--soft-border);
+    overflow: hidden;
+}
+
+.delete-confirm-modal .modal-header {
+    background-image: var(--brand-gradient);
+    color: #fff;
+    border-bottom: none;
+    padding: 1.25rem 1.5rem;
+}
+
+.delete-confirm-modal .modal-body {
+    background: #f8fafc;
+    padding: 1.25rem 1.5rem;
+}
+
+.delete-confirm-modal .modal-footer {
+    border-top: var(--soft-border);
+    padding: 1rem 1.5rem;
+}
+
+#deleteConfirmModal .btn {
+    border-radius: 12px;
+    padding-inline: 1.1rem;
+    font-weight: 600;
+}
+
 #review-grid .card {
     height: 100%;
 }

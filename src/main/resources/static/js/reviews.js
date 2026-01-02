@@ -8,6 +8,79 @@ function displayMessage(element, message, type = 'warning') {
     element.style.display = 'block';
 }
 
+const DELETE_CONFIRM_MESSAGE = 'Delete this review? This action will also remove the Google Drive file.';
+
+function setupDeleteConfirmation(reviewId, messageElement) {
+    const deleteButton = document.getElementById('detail-delete');
+    const modalElement = document.getElementById('deleteConfirmModal');
+    const confirmButton = document.getElementById('delete-confirm-btn');
+    const cancelButton = document.getElementById('delete-cancel-btn');
+    const deleteForm = deleteButton?.closest('form');
+
+    if (!deleteButton) return;
+
+    const performDeletion = async () => {
+        try {
+            const response = await fetchJson(`/api/reviews/${reviewId}`, { method: 'DELETE' });
+            if (response?.warnings?.length) {
+                displayMessage(messageElement, response.warnings.join('\n'), 'warning');
+            }
+            window.location.href = '/reviews';
+        } catch (err) {
+            displayMessage(messageElement, 'Failed to delete the review. Please try again later.', 'danger');
+        }
+    };
+
+    const wireFallbackConfirm = () => {
+        deleteButton.addEventListener('click', (event) => {
+            if (!confirm(DELETE_CONFIRM_MESSAGE)) {
+                event.preventDefault();
+                return;
+            }
+
+            if (deleteForm) {
+                deleteForm.submit();
+            } else {
+                performDeletion();
+            }
+        });
+    };
+
+    if (modalElement && confirmButton && window.bootstrap?.Modal) {
+        const modalInstance = new bootstrap.Modal(modalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true,
+        });
+
+        modalElement.addEventListener('shown.bs.modal', () => {
+            confirmButton?.focus();
+        });
+
+        deleteButton.type = 'button';
+        deleteButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            modalInstance.show();
+        });
+
+        confirmButton.addEventListener('click', async () => {
+            confirmButton.disabled = true;
+            const originalText = confirmButton.textContent;
+            confirmButton.textContent = 'Deleting...';
+            await performDeletion();
+            confirmButton.disabled = false;
+            confirmButton.textContent = originalText;
+            modalInstance.hide();
+        });
+
+        cancelButton?.addEventListener('click', () => {
+            modalInstance.hide();
+        });
+    } else {
+        wireFallbackConfirm();
+    }
+}
+
 function hideMessage(element) {
     if (!element) return;
     element.classList.add('d-none');
@@ -152,23 +225,7 @@ async function loadReviewDetail() {
         document.getElementById('detail-krw').textContent = review.formattedKrwCost || review.krwCost || '-';
         document.getElementById('detail-improved').textContent = review.improvedContent;
 
-        if (deleteButton) {
-            deleteButton.onclick = async (event) => {
-                event.preventDefault();
-                const confirmed = confirm('Delete this review? This action will also remove the Google Drive file.');
-                if (!confirmed) return;
-
-                try {
-                    const response = await fetchJson(`/api/reviews/${reviewId}`, { method: 'DELETE' });
-                    if (response?.warnings?.length) {
-                        displayMessage(message, response.warnings.join('\n'), 'warning');
-                    }
-                    window.location.href = '/reviews';
-                } catch (err) {
-                    displayMessage(message, 'Failed to delete the review. Please try again later.', 'danger');
-                }
-            };
-        }
+        setupDeleteConfirmation(reviewId, message);
 
         const googleInfo = document.getElementById('detail-google');
         const googleId = document.getElementById('detail-google-id');
