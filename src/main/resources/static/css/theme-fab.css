@@ -1,8 +1,8 @@
 #theme-fab {
     position: fixed;
-    right: 24px;
-    bottom: 24px;
-    z-index: 1055;
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    z-index: 2000;
     width: 52px;
     height: 52px;
     border-radius: 50%;
@@ -33,4 +33,15 @@
 
 #theme-fab i {
     font-size: 1.35rem;
+}
+
+@media (max-width: 575.98px) {
+    #theme-fab {
+        width: 44px;
+        height: 44px;
+    }
+
+    #theme-fab i {
+        font-size: 1.15rem;
+    }
 }
