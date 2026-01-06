@@ -132,13 +132,19 @@ body.bg-body-tertiary {
 }
 
 [data-bs-theme="dark"] .alert-warning {
-    background-color: #f2c94c !important;
-    border-color: #f1b71c !important;
-    color: #3b2a00 !important;
+    background-color: #B8870B !important;
+    border-color: #E3B341 !important;
+    color: #111111 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
 }
 
 [data-bs-theme="dark"] .alert-warning .bi,
 [data-bs-theme="dark"] .alert-warning a,
 [data-bs-theme="dark"] .alert-warning .alert-link {
-    color: #3b2a00 !important;
+    color: #111111 !important;
+}
+
+[data-bs-theme="dark"] .alert-warning a,
+[data-bs-theme="dark"] .alert-warning .alert-link {
+    text-decoration: underline;
 }
