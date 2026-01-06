@@ -130,3 +130,15 @@ body.bg-body-tertiary {
 .flash-alert.fade-out {
     opacity: 0;
 }
+
+[data-bs-theme="dark"] .alert-warning {
+    background-color: #f2c94c !important;
+    border-color: #f1b71c !important;
+    color: #3b2a00 !important;
+}
+
+[data-bs-theme="dark"] .alert-warning .bi,
+[data-bs-theme="dark"] .alert-warning a,
+[data-bs-theme="dark"] .alert-warning .alert-link {
+    color: #3b2a00 !important;
+}
