@@ -1,0 +1,25 @@
+:root {
+    color-scheme: light dark;
+}
+
+html,
+body {
+    transition: background-color 200ms ease, color 200ms ease;
+}
+
+body {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+body.bg-body-tertiary {
+    background-color: var(--bs-body-bg);
+}
+
+.card,
+.list-group-item,
+.modal-content {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border-color: var(--bs-border-color-translucent, var(--bs-border-color));
+}
