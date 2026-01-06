@@ -23,3 +23,78 @@ body.bg-body-tertiary {
     color: var(--bs-body-color);
     border-color: var(--bs-border-color-translucent, var(--bs-border-color));
 }
+
+[data-bs-theme="dark"] {
+    --app-surface-1: #0d1726;
+    --app-surface-2: #132238;
+    --app-surface-border: rgba(255, 255, 255, 0.08);
+    --app-surface-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+[data-bs-theme="dark"] .card,
+[data-bs-theme="dark"] .list-group-item,
+[data-bs-theme="dark"] .modal-content {
+    background-color: var(--app-surface-1);
+    color: var(--bs-body-color);
+    border-color: var(--app-surface-border);
+    box-shadow: var(--app-surface-shadow);
+}
+
+[data-bs-theme="dark"] .card .card-body,
+[data-bs-theme="dark"] .modal-content .modal-body {
+    background-color: transparent;
+}
+
+[data-bs-theme="dark"] main section,
+[data-bs-theme="dark"] .hero-card {
+    background-color: var(--app-surface-1);
+    border-color: var(--app-surface-border);
+    box-shadow: var(--app-surface-shadow);
+}
+
+[data-bs-theme="dark"] pre,
+[data-bs-theme="dark"] .status-tile,
+[data-bs-theme="dark"] .improved-content {
+    background-color: var(--app-surface-2);
+    color: var(--bs-body-color);
+    border-color: var(--app-surface-border);
+    box-shadow: none;
+}
+
+[data-bs-theme="dark"] #review-grid .card-title,
+[data-bs-theme="dark"] h1,
+[data-bs-theme="dark"] h2,
+[data-bs-theme="dark"] h3,
+[data-bs-theme="dark"] h4,
+[data-bs-theme="dark"] h5,
+[data-bs-theme="dark"] h6 {
+    color: var(--bs-heading-color);
+}
+
+[data-bs-theme="dark"] .form-floating > label {
+    color: var(--bs-secondary-color);
+}
+
+[data-bs-theme="dark"] .badge.bg-light {
+    background-color: var(--app-surface-2) !important;
+    border-color: var(--app-surface-border);
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .card-footer.bg-white,
+[data-bs-theme="dark"] .bg-white {
+    background-color: var(--app-surface-1) !important;
+    border-color: var(--app-surface-border) !important;
+}
+
+[data-bs-theme="dark"] .bg-body-tertiary {
+    background-color: var(--app-surface-2) !important;
+}
+
+[data-bs-theme="dark"] .status-grid {
+    border-color: var(--app-surface-border);
+}
+
+[data-bs-theme="dark"] .delete-confirm-modal .modal-body {
+    background-color: var(--app-surface-2);
+}

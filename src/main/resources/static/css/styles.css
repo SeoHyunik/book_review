@@ -87,7 +87,7 @@ pre {
 }
 
 .form-floating > label {
-    color: #6b7280;
+    color: var(--bs-secondary-color);
 }
 
 .form-control:focus, .form-control:focus-visible, .form-control.is-valid, .form-control.is-invalid {
@@ -170,7 +170,7 @@ pre {
     border: var(--soft-border);
     border-radius: 12px;
     padding: 1.25rem;
-    color: #0f172a;
+    color: var(--bs-body-color);
     white-space: pre-wrap;
     line-height: 1.6;
     font-size: 1rem;
