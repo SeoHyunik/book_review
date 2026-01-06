@@ -8,6 +8,16 @@
     <meta name="_csrf" th:content="${_csrf.token}"/>
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
 
+    <script>
+        (function () {
+            const saved = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = saved === 'light' || saved === 'dark' ? saved : (systemPrefersDark ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-bs-theme', theme);
+            document.documentElement.classList.add('theme-preload');
+        })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -18,6 +28,7 @@
     <link rel="stylesheet" th:href="@{/css/theme-fab.css}"/>
     <link rel="stylesheet" th:href="@{/css/theme-overrides.css}"/>
     <script th:src="@{/js/theme-toggle.js}" defer></script>
+    <script th:src="@{/js/flash-alert.js}" defer></script>
     <script th:src="@{/js/reviews.js}" defer></script>
 </head>
 <body class="bg-body-tertiary">
@@ -62,15 +73,15 @@
                 <p class="mb-0 text-secondary">AI 독후감 관리 서비스</p>
             </header>
 
-            <div th:if="${successMessage}" class="alert alert-success d-flex align-items-center gap-2" role="alert">
+            <div th:if="${successMessage}" class="flash-alert alert alert-success d-flex align-items-center gap-2" role="alert">
                 <i class="bi bi-check-circle-fill"></i>
                 <div th:utext="${#strings.replace(#strings.escapeXml(successMessage), '\\n', '<br/>')}"></div>
             </div>
-            <div th:if="${warningMessage}" class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+            <div th:if="${warningMessage}" class="flash-alert alert alert-warning d-flex align-items-center gap-2" role="alert">
                 <i class="bi bi-exclamation-triangle-fill"></i>
                 <div th:utext="${#strings.replace(#strings.escapeXml(warningMessage), '\\n', '<br/>')}"></div>
             </div>
-            <div th:if="${errorMessage}" class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+            <div th:if="${errorMessage}" class="flash-alert alert alert-danger d-flex align-items-center gap-2" role="alert">
                 <i class="bi bi-x-circle-fill"></i>
                 <div th:utext="${#strings.replace(#strings.escapeXml(errorMessage), '\\n', '<br/>')}"></div>
             </div>
@@ -85,31 +96,9 @@
     </div>
 </div>
 
-<style>
-    #flash-alert {
-        transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
-        will-change: opacity;
-    }
-    #flash-alert.fade-out {
-        opacity: 0;
-    }
-</style>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
         crossorigin="anonymous"></script>
-<script>
-    const flashAlert = document.getElementById('flash-alert');
-
-    if (flashAlert) {
-        window.setTimeout(() => {
-            flashAlert.classList.add('fade-out');
-
-            window.setTimeout(() => {
-                flashAlert.remove();
-            }, 400);
-        }, 5000);
-    }
-</script>
 <button id="theme-fab" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
     <i id="theme-fab-icon" class="bi bi-moon-stars-fill"></i>
 </button>

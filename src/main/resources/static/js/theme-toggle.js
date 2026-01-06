@@ -42,9 +42,10 @@
         const fab = document.getElementById('theme-fab');
         const iconEl = document.getElementById('theme-fab-icon');
 
-        const initialTheme = getPreferredTheme();
+        const initialTheme = root.getAttribute('data-bs-theme') || getPreferredTheme();
         const hasStored = Boolean(getStoredTheme());
         applyTheme(initialTheme, { persist: false, iconEl });
+        root.classList.remove('theme-preload');
 
         if (!hasStored && mediaQuery.addEventListener) {
             mediaQuery.addEventListener('change', (event) => handleSystemChange(event, iconEl));
