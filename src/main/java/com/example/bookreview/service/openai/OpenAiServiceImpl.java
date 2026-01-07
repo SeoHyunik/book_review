@@ -2,6 +2,7 @@ package com.example.bookreview.service.openai;
 
 import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.dto.internal.CostResult;
+import com.example.bookreview.dto.internal.ParsedOpenAiResult;
 import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.example.bookreview.dto.response.OpenAiResponse;
 import com.example.bookreview.exception.MissingApiKeyException;
@@ -168,15 +169,4 @@ public class OpenAiServiceImpl implements OpenAiService {
         return element != null && element.isJsonPrimitive() ? element.getAsInt() : 0;
     }
 
-    private record ParsedOpenAiResult(
-            String improvedContent,
-            String model,
-            String finishReason,
-            int inputTokens,
-            int outputTokens) {
-
-        OpenAiResponse toResponse() {
-            return new OpenAiResponse(improvedContent, model, inputTokens, outputTokens);
-        }
-    }
 }

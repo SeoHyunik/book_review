@@ -1,6 +1,7 @@
 package com.example.bookreview.util;
 
 import com.example.bookreview.dto.internal.CostResult;
+import com.example.bookreview.dto.internal.TokenPrice;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Map;
@@ -39,5 +40,4 @@ public class TokenCostCalculator {
         return new CostResult(totalTokens, totalCost);
     }
 
-    private record TokenPrice(BigDecimal promptPricePerThousand, BigDecimal completionPricePerThousand) {}
 }
