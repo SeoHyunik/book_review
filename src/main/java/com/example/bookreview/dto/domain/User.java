@@ -13,25 +13,25 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document(collection = "users")
 @Builder
 public record User(
-    @Id
-    String id,
+        @Id
+        String id,
 
-    @NotBlank
-    @Indexed(unique = true)
-    String username,
+        @NotBlank
+        @Indexed(unique = true)
+        String username,
 
-    @NotBlank
-    String passwordHash,
+        @NotBlank
+        String passwordHash,
 
-    @Indexed(unique = true, sparse = true)
-    String email,
+        @Indexed(unique = true, sparse = true)
+        String email,
 
-    Set<String> roles,
+        Set<String> roles,
 
-    boolean enabled,
+        boolean enabled,
 
-    @CreatedDate
-    Instant createdAt
+        @CreatedDate
+        Instant createdAt
 ) {
 
     public User {

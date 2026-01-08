@@ -22,7 +22,8 @@ public class ExternalApiUtils {
         Assert.hasText(request.url(), "Request URL must not be blank");
 
         HttpHeaders headers = request.headers() != null ? request.headers() : new HttpHeaders();
-        log.info("[HTTP] Calling external API: method={}, url={}, headers={}", request.method(), request.url(), headers);
+        log.info("[HTTP] Calling external API: method={}, url={}, headers={}", request.method(),
+                request.url(), headers);
 
         return webClientBuilder
                 .build()

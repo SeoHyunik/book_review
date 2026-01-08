@@ -15,8 +15,10 @@ import java.io.IOException;
 public class CustomAccessDeniedHandler implements AccessDeniedHandler {
 
     @Override
-    public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException) throws IOException, ServletException {
-        log.warn("Access denied for method [{}] on URI [{}]", request.getMethod(), request.getRequestURI());
+    public void handle(HttpServletRequest request, HttpServletResponse response,
+            AccessDeniedException accessDeniedException) throws IOException {
+        log.warn("Access denied for method [{}] on URI [{}]", request.getMethod(),
+                request.getRequestURI());
         response.sendRedirect("/access-denied");
     }
 }

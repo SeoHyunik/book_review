@@ -67,7 +67,8 @@ public class OpenAiServiceImpl implements OpenAiService {
     public Mono<OpenAiResponse> improveReview(String originalContent) {
         return Mono.fromCallable(() -> {
             AiReviewResult result = generateImprovedReview("Untitled", originalContent);
-            return new OpenAiResponse(result.improvedContent(), result.model(), result.promptTokens(), result.completionTokens());
+            return new OpenAiResponse(result.improvedContent(), result.model(),
+                    result.promptTokens(), result.completionTokens());
         });
     }
 
@@ -87,7 +88,8 @@ public class OpenAiServiceImpl implements OpenAiService {
 
         ParsedOpenAiResult parsedResult = callAndParse(apiRequest);
         if (!"stop".equalsIgnoreCase(parsedResult.finishReason())) {
-            log.warn("[OPENAI] OpenAI response finish_reason was '{}', retrying once", parsedResult.finishReason());
+            log.warn("[OPENAI] OpenAI response finish_reason was '{}', retrying once",
+                    parsedResult.finishReason());
             parsedResult = callAndParse(apiRequest);
         }
 
@@ -109,7 +111,8 @@ public class OpenAiServiceImpl implements OpenAiService {
             throw new MissingApiKeyException("OpenAI API key is not configured");
         }
         Assert.isTrue(StringUtils.hasText(title), "Review title must not be blank");
-        Assert.isTrue(StringUtils.hasText(originalContent), "Original review content must not be blank");
+        Assert.isTrue(StringUtils.hasText(originalContent),
+                "Original review content must not be blank");
     }
 
     private String buildChatCompletionPayload(String title, String originalContent) {
@@ -119,7 +122,8 @@ public class OpenAiServiceImpl implements OpenAiService {
 
         JsonObject systemMessage = new JsonObject();
         systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content", "주어진 독후감을 더 매끄럽고 풍부한 문장으로 개선해 달라. 600~800자 분량으로 유지하고, 친근하고 설득력 있게 작성하며 결과는 마크다운이 아닌 순수 텍스트로 반환해 달라.");
+        systemMessage.addProperty("content",
+                "주어진 독후감을 더 매끄럽고 풍부한 문장으로 개선해 달라. 600~800자 분량으로 유지하고, 친근하고 설득력 있게 작성하며 결과는 마크다운이 아닌 순수 텍스트로 반환해 달라.");
 
         JsonObject userMessage = new JsonObject();
         userMessage.addProperty("role", "user");
@@ -151,14 +155,17 @@ public class OpenAiServiceImpl implements OpenAiService {
         }
 
         String improvedContent = message.get("content").getAsString();
-        String finishReason = firstChoice.has("finish_reason") ? firstChoice.get("finish_reason").getAsString() : "";
+        String finishReason =
+                firstChoice.has("finish_reason") ? firstChoice.get("finish_reason").getAsString()
+                        : "";
 
         String model = root.has("model") ? root.get("model").getAsString() : "";
         JsonObject usage = root.getAsJsonObject("usage");
         int promptTokens = extractTokenCount(usage, "prompt_tokens");
         int completionTokens = extractTokenCount(usage, "completion_tokens");
 
-        return new ParsedOpenAiResult(improvedContent.trim(), model, finishReason, promptTokens, completionTokens);
+        return new ParsedOpenAiResult(improvedContent.trim(), model, finishReason, promptTokens,
+                completionTokens);
     }
 
     private int extractTokenCount(JsonObject usage, String field) {

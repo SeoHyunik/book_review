@@ -32,14 +32,16 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public String register(@Valid @ModelAttribute("registrationRequest") RegistrationRequest registrationRequest,
-                           BindingResult bindingResult,
-                           RedirectAttributes redirectAttributes,
-                           Model model) {
+    public String register(
+            @Valid @ModelAttribute("registrationRequest") RegistrationRequest registrationRequest,
+            BindingResult bindingResult,
+            RedirectAttributes redirectAttributes,
+            Model model) {
         log.info("Attempting to register user '{}'", registrationRequest.username());
 
         if (!registrationRequest.password().equals(registrationRequest.confirmPassword())) {
-            bindingResult.rejectValue("confirmPassword", "password.mismatch", "Passwords do not match");
+            bindingResult.rejectValue("confirmPassword", "password.mismatch",
+                    "Passwords do not match");
         }
 
         if (bindingResult.hasErrors()) {
@@ -51,9 +53,11 @@ public class AuthController {
             userService.registerUser(registrationRequest);
         } catch (DuplicateKeyException ex) {
             if (ex.getMessage() != null && ex.getMessage().toLowerCase().contains("email")) {
-                bindingResult.rejectValue("email", "email.duplicate", "This email is already in use.");
+                bindingResult.rejectValue("email", "email.duplicate",
+                        "This email is already in use.");
             } else {
-                bindingResult.rejectValue("username", "username.duplicate", "This username is already taken.");
+                bindingResult.rejectValue("username", "username.duplicate",
+                        "This username is already taken.");
             }
         } catch (IllegalArgumentException ex) {
             bindingResult.reject("registration.invalid", ex.getMessage());

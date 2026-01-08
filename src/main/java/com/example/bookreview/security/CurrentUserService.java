@@ -23,14 +23,16 @@ public class CurrentUserService {
             throw new IllegalStateException("No authenticated user found in security context");
         }
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalStateException("Authenticated user could not be loaded"));
+                .orElseThrow(
+                        () -> new IllegalStateException("Authenticated user could not be loaded"));
         log.debug("Resolved current user id={} for username={}", user.id(), username);
         return user.id();
     }
 
     public boolean isAdmin() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
             return false;
         }
         return authentication.getAuthorities().stream()
@@ -40,7 +42,8 @@ public class CurrentUserService {
 
     public String getCurrentUsernameOrNull() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
             return null;
         }
         return authentication.getName();

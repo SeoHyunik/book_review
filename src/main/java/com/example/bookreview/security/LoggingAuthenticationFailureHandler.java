@@ -19,7 +19,7 @@ public class LoggingAuthenticationFailureHandler extends SimpleUrlAuthentication
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
-                                        AuthenticationException exception) throws IOException, ServletException {
+            AuthenticationException exception) throws IOException, ServletException {
         String identifier = request.getParameter("username");
         log.warn("Authentication failed for identifier='{}' with reason={} - {}", identifier,
                 exception.getClass().getSimpleName(), exception.getMessage());

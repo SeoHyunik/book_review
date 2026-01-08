@@ -5,15 +5,16 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record ReviewRequest(
-    @NotBlank(message = "{review.title.notBlank}")
-    @Size(max = 100, message = "{review.title.size}")
-    @Pattern(regexp = ReviewRequest.TITLE_FORBIDDEN_CHARS, message = "{review.title.invalidChars}")
-    String title,
+        @NotBlank(message = "{review.title.notBlank}")
+        @Size(max = 100, message = "{review.title.size}")
+        @Pattern(regexp = ReviewRequest.TITLE_FORBIDDEN_CHARS, message = "{review.title.invalidChars}")
+        String title,
 
-    @NotBlank(message = "{review.originalContent.notBlank}")
-    @Size(max = 5000, message = "{review.originalContent.size}")
-    String originalContent
+        @NotBlank(message = "{review.originalContent.notBlank}")
+        @Size(max = 5000, message = "{review.originalContent.size}")
+        String originalContent
 ) {
+
     public static final String TITLE_FORBIDDEN_CHARS = "^[^\\\\/:*?\"<>|#%]+$";
 
     /**

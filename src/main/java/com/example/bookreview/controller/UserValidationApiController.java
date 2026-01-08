@@ -23,7 +23,8 @@ public class UserValidationApiController {
     private final UserRepository userRepository;
 
     @GetMapping("/check-username")
-    public ResponseEntity<UsernameAvailabilityResponse> checkUsername(@RequestParam("username") String username) {
+    public ResponseEntity<UsernameAvailabilityResponse> checkUsername(
+            @RequestParam("username") String username) {
         String trimmed = username == null ? "" : username.trim();
 
         if (!isValidUsername(trimmed)) {
@@ -36,7 +37,8 @@ public class UserValidationApiController {
     }
 
     @GetMapping("/check-email")
-    public ResponseEntity<EmailAvailabilityResponse> checkEmail(@RequestParam("email") String email) {
+    public ResponseEntity<EmailAvailabilityResponse> checkEmail(
+            @RequestParam("email") String email) {
         String trimmed = email == null ? "" : email.trim();
 
         if (!isValidEmail(trimmed)) {
@@ -49,7 +51,8 @@ public class UserValidationApiController {
     }
 
     private boolean isValidUsername(String username) {
-        return StringUtils.hasText(username) && username.length() >= 3 && username.matches(USERNAME_PATTERN);
+        return StringUtils.hasText(username) && username.length() >= 3 && username.matches(
+                USERNAME_PATTERN);
     }
 
     private boolean isValidEmail(String email) {

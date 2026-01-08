@@ -54,7 +54,8 @@ public class ReviewController {
     public String detail(@PathVariable String id, Model model) {
         log.debug("Displaying review detail page for id={}", id);
         Review review = reviewService.getReview(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Review not found"));
         model.addAttribute("review", review);
         model.addAttribute("pageTitle", "리뷰 상세");
         return "reviews/detail";
@@ -77,19 +78,24 @@ public class ReviewController {
         return "reviews/form";
     }
 
-    @PostMapping(consumes = {MediaType.APPLICATION_FORM_URLENCODED_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
-    public String create(@Valid @ModelAttribute("reviewRequest") ReviewRequest reviewRequest, BindingResult bindingResult,
-        Model model, RedirectAttributes redirectAttributes) {
+    @PostMapping(consumes = {MediaType.APPLICATION_FORM_URLENCODED_VALUE,
+            MediaType.MULTIPART_FORM_DATA_VALUE})
+    public String create(@Valid @ModelAttribute("reviewRequest") ReviewRequest reviewRequest,
+            BindingResult bindingResult,
+            Model model, RedirectAttributes redirectAttributes) {
         log.info("Received HTML form submission for new review: title='{}'", reviewRequest.title());
         if (bindingResult.hasErrors()) {
-            log.warn("Validation errors while creating review via form: {}", bindingResult.getAllErrors());
+            log.warn("Validation errors while creating review via form: {}",
+                    bindingResult.getAllErrors());
             model.addAttribute("pageTitle", "새 리뷰 작성");
             return "reviews/form";
         }
 
         Review review = reviewService.createReview(reviewRequest);
-        if (review.integrationStatus() != null && review.integrationStatus().warningMessage() != null) {
-            redirectAttributes.addFlashAttribute("warningMessage", "Saved with warnings: " + review.integrationStatus().warningMessage());
+        if (review.integrationStatus() != null
+                && review.integrationStatus().warningMessage() != null) {
+            redirectAttributes.addFlashAttribute("warningMessage",
+                    "Saved with warnings: " + review.integrationStatus().warningMessage());
         }
         log.info("Review created successfully via form with id={}", review.id());
         return "redirect:/reviews/" + review.id();
@@ -97,11 +103,13 @@ public class ReviewController {
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
-    public ResponseEntity<ReviewCreationResponse> createJson(@Valid @RequestBody ReviewRequest reviewRequest) {
+    public ResponseEntity<ReviewCreationResponse> createJson(
+            @Valid @RequestBody ReviewRequest reviewRequest) {
         log.info("Received JSON request to create review: title='{}'", reviewRequest.title());
         Review review = reviewService.createReview(reviewRequest);
         log.info("Review created successfully via API with id={}", review.id());
-        String message = review.integrationStatus() != null && review.integrationStatus().warningMessage() != null
+        String message = review.integrationStatus() != null
+                && review.integrationStatus().warningMessage() != null
                 ? "Saved with warnings: " + review.integrationStatus().warningMessage()
                 : "Saved successfully";
         ReviewCreationResponse response = new ReviewCreationResponse(
@@ -124,7 +132,8 @@ public class ReviewController {
     public String deleteReviewForm(@PathVariable String id, RedirectAttributes redirectAttributes) {
         DeleteReviewResponse response = DeleteReviewResponse.from(reviewService.deleteReview(id));
         if (!response.warnings().isEmpty()) {
-            redirectAttributes.addFlashAttribute("warningMessage", String.join("\n", response.warnings()));
+            redirectAttributes.addFlashAttribute("warningMessage",
+                    String.join("\n", response.warnings()));
         } else {
             redirectAttributes.addFlashAttribute("successMessage", "리뷰가 삭제되었습니다.");
         }

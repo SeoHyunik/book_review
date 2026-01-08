@@ -26,7 +26,8 @@ public class GoogleDriveClientProvider {
 
     public Drive getDriveService() {
         Assert.hasText(properties.credentialsPath(), "Google credentials path must be configured");
-        try (FileInputStream credentialsStream = new FileInputStream(properties.credentialsPath())) {
+        try (FileInputStream credentialsStream = new FileInputStream(
+                properties.credentialsPath())) {
             GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream)
                     .createScoped(List.of(DriveScopes.DRIVE_FILE, DriveScopes.DRIVE_READONLY));
 

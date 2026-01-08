@@ -100,7 +100,8 @@ public class GoogleDriveServiceImpl implements GoogleDriveService {
 
     private String toSlug(String filename) {
         String baseName = filename.replaceAll("\\.md$", "");
-        String sanitized = ALLOWED_CHARS.matcher(baseName.trim().replaceAll("\\s+", "-")).replaceAll("");
+        String sanitized = ALLOWED_CHARS.matcher(baseName.trim().replaceAll("\\s+", "-"))
+                .replaceAll("");
         if (!sanitized.toLowerCase(Locale.ROOT).endsWith(".md")) {
             sanitized = sanitized + ".md";
         }

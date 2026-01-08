@@ -35,7 +35,8 @@ public class TokenCostCalculator {
 
         BigDecimal totalCost = promptCost.add(completionCost).setScale(6, RoundingMode.HALF_UP);
         long totalTokens = (long) promptTokens + completionTokens;
-        log.debug("[OPENAI] Calculated token cost: model={}, promptTokens={}, completionTokens={}, totalCost={}",
+        log.debug(
+                "[OPENAI] Calculated token cost: model={}, promptTokens={}, completionTokens={}, totalCost={}",
                 effectiveModel, promptTokens, completionTokens, totalCost);
         return new CostResult(totalTokens, totalCost);
     }

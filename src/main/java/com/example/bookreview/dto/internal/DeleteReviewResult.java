@@ -7,9 +7,9 @@ import lombok.Builder;
 
 @Builder
 public record DeleteReviewResult(
-    boolean deleted,
-    boolean driveDeleted,
-    List<String> warnings
+        boolean deleted,
+        boolean driveDeleted,
+        List<String> warnings
 ) {
 
     public DeleteReviewResult {

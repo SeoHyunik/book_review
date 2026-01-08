@@ -27,12 +27,15 @@ public record Review(
         IntegrationStatus integrationStatus,
         LocalDateTime createdAt) {
 
-    private static final DateTimeFormatter CREATED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter CREATED_AT_FORMATTER = DateTimeFormatter.ofPattern(
+            "yyyy-MM-dd HH:mm");
     private static final ZoneId ASIA_SEOUL = ZoneId.of("Asia/Seoul");
 
     public Review {
         createdAt = createdAt == null ? LocalDateTime.now() : createdAt;
-        integrationStatus = integrationStatus == null ? new IntegrationStatus(null, null, null, null) : integrationStatus;
+        integrationStatus =
+                integrationStatus == null ? new IntegrationStatus(null, null, null, null)
+                        : integrationStatus;
         // 기존 문서는 ownerUserId가 없을 수 있으므로 null을 그대로 유지한다(마이그레이션 단계).
     }
 

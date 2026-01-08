@@ -71,8 +71,10 @@ public class ReviewServiceImpl implements ReviewService {
 
         AiReviewResult aiResult = fallbackAiResult(request);
         try {
-            aiResult = openAiService.generateImprovedReview(request.title(), request.originalContent());
-            log.debug("AI review generated with tokenCount={} and usdCost={}", aiResult.totalTokens(), aiResult.usdCost());
+            aiResult = openAiService.generateImprovedReview(request.title(),
+                    request.originalContent());
+            log.debug("AI review generated with tokenCount={} and usdCost={}",
+                    aiResult.totalTokens(), aiResult.usdCost());
         } catch (MissingApiKeyException ex) {
             openAiStatus = IntegrationStatus.Status.SKIPPED;
             appendWarning(warnings, "OpenAI 설정을 찾을 수 없어 개선 단계를 건너뛰었습니다.");
@@ -104,7 +106,8 @@ public class ReviewServiceImpl implements ReviewService {
             log.warn("Google Drive upload failed, continuing without file link", ex);
         }
 
-        IntegrationStatus integrationStatus = new IntegrationStatus(openAiStatus, currencyStatus, driveStatus,
+        IntegrationStatus integrationStatus = new IntegrationStatus(openAiStatus, currencyStatus,
+                driveStatus,
                 warnings.toString());
         String ownerUserId = currentUserService.getCurrentUserIdOrThrow();
 
@@ -138,7 +141,8 @@ public class ReviewServiceImpl implements ReviewService {
     public DeleteReviewResult deleteReview(String id) {
         log.info("Deleting review id={}", id);
         Review review = reviewRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Review not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Review not found"));
 
         boolean driveDeleted = false;
         String googleFileId = review.googleFileId();
@@ -149,7 +153,8 @@ public class ReviewServiceImpl implements ReviewService {
                 googleDriveService.deleteFile(googleFileId);
                 driveDeleted = true;
             } catch (Exception ex) {
-                log.warn("Failed to delete Google Drive file for review id={} fileId={}.", id, googleFileId, ex);
+                log.warn("Failed to delete Google Drive file for review id={} fileId={}.", id,
+                        googleFileId, ex);
                 appendWarning(warnings, "Google Drive file could not be removed.");
             }
         }

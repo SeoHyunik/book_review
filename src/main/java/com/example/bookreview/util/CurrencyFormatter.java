@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class CurrencyFormatter {
 
-    private static final NumberFormat KOREAN_FORMATTER = NumberFormat.getCurrencyInstance(Locale.KOREA);
+    private static final NumberFormat KOREAN_FORMATTER = NumberFormat.getCurrencyInstance(
+            Locale.KOREA);
     private static final NumberFormat USD_FORMATTER = NumberFormat.getCurrencyInstance(Locale.US);
 
     public static String formatKrw(BigDecimal amount) {

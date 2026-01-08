@@ -42,10 +42,12 @@ public class CurrencyServiceImpl implements CurrencyService {
         try {
             BigDecimal rate = getUsdToKrwRate();
             BigDecimal result = usdAmount.multiply(rate).setScale(0, RoundingMode.HALF_UP);
-            log.debug("[CURRENCY] Converted USD {} to KRW {} using fetched rate {}", usdAmount, result, rate);
+            log.debug("[CURRENCY] Converted USD {} to KRW {} using fetched rate {}", usdAmount,
+                    result, rate);
             return result;
         } catch (Exception ex) {
-            log.warn("[CURRENCY] Failed to fetch exchange rate, falling back to default {}: {}", DEFAULT_RATE, ex.getMessage());
+            log.warn("[CURRENCY] Failed to fetch exchange rate, falling back to default {}: {}",
+                    DEFAULT_RATE, ex.getMessage());
             return usdAmount.multiply(DEFAULT_RATE).setScale(0, RoundingMode.HALF_UP);
         }
     }
