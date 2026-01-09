@@ -114,6 +114,7 @@ dependencies {
 
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.79")
+    implementation("com.github.ulisesbocchio:jasypt-spring-boot-starter:3.0.5")
 
     // --- Lombok ---
     compileOnly("org.projectlombok:lombok")

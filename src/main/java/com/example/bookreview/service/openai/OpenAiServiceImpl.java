@@ -12,9 +12,14 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -31,6 +36,8 @@ public class OpenAiServiceImpl implements OpenAiService {
 
     private static final String DEFAULT_OPENAI_URL = "https://api.openai.com/v1/chat/completions";
     private static final String DEFAULT_MODEL = "gpt-4o";
+    private static final String TITLE_PLACEHOLDER = "{{title}}";
+    private static final String CONTENT_PLACEHOLDER = "{{originalContent}}";
     private final ExternalApiUtils apiUtils;
     private final Gson gson;
     private final TokenCostCalculator tokenCostCalculator;
@@ -40,6 +47,8 @@ public class OpenAiServiceImpl implements OpenAiService {
     private String openAiUrl;
     @Value("${openai.model:" + DEFAULT_MODEL + "}")
     private String openAiModel;
+    @Value("${openai.prompt-file}")
+    private Resource promptFile;
 
     @Override
     public AiReviewResult generateImprovedReview(String title, String originalContent) {
@@ -118,23 +127,53 @@ public class OpenAiServiceImpl implements OpenAiService {
     private String buildChatCompletionPayload(String title, String originalContent) {
         JsonObject root = new JsonObject();
         root.addProperty("model", openAiModel);
-        JsonArray messages = new JsonArray();
-
-        JsonObject systemMessage = new JsonObject();
-        systemMessage.addProperty("role", "system");
-        systemMessage.addProperty("content",
-                "주어진 독후감을 더 매끄럽고 풍부한 문장으로 개선해 달라. 600~800자 분량으로 유지하고, 친근하고 설득력 있게 작성하며 결과는 마크다운이 아닌 순수 텍스트로 반환해 달라.");
-
-        JsonObject userMessage = new JsonObject();
-        userMessage.addProperty("role", "user");
-        userMessage.addProperty("content", "제목: " + title + "\n원문: " + originalContent);
-
-        messages.add(systemMessage);
-        messages.add(userMessage);
-        root.add("messages", messages);
+        root.add("messages", buildMessages(title, originalContent));
         root.addProperty("temperature", 0.7);
 
         return gson.toJson(root);
+    }
+
+    private JsonArray buildMessages(String title, String originalContent) {
+        JsonObject promptRoot = loadPromptTemplate();
+        JsonArray promptMessages = promptRoot.getAsJsonArray("messages");
+        Assert.notNull(promptMessages, "Prompt file must include a messages array");
+
+        JsonArray messages = new JsonArray();
+        for (JsonElement element : promptMessages) {
+            JsonObject promptMessage = element.getAsJsonObject();
+            String role = promptMessage.has("role") ? promptMessage.get("role").getAsString() : "";
+            Assert.hasText(role, "Prompt message role must not be blank");
+
+            String content = null;
+            if (promptMessage.has("content")) {
+                content = promptMessage.get("content").getAsString();
+            } else if (promptMessage.has("template")) {
+                String template = promptMessage.get("template").getAsString();
+                content = template.replace(TITLE_PLACEHOLDER, title)
+                        .replace(CONTENT_PLACEHOLDER, originalContent);
+            }
+            Assert.hasText(content, "Prompt message content must not be blank");
+
+            JsonObject message = new JsonObject();
+            message.addProperty("role", role);
+            message.addProperty("content", content);
+            messages.add(message);
+        }
+
+        return messages;
+    }
+
+    private JsonObject loadPromptTemplate() {
+        try (Reader reader = new InputStreamReader(promptFile.getInputStream(),
+                StandardCharsets.UTF_8)) {
+            JsonObject root = gson.fromJson(reader, JsonObject.class);
+            if (root == null) {
+                throw new IllegalStateException("Prompt file was empty");
+            }
+            return root;
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read prompt file: " + promptFile, e);
+        }
     }
 
     private ParsedOpenAiResult parseResponse(String responseBody) {

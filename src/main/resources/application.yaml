@@ -41,8 +41,14 @@ spring:
       enabled: true
 
 openai:
-  api-key: ${OPENAI_API_KEY:}
-  model: ${OPENAI_MODEL:gpt-4o}
+  api-key: ENC(암호화된문자열)
+  api-url: https://api.openai.com/v1/chat/completions
+  model: gpt-4o
+  prompt-file: classpath:ai/prompts/improve_review_prompt.json
+
+jasypt:
+  encryptor:
+    password: ${JASYPT_PASSWORD}
 
 exchange-rate:
   api-key: ${EXCHANGE_RATE_API_KEY:}
