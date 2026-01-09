@@ -2,7 +2,7 @@ package com.example.bookreview.service.user;
 
 import com.example.bookreview.dto.domain.User;
 import com.example.bookreview.repository.UserRepository;
-import com.example.bookreview.web.request.RegistrationRequest;
+import com.example.bookreview.dto.request.RegistrationRequest;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;

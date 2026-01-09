@@ -1,7 +1,7 @@
 package com.example.bookreview.controller;
 
 import com.example.bookreview.service.user.UserService;
-import com.example.bookreview.web.request.RegistrationRequest;
+import com.example.bookreview.dto.request.RegistrationRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

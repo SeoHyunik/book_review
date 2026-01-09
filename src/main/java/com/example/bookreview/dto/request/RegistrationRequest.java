@@ -1,4 +1,4 @@
-package com.example.bookreview.web.request;
+package com.example.bookreview.dto.request;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
