@@ -32,11 +32,8 @@ class OpenAiServiceImplTest {
 
     private static MockWebServer mockWebServer;
 
-    private final OpenAiService openAiService;
-
-    OpenAiServiceImplTest(OpenAiService openAiService) {
-        this.openAiService = openAiService;
-    }
+    @org.springframework.beans.factory.annotation.Autowired
+    private OpenAiService openAiService;
 
     @BeforeAll
     void setUp() throws IOException {

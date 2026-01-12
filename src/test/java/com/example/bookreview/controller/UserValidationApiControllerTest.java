@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(UserValidationApiController.class)
+@WebMvcTest(controllers = UserValidationApiController.class, properties = "spring.cache.type=none")
 @Import(SecurityConfig.class)
 class UserValidationApiControllerTest {
 

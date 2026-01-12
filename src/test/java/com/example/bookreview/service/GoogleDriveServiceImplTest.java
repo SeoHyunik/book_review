@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 
 import com.example.bookreview.service.google.GoogleDriveService;
@@ -57,7 +58,7 @@ class GoogleDriveServiceImplTest {
         ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
         given(driveClientProvider.getDriveService()).willReturn(drive);
         given(drive.files()).willReturn(files);
-        given(files.create(fileCaptor.capture(), any())).willReturn(create);
+        given(files.create(any(File.class), any())).willReturn(create);
         given(create.setFields("id")).willReturn(create);
         given(create.execute()).willReturn(googleFile);
         given(googleFile.getId()).willReturn("abc123");
@@ -66,7 +67,7 @@ class GoogleDriveServiceImplTest {
 
         assertThat(fileId).isEqualTo("abc123");
         assertThat(fileCaptor.getValue().getName()).isEqualTo("운명과-분노.md");
-        verify(files).create(fileCaptor.getValue(), any());
+        verify(files).create(fileCaptor.capture(), any());
     }
 
     @Test
@@ -75,13 +76,10 @@ class GoogleDriveServiceImplTest {
         given(drive.files()).willReturn(files);
         given(files.get("file123")).willReturn(get);
         given(get.execute()).willReturn(googleFile);
-        given(get.executeMediaAsInputStream()).willThrow(new UnsupportedOperationException());
-
-        given(get.executeMedia()).willThrow(new UnsupportedOperationException());
-        org.mockito.BDDMockito.willAnswer(invocation -> {
+        doAnswer(invocation -> {
             ((java.io.OutputStream) invocation.getArgument(0)).write("hello".getBytes());
             return null;
-        }).given(get).executeMediaAndDownloadTo(any());
+        }).when(get).executeMediaAndDownloadTo(any());
 
         InputStream inputStream = googleDriveService.downloadFile("file123");
 
