@@ -96,7 +96,7 @@ class ReviewLoggingIntegrationTest {
                         .accept(MediaType.TEXT_HTML))
                 .andExpect(status().isOk());
 
-        String logs = output.getOut();
+        String logs = output.getOut() + output.getErr();
 
         assertThat(logs)
                 .contains("Received HTML form submission for new review: title='리뷰테스트'")

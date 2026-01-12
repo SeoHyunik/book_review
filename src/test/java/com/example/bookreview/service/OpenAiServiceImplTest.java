@@ -54,6 +54,7 @@ class OpenAiServiceImplTest {
         }
         registry.add("openai.api-key", () -> "test-key");
         registry.add("openai.api-url", () -> mockWebServer.url("/v1/chat/completions").toString());
+        registry.add("openai.prompt-file", () -> "classpath:ai/prompts/improve_review_prompt.json");
     }
 
     @Test
