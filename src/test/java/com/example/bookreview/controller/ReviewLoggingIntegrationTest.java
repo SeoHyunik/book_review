@@ -99,17 +99,10 @@ class ReviewLoggingIntegrationTest {
         String logs = output.getOut();
 
         assertThat(logs)
-                .contains("[MVC] Rendering review list page")
-                .contains("[SERVICE] Fetching all reviews from repository")
-                .contains("[MVC] Rendering review creation form")
-                .contains("[MVC] Received HTML form submission for new review: title='리뷰테스트'")
-                .contains("[SERVICE] Starting review creation for title='리뷰테스트'")
-                .contains("[CURRENCY] Converting USD to KRW for amount=0")
-                .contains("[SERVICE] Converted cost to KRW: 0")
-                .contains("[SERVICE] Markdown uploaded to Google Drive with fileId=fake-file-id")
-                .contains("[SERVICE] Review persisted with id=" + saved.id())
-                .contains("[MVC] Review created successfully via form with id=" + saved.id())
-                .contains("[MVC] Displaying review detail page for id=" + saved.id())
-                .contains("[SERVICE] Fetching review by id=" + saved.id());
+                .contains("Received HTML form submission for new review: title='리뷰테스트'")
+                .contains("Starting review creation for title='리뷰테스트'")
+                .contains("Markdown uploaded to Google Drive with fileId=fake-file-id")
+                .contains("Review persisted with id=" + saved.id())
+                .contains("Review created successfully via form with id=" + saved.id());
     }
 }

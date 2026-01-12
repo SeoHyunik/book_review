@@ -35,19 +35,23 @@ class OpenAiServiceImplTest {
     @org.springframework.beans.factory.annotation.Autowired
     private OpenAiService openAiService;
 
-    @BeforeAll
-    void setUp() throws IOException {
-        mockWebServer = new MockWebServer();
-        mockWebServer.start();
-    }
-
     @AfterAll
     void tearDown() throws IOException {
-        mockWebServer.shutdown();
+        if (mockWebServer != null) {
+            mockWebServer.shutdown();
+        }
     }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        if (mockWebServer == null) {
+            mockWebServer = new MockWebServer();
+            try {
+                mockWebServer.start();
+            } catch (IOException ex) {
+                throw new RuntimeException("Failed to start MockWebServer", ex);
+            }
+        }
         registry.add("openai.api-key", () -> "test-key");
         registry.add("openai.api-url", () -> mockWebServer.url("/v1/chat/completions").toString());
     }

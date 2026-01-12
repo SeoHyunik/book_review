@@ -14,6 +14,7 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.NoSuchFileException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -65,9 +66,9 @@ class GoogleDriveServiceImplTest {
 
         String fileId = googleDriveService.uploadMarkdown("운명과 분노!", "내용");
 
+        verify(files).create(fileCaptor.capture(), any());
         assertThat(fileId).isEqualTo("abc123");
         assertThat(fileCaptor.getValue().getName()).isEqualTo("운명과-분노.md");
-        verify(files).create(fileCaptor.capture(), any());
     }
 
     @Test
@@ -77,9 +78,10 @@ class GoogleDriveServiceImplTest {
         given(files.get("file123")).willReturn(get);
         given(get.execute()).willReturn(googleFile);
         doAnswer(invocation -> {
-            ((java.io.OutputStream) invocation.getArgument(0)).write("hello".getBytes());
+            OutputStream outputStream = invocation.getArgument(0);
+            outputStream.write("hello".getBytes());
             return null;
-        }).when(get).executeMediaAndDownloadTo(any());
+        }).when(get).executeMediaAndDownloadTo(any(OutputStream.class));
 
         InputStream inputStream = googleDriveService.downloadFile("file123");
 
