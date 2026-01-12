@@ -26,7 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
@@ -40,16 +40,16 @@ class ReviewLoggingIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private ReviewRepository reviewRepository;
 
-    @MockBean
+    @MockitoBean
     private OpenAiService openAiService;
 
-    @MockBean
+    @MockitoBean
     private GoogleDriveService googleDriveService;
 
-    @MockBean
+    @MockitoBean
     private CurrentUserService currentUserService;
 
     @Test

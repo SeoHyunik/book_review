@@ -14,10 +14,10 @@ import com.example.bookreview.util.TokenCostCalculator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(
         classes = {OpenAiServiceImpl.class, GsonConfig.class, TokenCostCalculator.class},
@@ -30,7 +30,7 @@ class OpenAiServiceTest {
     @Autowired
     private OpenAiService openAiService;
 
-    @MockBean
+    @MockitoBean
     private ExternalApiUtils externalApiUtils;
 
     @Test
