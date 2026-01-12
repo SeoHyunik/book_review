@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -130,7 +130,7 @@ class ReviewControllerTest {
 
     @Test
     @WithMockUser(username = "user", roles = {"USER"})
-    void createForm_withCsrf_redirectsToDetail() throws Exception {
+    void createForm_withCsrf_redirectsToDetail_secondSubmission() throws Exception {
         when(reviewService.createReview(any())).thenReturn(sampleReview());
 
         mockMvc.perform(post("/reviews")
@@ -144,7 +144,7 @@ class ReviewControllerTest {
 
     @Test
     @WithMockUser(username = "user", roles = {"USER"})
-    void createForm_missingCsrf_returnsForbidden() throws Exception {
+    void createForm_missingCsrf_returnsForbidden_secondSubmission() throws Exception {
         mockMvc.perform(post("/reviews")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .param("title", "새 제목")
@@ -153,7 +153,7 @@ class ReviewControllerTest {
     }
 
     @Test
-    void createForm_anonymous_redirectsToLogin() throws Exception {
+    void createForm_anonymous_redirectsToLogin_secondSubmission() throws Exception {
         mockMvc.perform(post("/reviews")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
