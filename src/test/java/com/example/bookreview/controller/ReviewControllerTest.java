@@ -128,38 +128,4 @@ class ReviewControllerTest {
                 .andExpect(header().string("Location", "http://localhost/login"));
     }
 
-    @Test
-    @WithMockUser(username = "user", roles = {"USER"})
-    void createForm_withCsrf_redirectsToDetail_secondSubmission() throws Exception {
-        when(reviewService.createReview(any())).thenReturn(sampleReview());
-
-        mockMvc.perform(post("/reviews")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("title", "새 제목")
-                        .param("originalContent", "내용"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", "/reviews/r1"));
-    }
-
-    @Test
-    @WithMockUser(username = "user", roles = {"USER"})
-    void createForm_missingCsrf_returnsForbidden_secondSubmission() throws Exception {
-        mockMvc.perform(post("/reviews")
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("title", "새 제목")
-                        .param("originalContent", "내용"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void createForm_anonymous_redirectsToLogin_secondSubmission() throws Exception {
-        mockMvc.perform(post("/reviews")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                        .param("title", "새 제목")
-                        .param("originalContent", "내용"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", "http://localhost/login"));
-    }
 }

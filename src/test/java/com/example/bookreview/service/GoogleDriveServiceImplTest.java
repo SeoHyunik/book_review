@@ -78,10 +78,10 @@ class GoogleDriveServiceImplTest {
         given(get.executeMediaAsInputStream()).willThrow(new UnsupportedOperationException());
 
         given(get.executeMedia()).willThrow(new UnsupportedOperationException());
-        given(get.executeMediaAndDownloadTo(any())).willAnswer(invocation -> {
+        org.mockito.BDDMockito.willAnswer(invocation -> {
             ((java.io.OutputStream) invocation.getArgument(0)).write("hello".getBytes());
             return null;
-        });
+        }).given(get).executeMediaAndDownloadTo(any());
 
         InputStream inputStream = googleDriveService.downloadFile("file123");
 
