@@ -2,6 +2,7 @@ package com.example.bookreview.service.review;
 
 import com.example.bookreview.dto.domain.Review;
 import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.dto.internal.CostResult;
 import com.example.bookreview.dto.internal.DeleteReviewResult;
 import com.example.bookreview.dto.internal.IntegrationStatus;
 import com.example.bookreview.dto.request.ReviewRequest;
@@ -11,6 +12,7 @@ import com.example.bookreview.security.CurrentUserService;
 import com.example.bookreview.service.currency.CurrencyService;
 import com.example.bookreview.service.google.GoogleDriveService;
 import com.example.bookreview.service.openai.OpenAiService;
+import com.example.bookreview.util.TokenCostCalculator;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +35,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final CurrencyService currencyService;
     private final GoogleDriveService googleDriveService;
     private final CurrentUserService currentUserService;
+    private final TokenCostCalculator tokenCostCalculator;
 
     @Override
     public List<Review> getReviews() {
@@ -88,10 +91,15 @@ public class ReviewServiceImpl implements ReviewService {
             log.warn("OpenAI content generation failed, continuing with fallback content", ex);
         }
 
-        long tokenCount = 0L;
+        long tokenCount = aiResult.totalTokens();
         BigDecimal usdCost = BigDecimal.ZERO;
         BigDecimal krwCost = null;
         try {
+            if (aiResult.fromAi()) {
+                CostResult costResult = tokenCostCalculator.calculate(aiResult.model(),
+                        aiResult.promptTokens(), aiResult.completionTokens());
+                usdCost = costResult.totalCost();
+            }
             krwCost = convertToKrw(usdCost);
         } catch (Exception ex) {
             currencyStatus = IntegrationStatus.Status.FAILED;
@@ -196,7 +204,7 @@ public class ReviewServiceImpl implements ReviewService {
 
     private AiReviewResult fallbackAiResult(ReviewRequest request) {
         String content = "[IMPROVEMENT_SKIPPED]\n" + request.originalContent();
-        return new AiReviewResult(content, false, "fallback", "SKIPPED");
+        return new AiReviewResult(content, false, "fallback", "SKIPPED", 0, 0, 0);
     }
 
     private void appendWarningIfMissing(StringBuilder warnings, String message) {

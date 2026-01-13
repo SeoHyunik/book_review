@@ -4,5 +4,8 @@ public record AiReviewResult(
         String improvedContent,
         boolean fromAi,
         String model,
-        String reason) {
+        String reason,
+        int promptTokens,
+        int completionTokens,
+        int totalTokens) {
 }

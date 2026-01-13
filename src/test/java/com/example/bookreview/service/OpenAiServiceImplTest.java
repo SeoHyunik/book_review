@@ -65,10 +65,10 @@ class OpenAiServiceImplTest {
                 {"data":[{"id":"gpt-4o","object":"model"}]}
                 """;
         String firstResponse = """
-                {"id":"chatcmpl-1","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Partial"},"finish_reason":"length"}],"usage":{"prompt_tokens":11,"completion_tokens":7}}
+                {"id":"chatcmpl-1","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Partial"},"finish_reason":"length"}],"usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18}}
                 """;
         String secondResponse = """
-                {"id":"chatcmpl-2","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Improved review text"},"finish_reason":"stop"}],"usage":{"prompt_tokens":13,"completion_tokens":9}}
+                {"id":"chatcmpl-2","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Improved review text"},"finish_reason":"stop"}],"usage":{"prompt_tokens":13,"completion_tokens":9,"total_tokens":22}}
                 """;
 
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(modelsResponse));
@@ -82,6 +82,9 @@ class OpenAiServiceImplTest {
         assertThat(response.model()).isEqualTo("gpt-4o");
         assertThat(response.fromAi()).isTrue();
         assertThat(response.reason()).isEqualTo("stop");
+        assertThat(response.promptTokens()).isEqualTo(13);
+        assertThat(response.completionTokens()).isEqualTo(9);
+        assertThat(response.totalTokens()).isEqualTo(22);
 
         RecordedRequest statusRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
         RecordedRequest firstRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
@@ -116,6 +119,7 @@ class OpenAiServiceImplTest {
         assertThat(response.fromAi()).isFalse();
         assertThat(response.reason()).isEqualTo("RATE_LIMIT");
         assertThat(response.improvedContent()).contains("[IMPROVEMENT_SKIPPED]");
+        assertThat(response.totalTokens()).isZero();
     }
 
     @Test
@@ -129,6 +133,7 @@ class OpenAiServiceImplTest {
         assertThat(response.fromAi()).isFalse();
         assertThat(response.reason()).isEqualTo("RATE_LIMIT");
         assertThat(response.improvedContent()).contains("[IMPROVEMENT_SKIPPED]");
+        assertThat(response.totalTokens()).isZero();
     }
 
     @Test
@@ -142,6 +147,7 @@ class OpenAiServiceImplTest {
         assertThat(response.fromAi()).isFalse();
         assertThat(response.reason()).isEqualTo("INSUFFICIENT_QUOTA");
         assertThat(response.improvedContent()).contains("[IMPROVEMENT_SKIPPED]");
+        assertThat(response.totalTokens()).isZero();
     }
 
     @Test
@@ -154,6 +160,7 @@ class OpenAiServiceImplTest {
         assertThat(response).isNotNull();
         assertThat(response.fromAi()).isFalse();
         assertThat(response.reason()).isEqualTo("INVALID_MODEL");
+        assertThat(response.totalTokens()).isZero();
 
         RecordedRequest statusRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
         assertThat(statusRequest).isNotNull();

@@ -68,7 +68,7 @@ public class OpenAiServiceImpl implements OpenAiService {
         OpenAiStatusCheck statusCheck = checkOpenAiStatus();
         if (!statusCheck.available()) {
             return new AiReviewResult(FALLBACK_PREFIX + originalContent, false, "unavailable",
-                    statusCheck.reason());
+                    statusCheck.reason(), 0, 0, 0);
         }
         return executeImproveReview(title, originalContent);
     }
@@ -76,7 +76,8 @@ public class OpenAiServiceImpl implements OpenAiService {
     @Override
     public OpenAiResponse improveReview(String originalContent) {
         AiReviewResult result = generateImprovedReview("Untitled", originalContent);
-        return new OpenAiResponse(result.improvedContent(), result.model(), 0, 0);
+        return new OpenAiResponse(result.improvedContent(), result.model(), result.promptTokens(),
+                result.completionTokens());
     }
 
     private AiReviewResult executeImproveReview(String title, String originalContent) {
@@ -245,12 +246,38 @@ public class OpenAiServiceImpl implements OpenAiService {
 
         String model = root.has("model") ? root.get("model").getAsString() : "";
 
-        return new AiReviewResult(improvedContent.trim(), true, model, finishReason);
+        int promptTokens = 0;
+        int completionTokens = 0;
+        int totalTokens = 0;
+        if (root.has("usage") && root.get("usage").isJsonObject()) {
+            JsonObject usage = root.getAsJsonObject("usage");
+            promptTokens = readInt(usage, "prompt_tokens");
+            completionTokens = readInt(usage, "completion_tokens");
+            totalTokens = readInt(usage, "total_tokens");
+        }
+
+        return new AiReviewResult(improvedContent.trim(), true, model, finishReason, promptTokens,
+                completionTokens, totalTokens);
     }
 
     private AiReviewResult fallbackResult(String originalContent, String reason) {
         String content = FALLBACK_PREFIX + originalContent;
-        return new AiReviewResult(content, false, "fallback", reason);
+        return new AiReviewResult(content, false, "fallback", reason, 0, 0, 0);
+    }
+
+    private int readInt(JsonObject root, String field) {
+        if (root == null || field == null || !root.has(field)) {
+            return 0;
+        }
+        JsonElement element = root.get(field);
+        if (element == null || !element.isJsonPrimitive()) {
+            return 0;
+        }
+        try {
+            return element.getAsInt();
+        } catch (Exception ex) {
+            return 0;
+        }
     }
 
     private OpenAiStatusCheck checkOpenAiStatus() {

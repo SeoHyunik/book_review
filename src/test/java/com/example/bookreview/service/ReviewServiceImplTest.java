@@ -6,6 +6,8 @@ import static org.mockito.Mockito.when;
 
 import com.example.bookreview.dto.internal.IntegrationStatus;
 import com.example.bookreview.dto.domain.Review;
+import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.dto.internal.CostResult;
 import com.example.bookreview.dto.request.ReviewRequest;
 import com.example.bookreview.exception.MissingApiKeyException;
 import com.example.bookreview.repository.ReviewRepository;
@@ -14,6 +16,7 @@ import com.example.bookreview.service.currency.CurrencyService;
 import com.example.bookreview.service.google.GoogleDriveService;
 import com.example.bookreview.service.openai.OpenAiService;
 import com.example.bookreview.service.review.ReviewServiceImpl;
+import com.example.bookreview.util.TokenCostCalculator;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,12 +43,15 @@ class ReviewServiceImplTest {
     @Mock
     private CurrentUserService currentUserService;
 
+    @Mock
+    private TokenCostCalculator tokenCostCalculator;
+
     private ReviewServiceImpl reviewService;
 
     @BeforeEach
     void setUp() {
         reviewService = new ReviewServiceImpl(reviewRepository, openAiService, currencyService, googleDriveService,
-                currentUserService);
+                currentUserService, tokenCostCalculator);
         when(currentUserService.getCurrentUserIdOrThrow()).thenReturn("user-1");
     }
 
@@ -86,5 +92,29 @@ class ReviewServiceImplTest {
         assertThat(saved.id()).isEqualTo("id-2");
         assertThat(saved.googleFileId()).isNull();
         assertThat(saved.integrationStatus().driveStatus()).isEqualTo(IntegrationStatus.Status.SKIPPED);
+    }
+
+    @Test
+    void createReview_persistsTokenCostFromAiResponse() {
+        AiReviewResult aiResult = new AiReviewResult("개선된 내용", true, "gpt-4o", "stop", 50, 10,
+                60);
+        when(openAiService.generateImprovedReview(any(), any())).thenReturn(aiResult);
+        when(tokenCostCalculator.calculate("gpt-4o", 50, 10)).thenReturn(
+                new CostResult(60, new BigDecimal("0.012345")));
+        when(currencyService.convertUsdToKrw(any())).thenReturn(new BigDecimal("18.52"));
+        when(googleDriveService.uploadMarkdown(any(), any())).thenReturn(Optional.of("file-123"));
+        when(reviewRepository.save(any())).thenAnswer(invocation -> {
+            Review incoming = invocation.getArgument(0);
+            return new Review("id-3", incoming.title(), incoming.originalContent(), incoming.improvedContent(),
+                    incoming.tokenCount(), incoming.usdCost(), incoming.krwCost(), incoming.googleFileId(),
+                    incoming.ownerUserId(), incoming.integrationStatus(), incoming.createdAt());
+        });
+
+        Review saved = reviewService.createReview(new ReviewRequest("제목", "내용"));
+
+        assertThat(saved.tokenCount()).isEqualTo(60);
+        assertThat(saved.usdCost()).isEqualByComparingTo("0.012345");
+        assertThat(saved.krwCost()).isEqualByComparingTo("18.52");
+        assertThat(saved.integrationStatus().openAiStatus()).isEqualTo(IntegrationStatus.Status.SUCCESS);
     }
 }

@@ -33,7 +33,7 @@ class OpenAiServiceTest {
     @Test
     void generateImprovedReview_returnsParsedResult() {
         String responseBody = """
-                {"id":"chatcmpl-2","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"개선된 내용"},"finish_reason":"stop"}],"usage":{"prompt_tokens":13,"completion_tokens":9}}
+                {"id":"chatcmpl-2","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"개선된 내용"},"finish_reason":"stop"}],"usage":{"prompt_tokens":13,"completion_tokens":9,"total_tokens":22}}
                 """;
 
         ExternalApiResult statusResult = new ExternalApiResult(200, "{\"data\":[{\"id\":\"gpt-4o\"}]}");
@@ -47,5 +47,8 @@ class OpenAiServiceTest {
         assertThat(openAiResult.improvedContent()).isEqualTo("개선된 내용");
         assertThat(openAiResult.fromAi()).isTrue();
         assertThat(openAiResult.reason()).isEqualTo("stop");
+        assertThat(openAiResult.promptTokens()).isEqualTo(13);
+        assertThat(openAiResult.completionTokens()).isEqualTo(9);
+        assertThat(openAiResult.totalTokens()).isEqualTo(22);
     }
 }

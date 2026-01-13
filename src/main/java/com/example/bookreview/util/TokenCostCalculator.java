@@ -19,7 +19,9 @@ public class TokenCostCalculator {
 
     private static final Map<String, TokenPrice> MODEL_PRICES = Map.of(
             "gpt-4o", new TokenPrice(new BigDecimal("0.01"), new BigDecimal("0.01")),
-            "gpt-4o-mini", new TokenPrice(new BigDecimal("0.005"), new BigDecimal("0.005"))
+            "gpt-4o-mini", new TokenPrice(new BigDecimal("0.005"), new BigDecimal("0.005")),
+            "gpt-4o-mini-2024-07-18", new TokenPrice(new BigDecimal("0.005"),
+                    new BigDecimal("0.005"))
     );
 
     public CostResult calculate(String model, int promptTokens, int completionTokens) {
