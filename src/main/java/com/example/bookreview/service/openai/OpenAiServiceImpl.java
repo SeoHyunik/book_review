@@ -241,6 +241,7 @@ public class OpenAiServiceImpl implements OpenAiService {
             return new OpenAiStatusCheck(false, UNKNOWN_REASON);
         }
         if (result.statusCode() >= 200 && result.statusCode() < 300) {
+            log.info("[OPENAI] Status check OK — valid OpenAI API key");
             return new OpenAiStatusCheck(true, "OK");
         }
         ExternalApiError error = apiUtils.parseErrorResponse(result.body());

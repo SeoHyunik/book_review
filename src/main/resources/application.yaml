@@ -43,7 +43,7 @@ spring:
 openai:
   api-key: ENC(37uGeEjg5tDfzeGJAUCAspd5tnn1K9Zi9dj7oxRJMj1aJ1820o3oI35dg1NDkHS7DJBhD0KgVk0GSaHatCXYlDbZOJBbzTke76dEwREtY5Iu8xPly4/1WGw63KOP0vgDvD4fFKII2sLJd8xh6XqPu6T+deFREfm0TMXZ5il0VDgseR4mSJCQan1y+VeHBJsGR9HtxP2NuNoygXDFyE3w2j56tHR+PES9IsgWDhjnupIoore6XAFjQPiRH5NdGx44h/BfOstt8cmQ+uFKX/kwOw==)
   api-url: https://api.openai.com/v1/chat/completions
-  model: gpt-4o
+  model: o3-mini
   prompt-file: classpath:ai/prompts/improve_review_prompt.json
 
 jasypt:
