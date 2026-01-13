@@ -6,7 +6,6 @@ import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.service.openai.OpenAiService;
 import com.example.bookreview.service.openai.OpenAiServiceImpl;
 import com.example.bookreview.util.ExternalApiUtils;
-import com.example.bookreview.util.TokenCostCalculator;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -26,7 +25,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
-        classes = {OpenAiServiceImpl.class, ExternalApiUtils.class, TokenCostCalculator.class, OpenAiServiceImplTest.TestConfig.class})
+        classes = {OpenAiServiceImpl.class, ExternalApiUtils.class, OpenAiServiceImplTest.TestConfig.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OpenAiServiceImplTest {
 
@@ -74,8 +73,8 @@ class OpenAiServiceImplTest {
         assertThat(response).isNotNull();
         assertThat(response.improvedContent()).isEqualTo("Improved review text");
         assertThat(response.model()).isEqualTo("gpt-4o");
-        assertThat(response.promptTokens()).isEqualTo(13);
-        assertThat(response.completionTokens()).isEqualTo(9);
+        assertThat(response.fromAi()).isTrue();
+        assertThat(response.reason()).isEqualTo("stop");
 
         RecordedRequest firstRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
         RecordedRequest secondRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
@@ -87,6 +86,18 @@ class OpenAiServiceImplTest {
 
         assertThat(secondRequest).isNotNull();
         assertThat(secondRequest.getMethod()).isEqualTo("POST");
+    }
+
+    @Test
+    void generateImprovedReview_returnsFallbackOnRateLimit() {
+        mockWebServer.enqueue(new MockResponse().setResponseCode(429).setBody("{\"error\":\"rate limit\"}"));
+
+        AiReviewResult response = openAiService.generateImprovedReview("Title", "Original review content");
+
+        assertThat(response).isNotNull();
+        assertThat(response.fromAi()).isFalse();
+        assertThat(response.reason()).isEqualTo("RATE_LIMITED");
+        assertThat(response.improvedContent()).contains("[IMPROVEMENT_SKIPPED]");
     }
 
     @TestConfiguration

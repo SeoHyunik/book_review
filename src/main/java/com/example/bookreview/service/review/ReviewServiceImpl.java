@@ -73,8 +73,11 @@ public class ReviewServiceImpl implements ReviewService {
         try {
             aiResult = openAiService.generateImprovedReview(request.title(),
                     request.originalContent());
-            log.debug("AI review generated with tokenCount={} and usdCost={}",
-                    aiResult.totalTokens(), aiResult.usdCost());
+            if (!aiResult.fromAi()) {
+                openAiStatus = IntegrationStatus.Status.FAILED;
+                appendWarning(warnings, "OpenAI 요청이 제한되어 기본 내용을 사용했습니다.");
+                log.warn("OpenAI rate-limited or unavailable; using fallback content");
+            }
         } catch (MissingApiKeyException ex) {
             openAiStatus = IntegrationStatus.Status.SKIPPED;
             appendWarning(warnings, "OpenAI 설정을 찾을 수 없어 개선 단계를 건너뛰었습니다.");
@@ -85,8 +88,8 @@ public class ReviewServiceImpl implements ReviewService {
             log.warn("OpenAI content generation failed, continuing with fallback content", ex);
         }
 
-        long tokenCount = aiResult.totalTokens();
-        BigDecimal usdCost = aiResult.usdCost() == null ? BigDecimal.ZERO : aiResult.usdCost();
+        long tokenCount = 0L;
+        BigDecimal usdCost = BigDecimal.ZERO;
         BigDecimal krwCost = null;
         try {
             krwCost = convertToKrw(usdCost);
@@ -100,6 +103,10 @@ public class ReviewServiceImpl implements ReviewService {
         String fileId = null;
         try {
             fileId = uploadToDrive(request.title(), markdown);
+            if (fileId == null) {
+                driveStatus = IntegrationStatus.Status.SKIPPED;
+                appendWarning(warnings, "Google Drive 설정이 없어 업로드를 건너뛰었습니다.");
+            }
         } catch (Exception ex) {
             driveStatus = IntegrationStatus.Status.FAILED;
             appendWarning(warnings, "Google Drive 업로드에 실패했습니다.");
@@ -178,14 +185,18 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private String uploadToDrive(String filename, String markdown) {
-        String fileId = googleDriveService.uploadMarkdown(filename, markdown);
-        log.info("Markdown uploaded to Google Drive with fileId={}", fileId);
-        return fileId;
+        Optional<String> fileId = googleDriveService.uploadMarkdown(filename, markdown);
+        if (fileId.isPresent()) {
+            log.info("Markdown uploaded to Google Drive with fileId={}", fileId.get());
+            return fileId.get();
+        }
+        log.warn("Google Drive upload skipped because credentials are missing.");
+        return null;
     }
 
     private AiReviewResult fallbackAiResult(ReviewRequest request) {
         String content = "[IMPROVEMENT_SKIPPED]\n" + request.originalContent();
-        return new AiReviewResult(content, "skipped", 0, 0, 0, BigDecimal.ZERO);
+        return new AiReviewResult(content, false, "fallback", "SKIPPED");
     }
 
     private void appendWarning(StringBuilder warnings, String message) {

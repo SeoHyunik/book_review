@@ -75,8 +75,8 @@ class ReviewLoggingIntegrationTest {
         given(reviewRepository.save(any())).willReturn(saved);
         given(reviewRepository.findById(saved.id())).willReturn(Optional.of(saved));
         given(openAiService.generateImprovedReview("리뷰테스트", "원본 내용"))
-                .willReturn(new AiReviewResult("개선된 독후감 예시", "gpt-4o", 2, 3, 5, BigDecimal.ZERO));
-        given(googleDriveService.uploadMarkdown(any(), any())).willReturn("fake-file-id");
+                .willReturn(new AiReviewResult("개선된 독후감 예시", true, "gpt-4o", "stop"));
+        given(googleDriveService.uploadMarkdown(any(), any())).willReturn(Optional.of("fake-file-id"));
 
         mockMvc.perform(get("/reviews").with(user("admin").roles("ADMIN")).accept(MediaType.TEXT_HTML))
                 .andExpect(status().isOk());

@@ -10,7 +10,6 @@ import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.example.bookreview.service.openai.OpenAiService;
 import com.example.bookreview.service.openai.OpenAiServiceImpl;
 import com.example.bookreview.util.ExternalApiUtils;
-import com.example.bookreview.util.TokenCostCalculator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(
-        classes = {OpenAiServiceImpl.class, GsonConfig.class, TokenCostCalculator.class},
+        classes = {OpenAiServiceImpl.class, GsonConfig.class},
         properties = {
                 "openai.api-key=test-key",
                 "openai.api-url=https://mock-openai.local/v1/chat/completions"
@@ -34,7 +33,7 @@ class OpenAiServiceTest {
     private ExternalApiUtils externalApiUtils;
 
     @Test
-    void generateImprovedReview_returnsParsedResultWithCost() {
+    void generateImprovedReview_returnsParsedResult() {
         String responseBody = """
                 {"id":"chatcmpl-2","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"개선된 내용"},"finish_reason":"stop"}],"usage":{"prompt_tokens":13,"completion_tokens":9}}
                 """;
@@ -48,9 +47,7 @@ class OpenAiServiceTest {
 
         assertThat(openAiResult).isNotNull();
         assertThat(openAiResult.improvedContent()).isEqualTo("개선된 내용");
-        assertThat(openAiResult.promptTokens()).isEqualTo(13);
-        assertThat(openAiResult.completionTokens()).isEqualTo(9);
-        assertThat(openAiResult.totalTokens()).isEqualTo(22);
-        assertThat(openAiResult.usdCost()).isEqualByComparingTo("0.000220");
+        assertThat(openAiResult.fromAi()).isTrue();
+        assertThat(openAiResult.reason()).isEqualTo("stop");
     }
 }

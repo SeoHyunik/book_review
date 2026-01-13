@@ -1,13 +1,11 @@
 package com.example.bookreview.service.openai;
 
 import com.example.bookreview.dto.internal.AiReviewResult;
-import com.example.bookreview.dto.internal.CostResult;
-import com.example.bookreview.dto.internal.ParsedOpenAiResult;
 import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.example.bookreview.dto.response.OpenAiResponse;
 import com.example.bookreview.exception.MissingApiKeyException;
+import com.example.bookreview.exception.OpenAiApiException;
 import com.example.bookreview.util.ExternalApiUtils;
-import com.example.bookreview.util.TokenCostCalculator;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -27,7 +25,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
-import reactor.core.publisher.Mono;
 
 @Slf4j
 @Service
@@ -38,9 +35,10 @@ public class OpenAiServiceImpl implements OpenAiService {
     private static final String DEFAULT_MODEL = "gpt-4o";
     private static final String TITLE_PLACEHOLDER = "{{title}}";
     private static final String CONTENT_PLACEHOLDER = "{{originalContent}}";
+    private static final String FALLBACK_PREFIX = "[IMPROVEMENT_SKIPPED]\n";
+    private static final String RATE_LIMIT_REASON = "RATE_LIMITED";
     private final ExternalApiUtils apiUtils;
     private final Gson gson;
-    private final TokenCostCalculator tokenCostCalculator;
     @Value("${openai.api-key:}")
     private String openAiApiKey;
     @Value("${openai.api-url:" + DEFAULT_OPENAI_URL + "}")
@@ -53,35 +51,16 @@ public class OpenAiServiceImpl implements OpenAiService {
     @Override
     public AiReviewResult generateImprovedReview(String title, String originalContent) {
         log.info("[OPENAI] Received request to improve review content for title='{}'", title);
-        try {
-            ParsedOpenAiResult parsedResult = executeImproveReview(title, originalContent);
-            CostResult costResult = tokenCostCalculator.calculate(
-                    parsedResult.model(), parsedResult.inputTokens(), parsedResult.outputTokens());
-            return new AiReviewResult(
-                    parsedResult.improvedContent(),
-                    parsedResult.model(),
-                    parsedResult.inputTokens(),
-                    parsedResult.outputTokens(),
-                    costResult.totalTokens(),
-                    costResult.usdCost());
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("[OPENAI] Failed to generate improved review", e);
-            throw new RuntimeException("OpenAI API 호출 중 오류가 발생했습니다: " + e.getMessage(), e);
-        }
+        return executeImproveReview(title, originalContent);
     }
 
     @Override
-    public Mono<OpenAiResponse> improveReview(String originalContent) {
-        return Mono.fromCallable(() -> {
-            AiReviewResult result = generateImprovedReview("Untitled", originalContent);
-            return new OpenAiResponse(result.improvedContent(), result.model(),
-                    result.promptTokens(), result.completionTokens());
-        });
+    public OpenAiResponse improveReview(String originalContent) {
+        AiReviewResult result = generateImprovedReview("Untitled", originalContent);
+        return new OpenAiResponse(result.improvedContent(), result.model(), 0, 0);
     }
 
-    private ParsedOpenAiResult executeImproveReview(String title, String originalContent) {
+    private AiReviewResult executeImproveReview(String title, String originalContent) {
         validateRequest(title, originalContent);
 
         String payload = buildChatCompletionPayload(title, originalContent);
@@ -95,24 +74,35 @@ public class OpenAiServiceImpl implements OpenAiService {
                 openAiUrl,
                 payload);
 
-        ParsedOpenAiResult parsedResult = callAndParse(apiRequest);
-        if (!"stop".equalsIgnoreCase(parsedResult.finishReason())) {
+        AiReviewResult result = callAndParse(apiRequest, originalContent);
+        if (result.fromAi() && !"stop".equalsIgnoreCase(result.reason())) {
             log.warn("[OPENAI] OpenAI response finish_reason was '{}', retrying once",
-                    parsedResult.finishReason());
-            parsedResult = callAndParse(apiRequest);
+                    result.reason());
+            result = callAndParse(apiRequest, originalContent);
         }
 
-        return parsedResult;
+        return result;
     }
 
-    private ParsedOpenAiResult callAndParse(ExternalApiRequest apiRequest) {
+    private AiReviewResult callAndParse(ExternalApiRequest apiRequest, String originalContent) {
         log.debug("[OPENAI] Sending request to OpenAI endpoint: {}", openAiUrl);
         ResponseEntity<String> responseEntity = apiUtils.callAPI(apiRequest);
-        if (responseEntity == null || !responseEntity.hasBody()) {
-            throw new IllegalStateException("OpenAI API response body was empty");
+        if (responseEntity == null) {
+            throw new OpenAiApiException("OpenAI API 응답을 받을 수 없습니다.");
         }
-        log.info("[OPENAI] Received response with status {}", responseEntity.getStatusCode());
-        return parseResponse(responseEntity.getBody());
+
+        int statusCode = responseEntity.getStatusCode().value();
+        log.info("[OPENAI] Received response with status {}", statusCode);
+
+        return switch (statusCode) {
+            case int code when code >= 200 && code < 300 -> parseResponse(responseEntity.getBody());
+            case 429 -> {
+                log.warn("[OPENAI] Rate limited by OpenAI (429). Returning fallback response.");
+                yield fallbackResult(originalContent, RATE_LIMIT_REASON);
+            }
+            default -> throw new OpenAiApiException(
+                    "OpenAI API 호출 실패: status=" + statusCode);
+        };
     }
 
     private void validateRequest(String title, String originalContent) {
@@ -176,21 +166,24 @@ public class OpenAiServiceImpl implements OpenAiService {
         }
     }
 
-    private ParsedOpenAiResult parseResponse(String responseBody) {
+    private AiReviewResult parseResponse(String responseBody) {
+        if (!StringUtils.hasText(responseBody)) {
+            throw new OpenAiApiException("OpenAI API response body was empty");
+        }
         JsonObject root = gson.fromJson(responseBody, JsonObject.class);
         if (root == null) {
-            throw new IllegalStateException("Failed to parse OpenAI response body");
+            throw new OpenAiApiException("Failed to parse OpenAI response body");
         }
 
         JsonArray choices = root.getAsJsonArray("choices");
         if (choices == null || choices.isEmpty()) {
-            throw new IllegalStateException("OpenAI returned no choices");
+            throw new OpenAiApiException("OpenAI returned no choices");
         }
 
         JsonObject firstChoice = choices.get(0).getAsJsonObject();
         JsonObject message = firstChoice.getAsJsonObject("message");
         if (message == null || !message.has("content")) {
-            throw new IllegalStateException("OpenAI response did not include message content");
+            throw new OpenAiApiException("OpenAI response did not include message content");
         }
 
         String improvedContent = message.get("content").getAsString();
@@ -199,20 +192,13 @@ public class OpenAiServiceImpl implements OpenAiService {
                         : "";
 
         String model = root.has("model") ? root.get("model").getAsString() : "";
-        JsonObject usage = root.getAsJsonObject("usage");
-        int promptTokens = extractTokenCount(usage, "prompt_tokens");
-        int completionTokens = extractTokenCount(usage, "completion_tokens");
 
-        return new ParsedOpenAiResult(improvedContent.trim(), model, finishReason, promptTokens,
-                completionTokens);
+        return new AiReviewResult(improvedContent.trim(), true, model, finishReason);
     }
 
-    private int extractTokenCount(JsonObject usage, String field) {
-        if (usage == null) {
-            return 0;
-        }
-        JsonElement element = usage.get(field);
-        return element != null && element.isJsonPrimitive() ? element.getAsInt() : 0;
+    private AiReviewResult fallbackResult(String originalContent, String reason) {
+        String content = FALLBACK_PREFIX + originalContent;
+        return new AiReviewResult(content, false, "fallback", reason);
     }
 
 }

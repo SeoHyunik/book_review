@@ -12,10 +12,11 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 @Slf4j
 @Component
@@ -24,20 +25,24 @@ public class GoogleDriveClientProvider {
 
     private final GoogleDriveProperties properties;
 
-    public Drive getDriveService() {
-        Assert.hasText(properties.credentialsPath(), "Google credentials path must be configured");
+    public Optional<Drive> getDriveService() {
+        if (!StringUtils.hasText(properties.credentialsPath())) {
+            log.warn("[DRIVE] Google credentials path is empty. Drive integration disabled.");
+            return Optional.empty();
+        }
         try (FileInputStream credentialsStream = new FileInputStream(
                 properties.credentialsPath())) {
             GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream)
                     .createScoped(List.of(DriveScopes.DRIVE_FILE, DriveScopes.DRIVE_READONLY));
 
             HttpRequestInitializer initializer = new HttpCredentialsAdapter(credentials);
-            return new Drive.Builder(
+            Drive drive = new Drive.Builder(
                     GoogleNetHttpTransport.newTrustedTransport(),
                     GsonFactory.getDefaultInstance(),
                     initializer)
                     .setApplicationName(properties.applicationName())
                     .build();
+            return Optional.of(drive);
         } catch (IOException | GeneralSecurityException e) {
             log.error("[DRIVE] Failed to initialize Google Drive client", e);
             throw new RuntimeException("Google Drive 인증 정보를 초기화할 수 없습니다: " + e.getMessage(), e);

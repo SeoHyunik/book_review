@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,11 +30,16 @@ public class GoogleDriveServiceImpl implements GoogleDriveService {
     private final GoogleDriveClientProvider driveClientProvider;
 
     @Override
-    public String uploadMarkdown(String filename, String markdownContent) {
+    public Optional<String> uploadMarkdown(String filename, String markdownContent) {
         Assert.hasText(filename, "Filename must not be blank");
         Assert.hasText(markdownContent, "Markdown content must not be blank");
 
-        Drive drive = driveClientProvider.getDriveService();
+        Optional<Drive> optionalDrive = driveClientProvider.getDriveService();
+        if (optionalDrive.isEmpty()) {
+            log.warn("[DRIVE] Google Drive credentials are missing. Skipping upload.");
+            return Optional.empty();
+        }
+        Drive drive = optionalDrive.get();
         String safeName = toSlug(filename);
         log.info("[DRIVE] Uploading markdown to Google Drive: filename='{}'", safeName);
 
@@ -56,17 +62,19 @@ public class GoogleDriveServiceImpl implements GoogleDriveService {
                 throw new IllegalStateException("Google Drive returned empty file id");
             }
             log.info("[DRIVE] File uploaded successfully with id={}", uploaded.getId());
-            return uploaded.getId();
+            return Optional.of(uploaded.getId());
         } catch (IOException e) {
             log.error("[DRIVE] Failed to upload markdown to Google Drive", e);
-            throw new RuntimeException("Google Drive 업로드 중 오류가 발생했습니다: " + e.getMessage(), e);
+            log.warn("[DRIVE] Upload failed; continuing without Google Drive integration.");
+            return Optional.empty();
         }
     }
 
     @Override
     public InputStream downloadFile(String fileId) throws NoSuchFileException {
         Assert.hasText(fileId, "File id must not be blank");
-        Drive drive = driveClientProvider.getDriveService();
+        Drive drive = driveClientProvider.getDriveService()
+                .orElseThrow(() -> new NoSuchFileException("Google Drive integration disabled"));
         log.info("[DRIVE] Downloading file from Google Drive: fileId={}", fileId);
         try {
             File file = drive.files().get(fileId).execute();
@@ -89,7 +97,13 @@ public class GoogleDriveServiceImpl implements GoogleDriveService {
     @Override
     public void deleteFile(String fileId) {
         Assert.hasText(fileId, "File id must not be blank");
-        Drive drive = driveClientProvider.getDriveService();
+        Optional<Drive> optionalDrive = driveClientProvider.getDriveService();
+        if (optionalDrive.isEmpty()) {
+            log.warn("[DRIVE] Google Drive integration disabled; skipping delete for fileId={}",
+                    fileId);
+            return;
+        }
+        Drive drive = optionalDrive.get();
         log.info("[DRIVE] Rolling back Google Drive upload for fileId={}", fileId);
         try {
             drive.files().delete(fileId).execute();

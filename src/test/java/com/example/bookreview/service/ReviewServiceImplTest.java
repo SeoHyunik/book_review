@@ -15,6 +15,7 @@ import com.example.bookreview.service.google.GoogleDriveService;
 import com.example.bookreview.service.openai.OpenAiService;
 import com.example.bookreview.service.review.ReviewServiceImpl;
 import java.math.BigDecimal;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,7 +53,7 @@ class ReviewServiceImplTest {
     void createReview_persistsWhenOpenAiMissingKey() {
         when(openAiService.generateImprovedReview(any(), any())).thenThrow(new MissingApiKeyException("key missing"));
         when(currencyService.convertUsdToKrw(any())).thenReturn(new BigDecimal("1500"));
-        when(googleDriveService.uploadMarkdown(any(), any())).thenReturn("file-123");
+        when(googleDriveService.uploadMarkdown(any(), any())).thenReturn(Optional.of("file-123"));
         when(reviewRepository.save(any())).thenAnswer(invocation -> {
             Review incoming = invocation.getArgument(0);
             return new Review("id-1", incoming.title(), incoming.originalContent(), incoming.improvedContent(),
@@ -69,10 +70,10 @@ class ReviewServiceImplTest {
     }
 
     @Test
-    void createReview_stillSavesWhenGoogleDriveFails() {
+    void createReview_stillSavesWhenGoogleDriveSkipped() {
         when(openAiService.generateImprovedReview(any(), any())).thenThrow(new MissingApiKeyException("key missing"));
         when(currencyService.convertUsdToKrw(any())).thenReturn(new BigDecimal("1500"));
-        when(googleDriveService.uploadMarkdown(any(), any())).thenThrow(new RuntimeException("drive down"));
+        when(googleDriveService.uploadMarkdown(any(), any())).thenReturn(Optional.empty());
         when(reviewRepository.save(any())).thenAnswer(invocation -> {
             Review incoming = invocation.getArgument(0);
             return new Review("id-2", incoming.title(), incoming.originalContent(), incoming.improvedContent(),
@@ -84,6 +85,6 @@ class ReviewServiceImplTest {
 
         assertThat(saved.id()).isEqualTo("id-2");
         assertThat(saved.googleFileId()).isNull();
-        assertThat(saved.integrationStatus().driveStatus()).isEqualTo(IntegrationStatus.Status.FAILED);
+        assertThat(saved.integrationStatus().driveStatus()).isEqualTo(IntegrationStatus.Status.SKIPPED);
     }
 }

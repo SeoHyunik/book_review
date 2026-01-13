@@ -1,12 +1,8 @@
 package com.example.bookreview.dto.internal;
 
-import java.math.BigDecimal;
-
 public record AiReviewResult(
         String improvedContent,
+        boolean fromAi,
         String model,
-        int promptTokens,
-        int completionTokens,
-        long totalTokens,
-        BigDecimal usdCost) {
+        String reason) {
 }

@@ -16,6 +16,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.NoSuchFileException;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,23 +58,23 @@ class GoogleDriveServiceImplTest {
     @Test
     void uploadMarkdown_sanitizesFileNameAndReturnsId() throws Exception {
         ArgumentCaptor<File> fileCaptor = ArgumentCaptor.forClass(File.class);
-        given(driveClientProvider.getDriveService()).willReturn(drive);
+        given(driveClientProvider.getDriveService()).willReturn(Optional.of(drive));
         given(drive.files()).willReturn(files);
         given(files.create(any(File.class), any())).willReturn(create);
         given(create.setFields("id")).willReturn(create);
         given(create.execute()).willReturn(googleFile);
         given(googleFile.getId()).willReturn("abc123");
 
-        String fileId = googleDriveService.uploadMarkdown("운명과 분노!", "내용");
+        Optional<String> fileId = googleDriveService.uploadMarkdown("운명과 분노!", "내용");
 
         verify(files).create(fileCaptor.capture(), any());
-        assertThat(fileId).isEqualTo("abc123");
+        assertThat(fileId).contains("abc123");
         assertThat(fileCaptor.getValue().getName()).isEqualTo("운명과-분노.md");
     }
 
     @Test
     void downloadFile_returnsStream() throws Exception {
-        given(driveClientProvider.getDriveService()).willReturn(drive);
+        given(driveClientProvider.getDriveService()).willReturn(Optional.of(drive));
         given(drive.files()).willReturn(files);
         given(files.get("file123")).willReturn(get);
         given(get.execute()).willReturn(googleFile);
@@ -91,7 +92,7 @@ class GoogleDriveServiceImplTest {
 
     @Test
     void downloadFile_throwsWhenMissing() throws Exception {
-        given(driveClientProvider.getDriveService()).willReturn(drive);
+        given(driveClientProvider.getDriveService()).willReturn(Optional.of(drive));
         given(drive.files()).willReturn(files);
         given(files.get("missing")).willReturn(get);
         given(get.execute()).willReturn(null);
@@ -102,12 +103,21 @@ class GoogleDriveServiceImplTest {
 
     @Test
     void deleteFile_silentlyLogsWhenFailed() throws Exception {
-        given(driveClientProvider.getDriveService()).willReturn(drive);
+        given(driveClientProvider.getDriveService()).willReturn(Optional.of(drive));
         given(drive.files()).willReturn(files);
         given(files.delete("file123")).willReturn(delete);
 
         googleDriveService.deleteFile("file123");
 
         verify(files).delete("file123");
+    }
+
+    @Test
+    void uploadMarkdown_returnsEmptyWhenDriveUnavailable() {
+        given(driveClientProvider.getDriveService()).willReturn(Optional.empty());
+
+        Optional<String> fileId = googleDriveService.uploadMarkdown("제목", "내용");
+
+        assertThat(fileId).isEmpty();
     }
 }
