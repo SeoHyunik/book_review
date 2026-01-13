@@ -1,11 +1,13 @@
 package com.example.bookreview.util;
 
 import com.example.bookreview.dto.request.ExternalApiRequest;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -20,7 +22,7 @@ public class ExternalApiUtils {
 
     private final WebClient.Builder webClientBuilder;
 
-    public ResponseEntity<String> callAPI(ExternalApiRequest request) {
+    public ExternalApiResult callAPI(ExternalApiRequest request) {
         Assert.notNull(request, "External API request must not be null");
         Assert.notNull(request.method(), "HTTP method must not be null");
         Assert.hasText(request.url(), "Request URL must not be blank");
@@ -38,13 +40,10 @@ public class ExternalApiUtils {
                     .headers(httpHeaders -> httpHeaders.addAll(headers))
                     .bodyValue(request.body() != null ? request.body() : "")
                     .exchangeToMono(response -> {
-                        if (response.statusCode().is2xxSuccessful()) {
-                            return response.toEntity(String.class);
-                        }
-                        if (response.statusCode().value() == 429) {
-                            return response.toEntity(String.class);
-                        }
-                        return response.createException().flatMap(Mono::error);
+                        int statusCode = response.statusCode().value();
+                        return response.bodyToMono(String.class)
+                                .defaultIfEmpty("")
+                                .map(body -> new ExternalApiResult(statusCode, body));
                     })
                     .block();
         } catch (WebClientResponseException ex) {
@@ -52,13 +51,34 @@ public class ExternalApiUtils {
                     ex.getStatusCode().value(),
                     ex.getResponseBodyAsString() != null ? ex.getResponseBodyAsString().length()
                             : 0);
-            return ResponseEntity.status(ex.getStatusCode())
-                    .headers(ex.getHeaders())
-                    .body(ex.getResponseBodyAsString());
+            return new ExternalApiResult(ex.getStatusCode().value(), ex.getResponseBodyAsString());
         } catch (WebClientRequestException ex) {
             log.warn("[HTTP] External API request failed: {}", ex.getMessage());
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(ex.getMessage());
+            return new ExternalApiResult(HttpStatus.SERVICE_UNAVAILABLE.value(), ex.getMessage());
+        }
+    }
+
+    public ExternalApiError parseErrorResponse(String body) {
+        if (body == null || body.isBlank()) {
+            return new ExternalApiError(null, null, null);
+        }
+        try {
+            JsonElement element = JsonParser.parseString(body);
+            if (!element.isJsonObject()) {
+                return new ExternalApiError(null, null, null);
+            }
+            JsonObject root = element.getAsJsonObject();
+            if (!root.has("error") || !root.get("error").isJsonObject()) {
+                return new ExternalApiError(null, null, null);
+            }
+            JsonObject error = root.getAsJsonObject("error");
+            String message = error.has("message") ? error.get("message").getAsString() : null;
+            String type = error.has("type") ? error.get("type").getAsString() : null;
+            String code = error.has("code") ? error.get("code").getAsString() : null;
+            return new ExternalApiError(message, type, code);
+        } catch (Exception ex) {
+            log.debug("[HTTP] Failed to parse external API error body", ex);
+            return new ExternalApiError(null, null, null);
         }
     }
 

@@ -5,6 +5,8 @@ import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.example.bookreview.dto.response.OpenAiResponse;
 import com.example.bookreview.exception.MissingApiKeyException;
 import com.example.bookreview.exception.OpenAiApiException;
+import com.example.bookreview.util.ExternalApiError;
+import com.example.bookreview.util.ExternalApiResult;
 import com.example.bookreview.util.ExternalApiUtils;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -21,7 +23,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
@@ -32,17 +33,23 @@ import org.springframework.util.StringUtils;
 public class OpenAiServiceImpl implements OpenAiService {
 
     private static final String DEFAULT_OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String DEFAULT_OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
     private static final String DEFAULT_MODEL = "gpt-4o";
     private static final String TITLE_PLACEHOLDER = "{{title}}";
     private static final String CONTENT_PLACEHOLDER = "{{originalContent}}";
     private static final String FALLBACK_PREFIX = "[IMPROVEMENT_SKIPPED]\n";
-    private static final String RATE_LIMIT_REASON = "RATE_LIMITED";
+    private static final String RATE_LIMIT_REASON = "RATE_LIMIT";
+    private static final String INSUFFICIENT_QUOTA_REASON = "INSUFFICIENT_QUOTA";
+    private static final String INVALID_KEY_REASON = "INVALID_KEY";
+    private static final String UNKNOWN_REASON = "UNKNOWN";
     private final ExternalApiUtils apiUtils;
     private final Gson gson;
     @Value("${openai.api-key:}")
     private String openAiApiKey;
     @Value("${openai.api-url:" + DEFAULT_OPENAI_URL + "}")
     private String openAiUrl;
+    @Value("${openai.models-url:" + DEFAULT_OPENAI_MODELS_URL + "}")
+    private String openAiModelsUrl;
     @Value("${openai.model:" + DEFAULT_MODEL + "}")
     private String openAiModel;
     @Value("${openai.prompt-file}")
@@ -51,6 +58,12 @@ public class OpenAiServiceImpl implements OpenAiService {
     @Override
     public AiReviewResult generateImprovedReview(String title, String originalContent) {
         log.info("[OPENAI] Received request to improve review content for title='{}'", title);
+        validateRequest(title, originalContent);
+        OpenAiStatusCheck statusCheck = checkOpenAiStatus();
+        if (!statusCheck.available()) {
+            return new AiReviewResult(FALLBACK_PREFIX + originalContent, false, "unavailable",
+                    statusCheck.reason());
+        }
         return executeImproveReview(title, originalContent);
     }
 
@@ -61,8 +74,6 @@ public class OpenAiServiceImpl implements OpenAiService {
     }
 
     private AiReviewResult executeImproveReview(String title, String originalContent) {
-        validateRequest(title, originalContent);
-
         String payload = buildChatCompletionPayload(title, originalContent);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -86,22 +97,37 @@ public class OpenAiServiceImpl implements OpenAiService {
 
     private AiReviewResult callAndParse(ExternalApiRequest apiRequest, String originalContent) {
         log.debug("[OPENAI] Sending request to OpenAI endpoint: {}", openAiUrl);
-        ResponseEntity<String> responseEntity = apiUtils.callAPI(apiRequest);
-        if (responseEntity == null) {
+        ExternalApiResult apiResult = apiUtils.callAPI(apiRequest);
+        if (apiResult == null) {
             throw new OpenAiApiException("OpenAI API 응답을 받을 수 없습니다.");
         }
 
-        int statusCode = responseEntity.getStatusCode().value();
+        int statusCode = apiResult.statusCode();
         log.info("[OPENAI] Received response with status {}", statusCode);
 
         return switch (statusCode) {
-            case int code when code >= 200 && code < 300 -> parseResponse(responseEntity.getBody());
+            case int code when code >= 200 && code < 300 -> parseResponse(apiResult.body());
             case 429 -> {
-                log.warn("[OPENAI] Rate limited by OpenAI (429). Returning fallback response.");
-                yield fallbackResult(originalContent, RATE_LIMIT_REASON);
+                ExternalApiError error = apiUtils.parseErrorResponse(apiResult.body());
+                String reason = resolveReason(statusCode, error);
+                log.warn("[OPENAI] OpenAI rate limit status={} type={} code={}", statusCode,
+                        error.type(), error.code());
+                yield fallbackResult(originalContent, reason);
             }
-            default -> throw new OpenAiApiException(
-                    "OpenAI API 호출 실패: status=" + statusCode);
+            case 401, 403 -> {
+                ExternalApiError error = apiUtils.parseErrorResponse(apiResult.body());
+                String reason = resolveReason(statusCode, error);
+                log.warn("[OPENAI] OpenAI error response status={} type={} code={}", statusCode,
+                        error.type(), error.code());
+                yield fallbackResult(originalContent, reason);
+            }
+            default -> {
+                ExternalApiError error = apiUtils.parseErrorResponse(apiResult.body());
+                String reason = resolveReason(statusCode, error);
+                log.warn("[OPENAI] OpenAI error response status={} type={} code={}", statusCode,
+                        error.type(), error.code());
+                yield fallbackResult(originalContent, reason);
+            }
         };
     }
 
@@ -199,6 +225,59 @@ public class OpenAiServiceImpl implements OpenAiService {
     private AiReviewResult fallbackResult(String originalContent, String reason) {
         String content = FALLBACK_PREFIX + originalContent;
         return new AiReviewResult(content, false, "fallback", reason);
+    }
+
+    private OpenAiStatusCheck checkOpenAiStatus() {
+        log.info("[OPENAI] Checking OpenAI API status before requesting completion");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(openAiApiKey);
+        ExternalApiRequest apiRequest = new ExternalApiRequest(
+                HttpMethod.GET,
+                headers,
+                openAiModelsUrl,
+                null);
+        ExternalApiResult result = apiUtils.callAPI(apiRequest);
+        if (result == null) {
+            return new OpenAiStatusCheck(false, UNKNOWN_REASON);
+        }
+        if (result.statusCode() >= 200 && result.statusCode() < 300) {
+            return new OpenAiStatusCheck(true, "OK");
+        }
+        ExternalApiError error = apiUtils.parseErrorResponse(result.body());
+        String reason = resolveReason(result.statusCode(), error);
+        log.warn("[OPENAI] OpenAI status check failed status={} type={} code={}",
+                result.statusCode(), error.type(), error.code());
+        return new OpenAiStatusCheck(false, reason);
+    }
+
+    private String resolveReason(int statusCode, ExternalApiError error) {
+        String type = error != null ? error.type() : null;
+        String code = error != null ? error.code() : null;
+        if (statusCode == 401) {
+            return INVALID_KEY_REASON;
+        }
+        if (statusCode == 429 || containsIgnoreCase(type, "rate_limit")) {
+            return RATE_LIMIT_REASON;
+        }
+        if (containsIgnoreCase(type, "insufficient_quota")
+                || containsIgnoreCase(code, "insufficient_quota")) {
+            return INSUFFICIENT_QUOTA_REASON;
+        }
+        if (containsIgnoreCase(type, "invalid_api_key")
+                || containsIgnoreCase(code, "invalid_api_key")) {
+            return INVALID_KEY_REASON;
+        }
+        return UNKNOWN_REASON;
+    }
+
+    private boolean containsIgnoreCase(String value, String token) {
+        if (value == null || token == null) {
+            return false;
+        }
+        return value.toLowerCase().contains(token.toLowerCase());
+    }
+
+    private record OpenAiStatusCheck(boolean available, String reason) {
     }
 
 }

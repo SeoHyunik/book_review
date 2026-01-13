@@ -9,13 +9,11 @@ import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.example.bookreview.service.openai.OpenAiService;
 import com.example.bookreview.service.openai.OpenAiServiceImpl;
+import com.example.bookreview.util.ExternalApiResult;
 import com.example.bookreview.util.ExternalApiUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(
@@ -38,10 +36,10 @@ class OpenAiServiceTest {
                 {"id":"chatcmpl-2","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"개선된 내용"},"finish_reason":"stop"}],"usage":{"prompt_tokens":13,"completion_tokens":9}}
                 """;
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        ExternalApiResult statusResult = new ExternalApiResult(200, "{\"data\":[{\"id\":\"gpt-4o\"}]}");
+        ExternalApiResult chatResult = new ExternalApiResult(200, responseBody);
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
-                .willReturn(ResponseEntity.ok().headers(headers).body(responseBody));
+                .willReturn(statusResult, chatResult);
 
         AiReviewResult openAiResult = openAiService.generateImprovedReview("테스트 제목", "원본 내용");
 

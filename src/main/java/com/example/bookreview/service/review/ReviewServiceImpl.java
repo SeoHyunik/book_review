@@ -75,16 +75,16 @@ public class ReviewServiceImpl implements ReviewService {
                     request.originalContent());
             if (!aiResult.fromAi()) {
                 openAiStatus = IntegrationStatus.Status.FAILED;
-                appendWarning(warnings, "OpenAI 요청이 제한되어 기본 내용을 사용했습니다.");
+                appendOpenAiWarning(warnings, aiResult.reason());
                 log.warn("OpenAI rate-limited or unavailable; using fallback content");
             }
         } catch (MissingApiKeyException ex) {
             openAiStatus = IntegrationStatus.Status.SKIPPED;
-            appendWarning(warnings, "OpenAI 설정을 찾을 수 없어 개선 단계를 건너뛰었습니다.");
+            appendWarningIfMissing(warnings, "OpenAI 설정을 찾을 수 없어 개선 단계를 건너뛰었습니다.");
             log.warn("OpenAI key missing, skipping AI improvement and using fallback content");
         } catch (Exception ex) {
             openAiStatus = IntegrationStatus.Status.FAILED;
-            appendWarning(warnings, "OpenAI 호출을 처리하지 못했습니다.");
+            appendWarningIfMissing(warnings, "OpenAI 호출을 처리하지 못했습니다.");
             log.warn("OpenAI content generation failed, continuing with fallback content", ex);
         }
 
@@ -95,7 +95,7 @@ public class ReviewServiceImpl implements ReviewService {
             krwCost = convertToKrw(usdCost);
         } catch (Exception ex) {
             currencyStatus = IntegrationStatus.Status.FAILED;
-            appendWarning(warnings, "환율 정보를 불러오지 못했습니다.");
+            appendWarningIfMissing(warnings, "환율 정보를 불러오지 못했습니다.");
             log.warn("Currency conversion failed, continuing without KRW cost", ex);
         }
 
@@ -105,11 +105,11 @@ public class ReviewServiceImpl implements ReviewService {
             fileId = uploadToDrive(request.title(), markdown);
             if (fileId == null) {
                 driveStatus = IntegrationStatus.Status.SKIPPED;
-                appendWarning(warnings, "Google Drive 설정이 없어 업로드를 건너뛰었습니다.");
+                appendWarningIfMissing(warnings, "Google Drive 설정이 없어 업로드를 건너뛰었습니다.");
             }
         } catch (Exception ex) {
             driveStatus = IntegrationStatus.Status.FAILED;
-            appendWarning(warnings, "Google Drive 업로드에 실패했습니다.");
+            appendWarningIfMissing(warnings, "Google Drive 업로드에 실패했습니다.");
             log.warn("Google Drive upload failed, continuing without file link", ex);
         }
 
@@ -162,7 +162,7 @@ public class ReviewServiceImpl implements ReviewService {
             } catch (Exception ex) {
                 log.warn("Failed to delete Google Drive file for review id={} fileId={}.", id,
                         googleFileId, ex);
-                appendWarning(warnings, "Google Drive file could not be removed.");
+                appendWarningIfMissing(warnings, "Google Drive file could not be removed.");
             }
         }
 
@@ -199,14 +199,27 @@ public class ReviewServiceImpl implements ReviewService {
         return new AiReviewResult(content, false, "fallback", "SKIPPED");
     }
 
-    private void appendWarning(StringBuilder warnings, String message) {
+    private void appendWarningIfMissing(StringBuilder warnings, String message) {
         if (message == null || message.isBlank()) {
+            return;
+        }
+        if (warnings.toString().contains(message)) {
             return;
         }
         if (!warnings.isEmpty()) {
             warnings.append("\n");
         }
         warnings.append(message);
+    }
+
+    private void appendOpenAiWarning(StringBuilder warnings, String reason) {
+        String message = switch (reason) {
+            case "RATE_LIMIT" -> "OpenAI 요청이 지나치게 많습니다. 호출 빈도를 줄여주세요.";
+            case "INSUFFICIENT_QUOTA" -> "OpenAI 크레딧이 부족합니다. 요금제를 확인하세요.";
+            case "INVALID_KEY" -> "유효하지 않은 OpenAI API 키입니다. 설정을 확인하세요.";
+            default -> "OpenAI 응답을 처리하지 못했습니다.";
+        };
+        appendWarningIfMissing(warnings, message);
     }
 
     private void rollbackGoogleFile(String fileId) {

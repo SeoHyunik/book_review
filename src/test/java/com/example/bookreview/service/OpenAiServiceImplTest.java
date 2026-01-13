@@ -53,11 +53,15 @@ class OpenAiServiceImplTest {
         }
         registry.add("openai.api-key", () -> "test-key");
         registry.add("openai.api-url", () -> mockWebServer.url("/v1/chat/completions").toString());
+        registry.add("openai.models-url", () -> mockWebServer.url("/v1/models").toString());
         registry.add("openai.prompt-file", () -> "classpath:ai/prompts/improve_review_prompt.json");
     }
 
     @Test
     void generateImprovedReviewParsesResponse() throws Exception {
+        String modelsResponse = """
+                {"data":[{"id":"gpt-4o","object":"model"}]}
+                """;
         String firstResponse = """
                 {"id":"chatcmpl-1","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Partial"},"finish_reason":"length"}],"usage":{"prompt_tokens":11,"completion_tokens":7}}
                 """;
@@ -65,6 +69,7 @@ class OpenAiServiceImplTest {
                 {"id":"chatcmpl-2","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Improved review text"},"finish_reason":"stop"}],"usage":{"prompt_tokens":13,"completion_tokens":9}}
                 """;
 
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(modelsResponse));
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(firstResponse));
         mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json").setBody(secondResponse));
 
@@ -76,8 +81,14 @@ class OpenAiServiceImplTest {
         assertThat(response.fromAi()).isTrue();
         assertThat(response.reason()).isEqualTo("stop");
 
+        RecordedRequest statusRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
         RecordedRequest firstRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
         RecordedRequest secondRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
+
+        assertThat(statusRequest).isNotNull();
+        assertThat(statusRequest.getMethod()).isEqualTo("GET");
+        assertThat(statusRequest.getHeader("Authorization")).isEqualTo("Bearer test-key");
+        assertThat(statusRequest.getPath()).isEqualTo("/v1/models");
 
         assertThat(firstRequest).isNotNull();
         assertThat(firstRequest.getMethod()).isEqualTo("POST");
@@ -90,13 +101,42 @@ class OpenAiServiceImplTest {
 
     @Test
     void generateImprovedReview_returnsFallbackOnRateLimit() {
-        mockWebServer.enqueue(new MockResponse().setResponseCode(429).setBody("{\"error\":\"rate limit\"}"));
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setBody("{\"data\":[{\"id\":\"gpt-4o\",\"object\":\"model\"}]}"));
+        mockWebServer.enqueue(new MockResponse().setResponseCode(429)
+                .setBody("{\"error\":{\"message\":\"rate limit\",\"type\":\"rate_limit_exceeded\"}}"));
 
         AiReviewResult response = openAiService.generateImprovedReview("Title", "Original review content");
 
         assertThat(response).isNotNull();
         assertThat(response.fromAi()).isFalse();
-        assertThat(response.reason()).isEqualTo("RATE_LIMITED");
+        assertThat(response.reason()).isEqualTo("RATE_LIMIT");
+        assertThat(response.improvedContent()).contains("[IMPROVEMENT_SKIPPED]");
+    }
+
+    @Test
+    void generateImprovedReview_returnsFallbackWhenStatusCheckRateLimited() {
+        mockWebServer.enqueue(new MockResponse().setResponseCode(429)
+                .setBody("{\"error\":{\"message\":\"Too many requests\",\"type\":\"rate_limit_exceeded\"}}"));
+
+        AiReviewResult response = openAiService.generateImprovedReview("Title", "Original review content");
+
+        assertThat(response).isNotNull();
+        assertThat(response.fromAi()).isFalse();
+        assertThat(response.reason()).isEqualTo("RATE_LIMIT");
+        assertThat(response.improvedContent()).contains("[IMPROVEMENT_SKIPPED]");
+    }
+
+    @Test
+    void generateImprovedReview_returnsFallbackWhenStatusCheckInsufficientQuota() {
+        mockWebServer.enqueue(new MockResponse().setResponseCode(403)
+                .setBody("{\"error\":{\"message\":\"Insufficient quota\",\"type\":\"insufficient_quota\",\"code\":\"insufficient_quota\"}}"));
+
+        AiReviewResult response = openAiService.generateImprovedReview("Title", "Original review content");
+
+        assertThat(response).isNotNull();
+        assertThat(response.fromAi()).isFalse();
+        assertThat(response.reason()).isEqualTo("INSUFFICIENT_QUOTA");
         assertThat(response.improvedContent()).contains("[IMPROVEMENT_SKIPPED]");
     }
 
