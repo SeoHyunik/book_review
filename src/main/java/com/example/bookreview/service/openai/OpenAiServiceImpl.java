@@ -41,6 +41,8 @@ public class OpenAiServiceImpl implements OpenAiService {
     private static final String RATE_LIMIT_REASON = "RATE_LIMIT";
     private static final String INSUFFICIENT_QUOTA_REASON = "INSUFFICIENT_QUOTA";
     private static final String INVALID_KEY_REASON = "INVALID_KEY";
+    private static final String INVALID_MODEL_REASON = "INVALID_MODEL";
+    private static final String UNSUPPORTED_PARAM_REASON = "UNSUPPORTED_PARAM";
     private static final String UNKNOWN_REASON = "UNKNOWN";
     private final ExternalApiUtils apiUtils;
     private final Gson gson;
@@ -52,6 +54,10 @@ public class OpenAiServiceImpl implements OpenAiService {
     private String openAiModelsUrl;
     @Value("${openai.model:" + DEFAULT_MODEL + "}")
     private String openAiModel;
+    @Value("${openai.max-tokens:0}")
+    private int openAiMaxTokens;
+    @Value("${openai.temperature:#{null}}")
+    private Double openAiTemperature;
     @Value("${openai.prompt-file}")
     private Resource promptFile;
 
@@ -110,22 +116,37 @@ public class OpenAiServiceImpl implements OpenAiService {
             case 429 -> {
                 ExternalApiError error = apiUtils.parseErrorResponse(apiResult.body());
                 String reason = resolveReason(statusCode, error);
-                log.warn("[OPENAI] OpenAI rate limit status={} type={} code={}", statusCode,
-                        error.type(), error.code());
+                log.warn(
+                        "[OPENAI] OpenAI rate limit status={} type={} code={} message={} param={}",
+                        statusCode,
+                        error.type(),
+                        error.code(),
+                        error.message(),
+                        error.param());
                 yield fallbackResult(originalContent, reason);
             }
             case 401, 403 -> {
                 ExternalApiError error = apiUtils.parseErrorResponse(apiResult.body());
                 String reason = resolveReason(statusCode, error);
-                log.warn("[OPENAI] OpenAI error response status={} type={} code={}", statusCode,
-                        error.type(), error.code());
+                log.warn(
+                        "[OPENAI] OpenAI error response status={} type={} code={} message={} param={}",
+                        statusCode,
+                        error.type(),
+                        error.code(),
+                        error.message(),
+                        error.param());
                 yield fallbackResult(originalContent, reason);
             }
             default -> {
                 ExternalApiError error = apiUtils.parseErrorResponse(apiResult.body());
                 String reason = resolveReason(statusCode, error);
-                log.warn("[OPENAI] OpenAI error response status={} type={} code={}", statusCode,
-                        error.type(), error.code());
+                log.warn(
+                        "[OPENAI] OpenAI error response status={} type={} code={} message={} param={}",
+                        statusCode,
+                        error.type(),
+                        error.code(),
+                        error.message(),
+                        error.param());
                 yield fallbackResult(originalContent, reason);
             }
         };
@@ -144,7 +165,12 @@ public class OpenAiServiceImpl implements OpenAiService {
         JsonObject root = new JsonObject();
         root.addProperty("model", openAiModel);
         root.add("messages", buildMessages(title, originalContent));
-        root.addProperty("temperature", 0.7);
+        if (openAiMaxTokens > 0) {
+            root.addProperty("max_tokens", openAiMaxTokens);
+        }
+        if (openAiTemperature != null) {
+            root.addProperty("temperature", openAiTemperature);
+        }
 
         return gson.toJson(root);
     }
@@ -241,19 +267,25 @@ public class OpenAiServiceImpl implements OpenAiService {
             return new OpenAiStatusCheck(false, UNKNOWN_REASON);
         }
         if (result.statusCode() >= 200 && result.statusCode() < 300) {
-            log.info("[OPENAI] Status check OK — valid OpenAI API key");
-            return new OpenAiStatusCheck(true, "OK");
+            if (isModelAvailable(result.body())) {
+                log.info("[OPENAI] Status check OK — valid OpenAI API key");
+                return new OpenAiStatusCheck(true, "OK");
+            }
+            log.warn("[OPENAI] OpenAI model '{}' not found in /v1/models response",
+                    openAiModel);
+            return new OpenAiStatusCheck(false, INVALID_MODEL_REASON);
         }
         ExternalApiError error = apiUtils.parseErrorResponse(result.body());
         String reason = resolveReason(result.statusCode(), error);
-        log.warn("[OPENAI] OpenAI status check failed status={} type={} code={}",
-                result.statusCode(), error.type(), error.code());
+        log.warn("[OPENAI] OpenAI status check failed status={} type={} code={} message={} param={}",
+                result.statusCode(), error.type(), error.code(), error.message(), error.param());
         return new OpenAiStatusCheck(false, reason);
     }
 
     private String resolveReason(int statusCode, ExternalApiError error) {
         String type = error != null ? error.type() : null;
         String code = error != null ? error.code() : null;
+        String param = error != null ? error.param() : null;
         if (statusCode == 401) {
             return INVALID_KEY_REASON;
         }
@@ -268,6 +300,12 @@ public class OpenAiServiceImpl implements OpenAiService {
                 || containsIgnoreCase(code, "invalid_api_key")) {
             return INVALID_KEY_REASON;
         }
+        if (containsIgnoreCase(code, "unsupported_parameter")) {
+            if (containsIgnoreCase(param, "model")) {
+                return INVALID_MODEL_REASON;
+            }
+            return UNSUPPORTED_PARAM_REASON;
+        }
         return UNKNOWN_REASON;
     }
 
@@ -276,6 +314,32 @@ public class OpenAiServiceImpl implements OpenAiService {
             return false;
         }
         return value.toLowerCase().contains(token.toLowerCase());
+    }
+
+    private boolean isModelAvailable(String responseBody) {
+        if (!StringUtils.hasText(responseBody)) {
+            return false;
+        }
+        try {
+            JsonObject root = gson.fromJson(responseBody, JsonObject.class);
+            if (root == null || !root.has("data") || !root.get("data").isJsonArray()) {
+                return false;
+            }
+            JsonArray data = root.getAsJsonArray("data");
+            for (JsonElement element : data) {
+                if (!element.isJsonObject()) {
+                    continue;
+                }
+                JsonObject model = element.getAsJsonObject();
+                if (model.has("id") && openAiModel.equals(model.get("id").getAsString())) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (Exception ex) {
+            log.debug("[OPENAI] Failed to parse models response", ex);
+            return false;
+        }
     }
 
     private record OpenAiStatusCheck(boolean available, String reason) {

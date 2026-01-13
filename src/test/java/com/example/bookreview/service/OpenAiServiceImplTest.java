@@ -55,6 +55,8 @@ class OpenAiServiceImplTest {
         registry.add("openai.api-url", () -> mockWebServer.url("/v1/chat/completions").toString());
         registry.add("openai.models-url", () -> mockWebServer.url("/v1/models").toString());
         registry.add("openai.prompt-file", () -> "classpath:ai/prompts/improve_review_prompt.json");
+        registry.add("openai.max-tokens", () -> "800");
+        registry.add("openai.temperature", () -> "0.7");
     }
 
     @Test
@@ -94,6 +96,8 @@ class OpenAiServiceImplTest {
         assertThat(firstRequest.getMethod()).isEqualTo("POST");
         assertThat(firstRequest.getHeader("Authorization")).isEqualTo("Bearer test-key");
         assertThat(firstRequest.getPath()).isEqualTo("/v1/chat/completions");
+        assertThat(firstRequest.getBody().readUtf8()).contains("\"max_tokens\":800")
+                .contains("\"temperature\":0.7");
 
         assertThat(secondRequest).isNotNull();
         assertThat(secondRequest.getMethod()).isEqualTo("POST");
@@ -138,6 +142,23 @@ class OpenAiServiceImplTest {
         assertThat(response.fromAi()).isFalse();
         assertThat(response.reason()).isEqualTo("INSUFFICIENT_QUOTA");
         assertThat(response.improvedContent()).contains("[IMPROVEMENT_SKIPPED]");
+    }
+
+    @Test
+    void generateImprovedReview_returnsFallbackWhenModelMissing() throws Exception {
+        mockWebServer.enqueue(new MockResponse().setHeader("Content-Type", "application/json")
+                .setBody("{\"data\":[{\"id\":\"gpt-4o-mini\",\"object\":\"model\"}]}"));
+
+        AiReviewResult response = openAiService.generateImprovedReview("Title", "Original review content");
+
+        assertThat(response).isNotNull();
+        assertThat(response.fromAi()).isFalse();
+        assertThat(response.reason()).isEqualTo("INVALID_MODEL");
+
+        RecordedRequest statusRequest = mockWebServer.takeRequest(5, TimeUnit.SECONDS);
+        assertThat(statusRequest).isNotNull();
+        assertThat(statusRequest.getMethod()).isEqualTo("GET");
+        assertThat(mockWebServer.getRequestCount()).isEqualTo(1);
     }
 
     @TestConfiguration

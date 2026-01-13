@@ -60,25 +60,26 @@ public class ExternalApiUtils {
 
     public ExternalApiError parseErrorResponse(String body) {
         if (body == null || body.isBlank()) {
-            return new ExternalApiError(null, null, null);
+            return new ExternalApiError(null, null, null, null);
         }
         try {
             JsonElement element = JsonParser.parseString(body);
             if (!element.isJsonObject()) {
-                return new ExternalApiError(null, null, null);
+                return new ExternalApiError(null, null, null, null);
             }
             JsonObject root = element.getAsJsonObject();
             if (!root.has("error") || !root.get("error").isJsonObject()) {
-                return new ExternalApiError(null, null, null);
+                return new ExternalApiError(null, null, null, null);
             }
             JsonObject error = root.getAsJsonObject("error");
             String message = error.has("message") ? error.get("message").getAsString() : null;
             String type = error.has("type") ? error.get("type").getAsString() : null;
             String code = error.has("code") ? error.get("code").getAsString() : null;
-            return new ExternalApiError(message, type, code);
+            String param = error.has("param") ? error.get("param").getAsString() : null;
+            return new ExternalApiError(message, type, code, param);
         } catch (Exception ex) {
             log.debug("[HTTP] Failed to parse external API error body", ex);
-            return new ExternalApiError(null, null, null);
+            return new ExternalApiError(null, null, null, null);
         }
     }
 
