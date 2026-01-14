@@ -293,4 +293,16 @@ async function loadReviewDetail() {
 window.addEventListener('DOMContentLoaded', () => {
     loadReviewList();
     loadReviewDetail();
+    setupReviewFormLoading(); // 리뷰 작성 폼 제출 시 로딩 오버레이 표시를 초기화합니다.
 });
+
+// 폼 제출 시 로딩 오버레이를 표시
+function setupReviewFormLoading() {
+    const form = document.getElementById('review-form');
+    const overlay = document.getElementById('loading-overlay');
+    if (form && overlay) {
+        form.addEventListener('submit', () => {
+            overlay.classList.remove('d-none');
+        });
+    }
+}

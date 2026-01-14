@@ -39,6 +39,13 @@
                 </button>
             </div>
         </form>
+        <!-- 로딩 중 표시될 오버레이: 제출 버튼 클릭 시 화면을 흐리게 처리하며 노트 필기 애니메이션을 보여줍니다. -->
+        <div id="loading-overlay" class="loading-overlay d-none">
+            <div class="loading-animation">
+                <i class="bi bi-journal-text note-icon"></i>
+                <i class="bi bi-pencil-fill pen-icon"></i>
+            </div>
+        </div>
     </section>
 </th:block>
 </html>
