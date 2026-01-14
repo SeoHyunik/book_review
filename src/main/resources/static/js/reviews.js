@@ -293,9 +293,8 @@ async function loadReviewDetail() {
 window.addEventListener('DOMContentLoaded', () => {
     loadReviewList();
     loadReviewDetail();
-    setupReviewFormLoading(); // 리뷰 작성 폼 제출 시 로딩 오버레이 표시를 초기화합니다.
-    // Remove any lingering blur class from previous navigations with a smooth transition
-    document.body.classList.remove('blur-content');
+    // 리뷰 작성 폼 제출 시 로딩 오버레이 표시를 초기화합니다.
+    setupReviewFormLoading();
 });
 
 // 폼 제출 시 로딩 오버레이를 표시
@@ -304,9 +303,8 @@ function setupReviewFormLoading() {
     const overlay = document.getElementById('loading-overlay');
     if (form && overlay) {
         form.addEventListener('submit', () => {
-            // Blur the page to create a soft focus effect
-            document.body.classList.add('blur-content');
-            // Show the overlay and reset any fade-out classes
+            // 배경은 overlay의 backdrop-filter로만 블러 처리하고,
+            // 아이콘은 선명하게 보이도록 body에는 filter를 적용하지 않는다.
             overlay.classList.remove('d-none', 'fade-out');
         });
     }
