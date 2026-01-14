@@ -234,12 +234,12 @@ pre {
 
 .loading-overlay .note-icon {
     font-size: 4rem;
-    color: #ffffff;
+    color: inherit; /* 실제 색상은 theme-overrides.css에서 data-bs-theme별로 지정 */
 }
 
 .loading-overlay .pen-icon {
     font-size: 2rem;
-    color: #ffffff;
+    color: inherit; /* 실제 색상은 theme-overrides.css에서 data-bs-theme별로 지정 */
     position: absolute;
     top: 40%;
     left: 0;
@@ -254,7 +254,7 @@ pre {
     100% { transform: translateX(4rem) translateY(-0.3rem) rotate(0deg); }
 }
 
-/* Additional classes for overlay fade out and blur management */
+/* Additional classes for overlay fade out and wrapper */
 .loading-overlay.fade-out {
     opacity: 0;
     backdrop-filter: blur(0);
@@ -265,10 +265,4 @@ pre {
     position: relative;
     width: 5rem;
     height: 3rem;
-}
-
-/* Blur effect on the body when overlay is active */
-.blur-content {
-    filter: blur(6px) brightness(0.7);
-    transition: filter 300ms ease;
 }
