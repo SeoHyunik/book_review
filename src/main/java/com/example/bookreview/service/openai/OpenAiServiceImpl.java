@@ -126,18 +126,6 @@ public class OpenAiServiceImpl implements OpenAiService {
                         error.param());
                 yield fallbackResult(originalContent, reason);
             }
-            case 401, 403 -> {
-                ExternalApiError error = apiUtils.parseErrorResponse(apiResult.body());
-                String reason = resolveReason(statusCode, error);
-                log.warn(
-                        "[OPENAI] OpenAI error response status={} type={} code={} message={} param={}",
-                        statusCode,
-                        error.type(),
-                        error.code(),
-                        error.message(),
-                        error.param());
-                yield fallbackResult(originalContent, reason);
-            }
             default -> {
                 ExternalApiError error = apiUtils.parseErrorResponse(apiResult.body());
                 String reason = resolveReason(statusCode, error);
