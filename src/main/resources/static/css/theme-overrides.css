@@ -148,3 +148,63 @@ body.bg-body-tertiary {
 [data-bs-theme="dark"] .alert-warning .alert-link {
     text-decoration: underline;
 }
+
+/* --- Loading overlay theme adjustments --- */
+
+/* 다크 모드: 배경은 어둡고 아이콘은 밝게 */
+[data-bs-theme="dark"] .loading-overlay {
+    background-color: rgba(0, 0, 0, 0.45);
+}
+
+[data-bs-theme="dark"] .loading-overlay .note-icon,
+[data-bs-theme="dark"] .loading-overlay .pen-icon {
+    color: #ffffff;
+}
+
+/* 라이트 모드: 배경은 밝게, 아이콘은 어두운 컬러로 반전 */
+[data-bs-theme="light"] .loading-overlay {
+    background-color: rgba(255, 255, 255, 0.75);
+}
+
+[data-bs-theme="light"] .loading-overlay .note-icon,
+[data-bs-theme="light"] .loading-overlay .pen-icon {
+    color: #111827; /* 거의 검정에 가까운 딥그레이 */
+}
+
+/* --- Improved review 내부 스크롤바 테마 --- */
+
+/* 공통 스크롤바 두께 */
+.improved-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+/* 라이트 모드 스크롤바 */
+[data-bs-theme="light"] .improved-content::-webkit-scrollbar-track {
+    background: #f3f4f6;
+}
+
+[data-bs-theme="light"] .improved-content::-webkit-scrollbar-thumb {
+    background: #cbd5f5;
+    border-radius: 999px;
+}
+
+/* 다크 모드 스크롤바 */
+[data-bs-theme="dark"] .improved-content::-webkit-scrollbar-track {
+    background: #1f2933;
+}
+
+[data-bs-theme="dark"] .improved-content::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 999px;
+}
+
+/* 파이어폭스 등 비 WebKit 브라우저용 */
+[data-bs-theme="light"] .improved-content {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5f5 #f3f4f6;
+}
+
+[data-bs-theme="dark"] .improved-content {
+    scrollbar-width: thin;
+    scrollbar-color: #4b5563 #1f2933;
+}
