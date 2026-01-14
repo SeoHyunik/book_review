@@ -295,6 +295,8 @@ window.addEventListener('DOMContentLoaded', () => {
     loadReviewDetail();
     // 리뷰 작성 폼 제출 시 로딩 오버레이 표시를 초기화합니다.
     setupReviewFormLoading();
+    // 새 리뷰 작성 폼의 원본 독후감 textarea 자동 리사이즈
+    setupAutoResizeOriginalContent();
 });
 
 // 폼 제출 시 로딩 오버레이를 표시
@@ -308,4 +310,21 @@ function setupReviewFormLoading() {
             overlay.classList.remove('d-none', 'fade-out');
         });
     }
+}
+
+// 새 리뷰 작성 폼의 원본 독후감 textarea 높이를 내용에 맞게 자동 조정한다.
+function setupAutoResizeOriginalContent() {
+    const textarea = document.getElementById('originalContent');
+    if (!textarea) return;
+
+    const resize = () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+    };
+
+    textarea.addEventListener('input', resize);
+    textarea.addEventListener('change', resize);
+
+    // 초기 값이 있을 때도 높이를 맞춰준다.
+    resize();
 }
