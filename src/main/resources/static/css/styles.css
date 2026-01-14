@@ -179,6 +179,12 @@ pre {
     overflow-y: auto;
 }
 
+/* 새 리뷰 작성 폼의 원본 독후감 textarea는 스크롤바 없이 내용에 따라 세로 길이가 늘어나도록 한다. */
+#originalContent {
+    overflow-y: hidden;
+    resize: none;
+}
+
 @media (max-width: 991.98px) {
     .navbar .navbar-collapse {
         padding-top: 12px;
