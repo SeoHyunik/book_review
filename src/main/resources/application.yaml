@@ -53,7 +53,7 @@ jasypt:
     password: open_ai_secret
 
 exchange-rate:
-  api-key: ${EXCHANGE_RATE_API_KEY:}
+  api-key: ${EXCHANGE_RATE_API_KEY:b459b3ea4a98482e611335ce}
   api-url: ${EXCHANGE_RATE_API_URL:https://v6.exchangerate-api.com/v6/%s/latest/USD}
 
 google:
