@@ -293,7 +293,10 @@ async function loadReviewDetail() {
 window.addEventListener('DOMContentLoaded', () => {
     loadReviewList();
     loadReviewDetail();
-    setupReviewFormLoading(); // 리뷰 작성 폼 제출 시 로딩 오버레이 표시를 초기화합니다.
+    // 리뷰 작성 폼 제출 시 로딩 오버레이 표시를 초기화합니다.
+    setupReviewFormLoading();
+    // 새 리뷰 작성 폼의 원본 독후감 textarea 자동 리사이즈
+    setupAutoResizeOriginalContent();
 });
 
 // 폼 제출 시 로딩 오버레이를 표시
@@ -302,7 +305,26 @@ function setupReviewFormLoading() {
     const overlay = document.getElementById('loading-overlay');
     if (form && overlay) {
         form.addEventListener('submit', () => {
-            overlay.classList.remove('d-none');
+            // 배경은 overlay의 backdrop-filter로만 블러 처리하고,
+            // 아이콘은 선명하게 보이도록 body에는 filter를 적용하지 않는다.
+            overlay.classList.remove('d-none', 'fade-out');
         });
     }
+}
+
+// 새 리뷰 작성 폼의 원본 독후감 textarea 높이를 내용에 맞게 자동 조정한다.
+function setupAutoResizeOriginalContent() {
+    const textarea = document.getElementById('originalContent');
+    if (!textarea) return;
+
+    const resize = () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+    };
+
+    textarea.addEventListener('input', resize);
+    textarea.addEventListener('change', resize);
+
+    // 초기 값이 있을 때도 높이를 맞춰준다.
+    resize();
 }
