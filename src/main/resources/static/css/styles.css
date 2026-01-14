@@ -174,6 +174,9 @@ pre {
     white-space: pre-wrap;
     line-height: 1.6;
     font-size: 1rem;
+    /* Limit height and allow internal scrolling so long reviews don't stretch the entire page */
+    max-height: 40vh;
+    overflow-y: auto;
 }
 
 @media (max-width: 991.98px) {
@@ -224,6 +227,9 @@ pre {
     justify-content: center;
     background-color: rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(4px);
+    /* Smooth fade and blur transitions when the overlay appears or disappears */
+    opacity: 1;
+    transition: opacity 300ms ease, backdrop-filter 300ms ease;
 }
 
 .loading-overlay .note-icon {
@@ -234,11 +240,35 @@ pre {
 .loading-overlay .pen-icon {
     font-size: 2rem;
     color: #ffffff;
-    animation: pen-write 1.5s linear infinite alternate;
-    margin-top: -1.5rem;
+    position: absolute;
+    top: 40%;
+    left: 0;
+    animation: pen-write 1.6s ease-in-out infinite;
 }
 
 @keyframes pen-write {
-    from { transform: translateX(-1.5rem); }
-    to   { transform: translateX(1.5rem); }
+    0%   { transform: translateX(0) translateY(-0.6rem) rotate(0deg); }
+    25%  { transform: translateX(1rem) translateY(0.2rem) rotate(-5deg); }
+    50%  { transform: translateX(2rem) translateY(-0.2rem) rotate(0deg); }
+    75%  { transform: translateX(3rem) translateY(0.3rem) rotate(5deg); }
+    100% { transform: translateX(4rem) translateY(-0.3rem) rotate(0deg); }
+}
+
+/* Additional classes for overlay fade out and blur management */
+.loading-overlay.fade-out {
+    opacity: 0;
+    backdrop-filter: blur(0);
+}
+
+/* Wrapper for animated note and pen icons */
+.loading-animation {
+    position: relative;
+    width: 5rem;
+    height: 3rem;
+}
+
+/* Blur effect on the body when overlay is active */
+.blur-content {
+    filter: blur(6px) brightness(0.7);
+    transition: filter 300ms ease;
 }
