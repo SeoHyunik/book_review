@@ -61,6 +61,10 @@ google:
     credentials-path: ${GOOGLE_CREDENTIALS_PATH:}
     tokens-directory: ${GOOGLE_TOKENS_DIR:tokens}
     parent-folder-id: ${GOOGLE_DRIVE_PARENT_ID:}
+    # 예시 (실제 ENC 값은 넣지 말고 참고용으로만 유지)
+    # credentials-path: ENC(example-encrypted-credentials-path)
+    # tokens-directory: tokens
+    # parent-folder-id: ENC(example-encrypted-parent-folder-id)
 
 logging:
   # Spring Boot가 사용할 로깅 설정 파일을 명시적으로 고정 (log4j2-spring.xml 강제)
