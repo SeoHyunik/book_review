@@ -107,7 +107,9 @@ public class ReviewServiceImpl implements ReviewService {
             log.warn("Currency conversion failed, continuing without KRW cost", ex);
         }
 
-        String markdown = buildMarkdown(request.title(), aiResult.improvedContent());
+        String author = currentUserService.getCurrentUsernameOrNull();
+        String markdown = buildMarkdown(request.title(), author, "N/A",
+                request.originalContent(), aiResult.improvedContent());
         String fileId = null;
         try {
             fileId = uploadToDrive(request.title(), markdown);
@@ -241,8 +243,27 @@ public class ReviewServiceImpl implements ReviewService {
         }
     }
 
-    private String buildMarkdown(String title, String improvedContent) {
-        return "# " + title + "\n\n" + improvedContent + "\n";
+    private String buildMarkdown(String title, String author, String rating, String content,
+                                 String improvedContent) {
+        String safeTitle = defaultMarkdownValue(title, "Untitled Review");
+        String safeAuthor = defaultMarkdownValue(author, "Unknown");
+        String safeRating = defaultMarkdownValue(rating, "N/A");
+        String safeContent = defaultMarkdownValue(content, "");
+        String safeImproved = defaultMarkdownValue(improvedContent, "");
+        return "# " + safeTitle + "\n\n"
+                + "- Author: " + safeAuthor + "\n"
+                + "- Rating: " + safeRating + "\n\n"
+                + "## Original Content\n"
+                + safeContent + "\n\n"
+                + "## Improved Content\n"
+                + safeImproved + "\n";
+    }
+
+    private String defaultMarkdownValue(String value, String fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        return value;
     }
 
     private void validateTitleForUpload(String title) {
