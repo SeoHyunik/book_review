@@ -164,7 +164,7 @@ async function loadReviewList() {
                         <div class="d-flex justify-content-between gap-2 align-items-start">
                             <div>
                                 <h2 class="card-title h5 mb-1 text-dark">${review.title}</h2>
-                                <p class="text-secondary small mb-1">${review.formattedCreatedAt || review.createdAt || '-'} • 토큰 ${review.tokenCount || 0}</p>
+                                <p class="text-secondary small mb-1">${review.formattedCreatedAt || review.createdAt || '-'} • TOKEN ${review.tokenCount || 0}</p>
                                 <div class="d-flex flex-wrap gap-2">
                                     <span class="badge bg-light text-success border">USD ${review.formattedUsdCost || review.usdCost || '-'}</span>
                                     <span class="badge bg-light text-success border">KRW ${review.formattedKrwCost || review.krwCost || '-'}</span>

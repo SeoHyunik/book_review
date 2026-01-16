@@ -25,10 +25,10 @@ public class CurrencyServiceImpl implements CurrencyService {
     private final WebClient.Builder webClientBuilder;
     private final Gson gson = new Gson();
 
-    @Value("${exchange-rate.api-key:${EXCHANGE_RATE_API_KEY:}}")
+    @Value("${exchange-rate.api-key:}")
     private String apiKey;
 
-    @Value("${exchange-rate.api-url:https://v6.exchangerate-api.com/v6/%s/latest/USD}")
+    @Value("${exchange-rate.api-url:}")
     private String apiUrl;
 
     @Override

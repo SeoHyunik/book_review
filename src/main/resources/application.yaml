@@ -43,6 +43,7 @@ spring:
 openai:
   api-key: ENC(37uGeEjg5tDfzeGJAUCAspd5tnn1K9Zi9dj7oxRJMj1aJ1820o3oI35dg1NDkHS7DJBhD0KgVk0GSaHatCXYlDbZOJBbzTke76dEwREtY5Iu8xPly4/1WGw63KOP0vgDvD4fFKII2sLJd8xh6XqPu6T+deFREfm0TMXZ5il0VDgseR4mSJCQan1y+VeHBJsGR9HtxP2NuNoygXDFyE3w2j56tHR+PES9IsgWDhjnupIoore6XAFjQPiRH5NdGx44h/BfOstt8cmQ+uFKX/kwOw==)
   api-url: https://api.openai.com/v1/chat/completions
+  models-url: https://api.openai.com/v1/models
   model: gpt-4o-mini
   max-tokens: 800
   temperature: 0.7
@@ -53,8 +54,8 @@ jasypt:
     password: open_ai_secret
 
 exchange-rate:
-  api-key: ${EXCHANGE_RATE_API_KEY:b459b3ea4a98482e611335ce}
-  api-url: ${EXCHANGE_RATE_API_URL:https://v6.exchangerate-api.com/v6/%s/latest/USD}
+  api-key: b459b3ea4a98482e611335ce
+  api-url: https://v6.exchangerate-api.com/v6/%s/latest/USD
 
 google:
   drive:

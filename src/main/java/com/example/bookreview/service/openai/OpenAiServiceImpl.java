@@ -32,9 +32,6 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class OpenAiServiceImpl implements OpenAiService {
 
-    private static final String DEFAULT_OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String DEFAULT_OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
-    private static final String DEFAULT_MODEL = "gpt-4o";
     private static final String TITLE_PLACEHOLDER = "{{title}}";
     private static final String CONTENT_PLACEHOLDER = "{{originalContent}}";
     private static final String FALLBACK_PREFIX = "[IMPROVEMENT_SKIPPED]\n";
@@ -46,17 +43,18 @@ public class OpenAiServiceImpl implements OpenAiService {
     private static final String UNKNOWN_REASON = "UNKNOWN";
     private final ExternalApiUtils apiUtils;
     private final Gson gson;
+
     @Value("${openai.api-key:}")
     private String openAiApiKey;
-    @Value("${openai.api-url:" + DEFAULT_OPENAI_URL + "}")
+    @Value("${openai.api-url:}")
     private String openAiUrl;
-    @Value("${openai.models-url:" + DEFAULT_OPENAI_MODELS_URL + "}")
+    @Value("${openai.models-url:}")
     private String openAiModelsUrl;
-    @Value("${openai.model:" + DEFAULT_MODEL + "}")
+    @Value("${openai.model:}")
     private String openAiModel;
     @Value("${openai.max-tokens:0}")
     private int openAiMaxTokens;
-    @Value("${openai.temperature:#{null}}")
+    @Value("${openai.temperature:}")
     private Double openAiTemperature;
     @Value("${openai.prompt-file}")
     private Resource promptFile;
