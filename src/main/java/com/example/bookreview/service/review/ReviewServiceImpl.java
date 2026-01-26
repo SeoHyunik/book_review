@@ -16,6 +16,7 @@ import com.example.bookreview.util.TokenCostCalculator;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -195,13 +197,15 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private String uploadToDrive(String filename, String markdown) {
-        Optional<String> fileId = googleDriveService.uploadMarkdown(filename, markdown);
-        if (fileId.isPresent()) {
-            log.info("Markdown uploaded to Google Drive with fileId={}", fileId.get());
-            return fileId.get();
-        }
-        log.warn("Google Drive upload skipped because credentials are missing.");
-        return null;
+        return googleDriveService.uploadMarkdown(filename, markdown)
+                .map(fileId -> {
+                    log.info("Markdown uploaded to Google Drive with fileId={}", fileId);
+                    return fileId;
+                })
+                .orElseGet(() -> {
+                    log.warn("Google Drive upload skipped because credentials are missing.");
+                    return null;
+                });
     }
 
     private AiReviewResult fallbackAiResult(ReviewRequest request) {
@@ -210,16 +214,18 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private void appendWarningIfMissing(StringBuilder warnings, String message) {
-        if (message == null || message.isBlank()) {
-            return;
-        }
-        if (warnings.toString().contains(message)) {
-            return;
-        }
-        if (!warnings.isEmpty()) {
-            warnings.append("\n");
-        }
-        warnings.append(message);
+        List<Predicate<String>> validators = List.of(
+                StringUtils::hasText,
+                msg -> !warnings.toString().contains(msg)
+        );
+        Optional.ofNullable(message)
+                .filter(msg -> validators.stream().allMatch(validator -> validator.test(msg)))
+                .ifPresent(msg -> {
+                    if (!warnings.isEmpty()) {
+                        warnings.append("\n");
+                    }
+                    warnings.append(msg);
+                });
     }
 
     private void appendOpenAiWarning(StringBuilder warnings, String reason) {
@@ -250,13 +256,18 @@ public class ReviewServiceImpl implements ReviewService {
         String safeRating = defaultMarkdownValue(rating, "N/A");
         String safeContent = defaultMarkdownValue(content, "");
         String safeImproved = defaultMarkdownValue(improvedContent, "");
-        return "# " + safeTitle + "\n\n"
-                + "- Author: " + safeAuthor + "\n"
-                + "- Rating: " + safeRating + "\n\n"
-                + "## Original Content\n"
-                + safeContent + "\n\n"
-                + "## Improved Content\n"
-                + safeImproved + "\n";
+        return """
+                # %s
+
+                - Author: %s
+                - Rating: %s
+
+                ## Original Content
+                %s
+
+                ## Improved Content
+                %s
+                """.formatted(safeTitle, safeAuthor, safeRating, safeContent, safeImproved);
     }
 
     private String defaultMarkdownValue(String value, String fallback) {

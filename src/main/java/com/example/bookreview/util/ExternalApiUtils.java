@@ -4,12 +4,14 @@ import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -59,28 +61,34 @@ public class ExternalApiUtils {
     }
 
     public ExternalApiError parseErrorResponse(String body) {
-        if (body == null || body.isBlank()) {
-            return new ExternalApiError(null, null, null, null);
-        }
+        ExternalApiError empty = new ExternalApiError(null, null, null, null);
         try {
-            JsonElement element = JsonParser.parseString(body);
-            if (!element.isJsonObject()) {
-                return new ExternalApiError(null, null, null, null);
-            }
-            JsonObject root = element.getAsJsonObject();
-            if (!root.has("error") || !root.get("error").isJsonObject()) {
-                return new ExternalApiError(null, null, null, null);
-            }
-            JsonObject error = root.getAsJsonObject("error");
-            String message = error.has("message") ? error.get("message").getAsString() : null;
-            String type = error.has("type") ? error.get("type").getAsString() : null;
-            String code = error.has("code") ? error.get("code").getAsString() : null;
-            String param = error.has("param") ? error.get("param").getAsString() : null;
-            return new ExternalApiError(message, type, code, param);
+            return Optional.ofNullable(body)
+                    .filter(StringUtils::hasText)
+                    .map(JsonParser::parseString)
+                    .filter(JsonElement::isJsonObject)
+                    .map(JsonElement::getAsJsonObject)
+                    .filter(root -> root.has("error") && root.get("error").isJsonObject())
+                    .map(root -> root.getAsJsonObject("error"))
+                    .map(error -> new ExternalApiError(
+                            readString(error, "message"),
+                            readString(error, "type"),
+                            readString(error, "code"),
+                            readString(error, "param")))
+                    .orElse(empty);
         } catch (Exception ex) {
             log.debug("[HTTP] Failed to parse external API error body", ex);
-            return new ExternalApiError(null, null, null, null);
+            return empty;
         }
+    }
+
+    private String readString(JsonObject root, String field) {
+        return Optional.ofNullable(root)
+                .filter(obj -> obj.has(field))
+                .map(obj -> obj.get(field))
+                .filter(JsonElement::isJsonPrimitive)
+                .map(JsonElement::getAsString)
+                .orElse(null);
     }
 
     private HttpHeaders sanitizeHeaders(HttpHeaders headers) {
