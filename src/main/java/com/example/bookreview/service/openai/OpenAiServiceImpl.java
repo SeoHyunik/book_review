@@ -1,6 +1,8 @@
 package com.example.bookreview.service.openai;
 
 import com.example.bookreview.dto.internal.AiReviewResult;
+import com.example.bookreview.dto.internal.openai.ErrorDescriptor;
+import com.example.bookreview.dto.internal.openai.OpenAiStatusCheck;
 import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.example.bookreview.dto.response.OpenAiResponse;
 import com.example.bookreview.exception.MissingApiKeyException;
@@ -357,19 +359,6 @@ public class OpenAiServiceImpl implements OpenAiService {
         } catch (Exception ex) {
             log.debug("[OPENAI] Failed to parse models response", ex);
             return false;
-        }
-    }
-
-    private record OpenAiStatusCheck(boolean available, String reason) {
-    }
-
-    private record ErrorDescriptor(String type, String code, String param) {
-
-        private static ErrorDescriptor from(ExternalApiError error) {
-            if (error == null) {
-                return new ErrorDescriptor(null, null, null);
-            }
-            return new ErrorDescriptor(error.type(), error.code(), error.param());
         }
     }
 
