@@ -1,8 +1,8 @@
 package com.example.bookreview.service.openai;
 
 import com.example.bookreview.dto.internal.AiReviewResult;
-import com.example.bookreview.dto.internal.openai.ErrorDescriptor;
-import com.example.bookreview.dto.internal.openai.OpenAiStatusCheck;
+import com.example.bookreview.dto.internal.ErrorDescriptor;
+import com.example.bookreview.dto.internal.OpenAiStatusCheck;
 import com.example.bookreview.dto.request.ExternalApiRequest;
 import com.example.bookreview.dto.response.OpenAiResponse;
 import com.example.bookreview.exception.MissingApiKeyException;

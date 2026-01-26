@@ -1,4 +1,4 @@
-package com.example.bookreview.dto.internal.openai;
+package com.example.bookreview.dto.internal;
 
 import com.example.bookreview.util.ExternalApiError;
 
