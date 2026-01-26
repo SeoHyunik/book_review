@@ -279,47 +279,52 @@ public class OpenAiServiceImpl implements OpenAiService {
         if (result == null) {
             return new OpenAiStatusCheck(false, UNKNOWN_REASON);
         }
-        if (result.statusCode() >= 200 && result.statusCode() < 300) {
-            if (isModelAvailable(result.body())) {
-                log.info("[OPENAI] Status check OK — valid OpenAI API key");
-                return new OpenAiStatusCheck(true, "OK");
+        return switch (result.statusCode()) {
+            case int code when code >= 200 && code < 300 -> {
+                if (isModelAvailable(result.body())) {
+                    log.info("[OPENAI] Status check OK — valid OpenAI API key");
+                    yield new OpenAiStatusCheck(true, "OK");
+                }
+                log.warn("[OPENAI] OpenAI model '{}' not found in /v1/models response",
+                        openAiModel);
+                yield new OpenAiStatusCheck(false, INVALID_MODEL_REASON);
             }
-            log.warn("[OPENAI] OpenAI model '{}' not found in /v1/models response",
-                    openAiModel);
-            return new OpenAiStatusCheck(false, INVALID_MODEL_REASON);
-        }
-        ExternalApiError error = apiUtils.parseErrorResponse(result.body());
-        String reason = resolveReason(result.statusCode(), error);
-        log.warn("[OPENAI] OpenAI status check failed status={} type={} code={} message={} param={}",
-                result.statusCode(), error.type(), error.code(), error.message(), error.param());
-        return new OpenAiStatusCheck(false, reason);
+            default -> {
+                ExternalApiError error = apiUtils.parseErrorResponse(result.body());
+                String reason = resolveReason(result.statusCode(), error);
+                log.warn(
+                        "[OPENAI] OpenAI status check failed status={} type={} code={} message={} param={}",
+                        result.statusCode(), error.type(), error.code(), error.message(),
+                        error.param());
+                yield new OpenAiStatusCheck(false, reason);
+            }
+        };
     }
 
     private String resolveReason(int statusCode, ExternalApiError error) {
-        String type = error != null ? error.type() : null;
-        String code = error != null ? error.code() : null;
-        String param = error != null ? error.param() : null;
-        if (statusCode == 401) {
-            return INVALID_KEY_REASON;
-        }
-        if (statusCode == 429 || containsIgnoreCase(type, "rate_limit")) {
-            return RATE_LIMIT_REASON;
-        }
-        if (containsIgnoreCase(type, "insufficient_quota")
-                || containsIgnoreCase(code, "insufficient_quota")) {
-            return INSUFFICIENT_QUOTA_REASON;
-        }
-        if (containsIgnoreCase(type, "invalid_api_key")
-                || containsIgnoreCase(code, "invalid_api_key")) {
-            return INVALID_KEY_REASON;
-        }
-        if (containsIgnoreCase(code, "unsupported_parameter")) {
-            if (containsIgnoreCase(param, "model")) {
-                return INVALID_MODEL_REASON;
-            }
-            return UNSUPPORTED_PARAM_REASON;
-        }
-        return UNKNOWN_REASON;
+        ErrorDescriptor descriptor = ErrorDescriptor.from(error);
+        return switch (statusCode) {
+            case 401 -> INVALID_KEY_REASON;
+            case 429 -> RATE_LIMIT_REASON;
+            default -> switch (descriptor) {
+                case ErrorDescriptor(String type, String code, String param)
+                        when containsIgnoreCase(type, "rate_limit") -> RATE_LIMIT_REASON;
+                case ErrorDescriptor(String type, String code, String param)
+                        when containsIgnoreCase(type, "insufficient_quota")
+                        || containsIgnoreCase(code, "insufficient_quota") ->
+                        INSUFFICIENT_QUOTA_REASON;
+                case ErrorDescriptor(String type, String code, String param)
+                        when containsIgnoreCase(type, "invalid_api_key")
+                        || containsIgnoreCase(code, "invalid_api_key") -> INVALID_KEY_REASON;
+                case ErrorDescriptor(String type, String code, String param)
+                        when containsIgnoreCase(code, "unsupported_parameter")
+                        && containsIgnoreCase(param, "model") -> INVALID_MODEL_REASON;
+                case ErrorDescriptor(String type, String code, String param)
+                        when containsIgnoreCase(code, "unsupported_parameter") ->
+                        UNSUPPORTED_PARAM_REASON;
+                default -> UNKNOWN_REASON;
+            };
+        };
     }
 
     private boolean containsIgnoreCase(String value, String token) {
@@ -356,6 +361,16 @@ public class OpenAiServiceImpl implements OpenAiService {
     }
 
     private record OpenAiStatusCheck(boolean available, String reason) {
+    }
+
+    private record ErrorDescriptor(String type, String code, String param) {
+
+        private static ErrorDescriptor from(ExternalApiError error) {
+            if (error == null) {
+                return new ErrorDescriptor(null, null, null);
+            }
+            return new ErrorDescriptor(error.type(), error.code(), error.param());
+        }
     }
 
 }
