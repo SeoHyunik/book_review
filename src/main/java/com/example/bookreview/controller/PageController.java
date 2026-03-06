@@ -10,7 +10,7 @@ public class PageController {
 
     @GetMapping("/")
     public String home() {
-        log.info("Root path accessed, redirecting to /reviews");
-        return "redirect:/reviews";
+        log.info("Root path accessed, redirecting to /news");
+        return "redirect:/news";
     }
 }

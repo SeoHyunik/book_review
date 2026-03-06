@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title th:text="${pageTitle} ?: 'Book Review'"></title>
+    <title th:text="${pageTitle} ?: 'Macro News'"></title>
     <meta name="_csrf" th:content="${_csrf.token}"/>
     <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
 
@@ -34,16 +34,16 @@
 <body class="bg-body-tertiary">
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm sticky-top">
     <div class="container">
-        <a class="navbar-brand fw-semibold" th:href="@{/reviews}">📚 Book Review</a>
+        <a class="navbar-brand fw-semibold" th:href="@{/news}">Macro News</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav"
                 aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="nav">
             <ul class="navbar-nav ms-auto gap-lg-2 align-items-lg-center">
-                <li class="nav-item"><a class="nav-link" th:href="@{/reviews}">Reviews</a></li>
-                <li class="nav-item" sec:authorize="isAuthenticated()">
-                    <a class="btn btn-light text-primary fw-semibold ms-lg-2" th:href="@{/reviews/new}">New Review</a>
+                <li class="nav-item"><a class="nav-link" th:href="@{/news}">News</a></li>
+                <li class="nav-item" sec:authorize="hasRole('ADMIN')">
+                    <a class="btn btn-light text-primary fw-semibold ms-lg-2" th:href="@{/admin/news}">Admin News</a>
                 </li>
                 <li class="nav-item" sec:authorize="isAnonymous()">
                     <a class="nav-link" th:href="@{/login}">Login</a>
@@ -65,13 +65,12 @@
     </div>
 </nav>
 
-<!-- 전체 페이지 컨텐츠는 푸터 공간만큼 패딩을 추가하여 고정된 푸터와 겹치지 않도록 합니다 -->
 <div class="container py-5 pb-5">
     <div class="row justify-content-center">
         <div class="col-12 col-lg-10 col-xl-9">
             <header class="mb-4 d-flex align-items-center gap-2">
-                <span class="badge bg-info-subtle text-info fw-semibold text-uppercase">AI Reviews</span>
-                <p class="mb-0 text-secondary">AI 독후감 관리 서비스</p>
+                <span class="badge bg-info-subtle text-info fw-semibold text-uppercase">Macro News</span>
+                <p class="mb-0 text-secondary">Macro News Interpretation Service</p>
             </header>
 
             <div th:if="${successMessage}" class="flash-alert alert alert-success d-flex align-items-center gap-2" role="alert">
@@ -88,15 +87,13 @@
             </div>
 
             <main th:replace="${content}"></main>
-
-            <!-- 푸터는 화면 하단에 고정되어 모든 페이지에서 항상 보이도록 합니다 -->
-        </div> <!-- end col-12 col-lg-10 col-xl-9 -->
-    </div> <!-- end row -->
-</div> <!-- end container -->
+        </div>
+    </div>
+</div>
 
 <footer class="fixed-bottom bg-body-tertiary text-center text-secondary small py-2">
     <div class="container">
-        <p class="mb-1">AI 독후감 관리 서비스 crafted with Spring Boot &amp; Thymeleaf by Fastlaner</p>
+        <p class="mb-1">Macro News Interpreter crafted with Spring Boot &amp; Thymeleaf by Fastlaner</p>
     </div>
 </footer>
 
