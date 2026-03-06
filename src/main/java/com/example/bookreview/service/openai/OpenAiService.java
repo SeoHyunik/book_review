@@ -3,6 +3,7 @@ package com.example.bookreview.service.openai;
 import com.example.bookreview.dto.internal.AiReviewResult;
 import com.example.bookreview.dto.response.OpenAiResponse;
 
+// Legacy review-oriented AI interface kept for existing review flow during migration.
 public interface OpenAiService {
 
     OpenAiResponse improveReview(String originalContent);
