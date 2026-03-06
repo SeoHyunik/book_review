@@ -62,10 +62,10 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .loginProcessingUrl("/login")
-                        .defaultSuccessUrl("/reviews", true)
+                        .defaultSuccessUrl("/news", true)
                         .failureHandler(loggingAuthenticationFailureHandler)
                         .permitAll())
-                .logout(logout -> logout.logoutSuccessUrl("/reviews"))
+                .logout(logout -> logout.logoutSuccessUrl("/news"))
                 // 嚥≪뮄??紐낅릭筌왖 ??? ????癒?뮉 /login ??곗쨮 ??猷??쀪텕?? ?紐꾩쵄???????亦낅슦釉??봔鈺곌퉭彛?AccessDeniedHandler揶쎛 筌ｌ꼶???뺣뼄.
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"))
