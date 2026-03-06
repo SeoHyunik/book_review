@@ -13,17 +13,17 @@ spring:
     transactions:
       enabled: true # Replica set required in production for this to take effect
 
-  # thymeleaf 수정 반영(캐시 OFF)
+  # thymeleaf ??륁젟 獄쏆꼷??筌?Ŋ??OFF)
   thymeleaf:
     cache: false
 
-  # 정적 리소스(css/js 등)도 캐시 최소화(개발용)
+  # ?類ㅼ읅 ?귐딅꺖??css/js ????筌?Ŋ??筌ㅼ뮇???揶쏆뮆而??
   web:
     resources:
       cache:
         period: 0
 
-  # devtools(이미 적용되어 있다면 유지)
+  # devtools(??? ?怨몄뒠??뤿선 ??덈뼄筌??醫?)
   devtools:
     restart:
       additional-paths: src/main/resources
@@ -48,6 +48,7 @@ openai:
   max-tokens: 800
   temperature: 0.7
   prompt-file: classpath:ai/prompts/improve_review_prompt.json
+  macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
 
 jasypt:
   encryptor:
@@ -62,11 +63,11 @@ google:
     credentials-path: ${GOOGLE_CREDENTIALS_PATH:}
     tokens-directory: ${GOOGLE_TOKENS_DIR:tokens}
     parent-folder-id: ${GOOGLE_DRIVE_PARENT_ID:}
-    # 예시 (실제 ENC 값은 넣지 말고 참고용으로만 유지)
+    # ??됰뻻 (??쇱젫 ENC 揶쏅?? ?節? 筌띾Þ??筌〓㈇???뱀몵嚥≪뮆彛??醫?)
     # credentials-path: ENC(example-encrypted-credentials-path)
     # tokens-directory: tokens
     # parent-folder-id: ENC(example-encrypted-parent-folder-id)
 
 logging:
-  # Spring Boot가 사용할 로깅 설정 파일을 명시적으로 고정 (log4j2-spring.xml 강제)
+  # Spring Boot揶쎛 ?????嚥≪뮄????쇱젟 ???뵬??筌뤿굞??怨몄몵嚥??⑥쥙??(log4j2-spring.xml 揶쏅벡??
   config: classpath:log4j2-spring.xml
