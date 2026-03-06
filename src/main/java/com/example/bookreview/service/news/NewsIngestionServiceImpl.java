@@ -95,3 +95,4 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         return builder.toString();
     }
 }
+

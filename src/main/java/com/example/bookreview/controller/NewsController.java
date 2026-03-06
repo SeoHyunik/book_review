@@ -41,3 +41,4 @@ public class NewsController {
         return "news/detail";
     }
 }
+

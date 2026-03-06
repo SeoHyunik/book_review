@@ -36,3 +36,4 @@ public record AdminIngestionRequest(
         return value == null ? "" : value;
     }
 }
+

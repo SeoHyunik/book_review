@@ -6,3 +6,4 @@ public interface NewsIngestionService {
 
     String ingestOne(AdminIngestionRequest request);
 }
+

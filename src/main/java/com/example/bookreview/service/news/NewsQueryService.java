@@ -21,3 +21,4 @@ public class NewsQueryService {
         return newsEventRepository.findById(id);
     }
 }
+
