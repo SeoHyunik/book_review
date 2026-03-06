@@ -1,9 +1,11 @@
 package com.example.bookreview.service.news;
 
+import com.example.bookreview.dto.domain.AnalysisResult;
 import com.example.bookreview.dto.domain.NewsEvent;
 import com.example.bookreview.dto.domain.NewsStatus;
 import com.example.bookreview.dto.request.AdminIngestionRequest;
 import com.example.bookreview.repository.NewsEventRepository;
+import com.example.bookreview.service.macro.MacroAiService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -21,6 +23,7 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
     private static final String DEFAULT_INGESTED_BY = "admin-manual";
 
     private final NewsEventRepository newsEventRepository;
+    private final MacroAiService macroAiService;
 
     @Override
     @Transactional
@@ -47,26 +50,66 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
                             .ingestedBy(resolveIngestedBy(request.ingestedBy()))
                             .build();
                     NewsEvent saved = newsEventRepository.save(duplicate);
-                    log.info("NewsEvent saved as DUPLICATE with id={}", saved.id());
+                    log.info("NewsEvent final persisted status={} id={}", saved.status(), saved.id());
                     return saved.id();
                 })
-                .orElseGet(() -> {
-                    NewsEvent ingested = NewsEvent.builder()
-                            .externalId(externalId)
-                            .source(request.source())
-                            .title(request.title())
-                            .summary(request.summary())
-                            .content(request.content())
-                            .url(request.url())
-                            .publishedAt(request.publishedAt())
-                            .ingestedAt(LocalDateTime.now())
-                            .status(NewsStatus.INGESTED)
-                            .ingestedBy(resolveIngestedBy(request.ingestedBy()))
-                            .build();
-                    NewsEvent saved = newsEventRepository.save(ingested);
-                    log.info("NewsEvent saved as INGESTED with id={}", saved.id());
-                    return saved.id();
-                });
+                .orElseGet(() -> ingestAndAnalyze(request, externalId));
+    }
+
+    private String ingestAndAnalyze(AdminIngestionRequest request, String externalId) {
+        NewsEvent ingested = NewsEvent.builder()
+                .externalId(externalId)
+                .source(request.source())
+                .title(request.title())
+                .summary(request.summary())
+                .content(request.content())
+                .url(request.url())
+                .publishedAt(request.publishedAt())
+                .ingestedAt(LocalDateTime.now())
+                .status(NewsStatus.INGESTED)
+                .ingestedBy(resolveIngestedBy(request.ingestedBy()))
+                .build();
+
+        NewsEvent savedIngested = newsEventRepository.save(ingested);
+        log.info("NewsEvent saved as INGESTED with id={}", savedIngested.id());
+
+        try {
+            log.info("Starting AI interpretation for newsEventId={}", savedIngested.id());
+            AnalysisResult analysisResult = macroAiService.interpretNewsEvent(savedIngested);
+            NewsEvent analyzed = copyWithAnalysisAndStatus(savedIngested, analysisResult,
+                    NewsStatus.ANALYZED);
+            NewsEvent savedAnalyzed = newsEventRepository.save(analyzed);
+            log.info("AI interpretation success for newsEventId={}", savedAnalyzed.id());
+            log.info("NewsEvent final persisted status={} id={}", savedAnalyzed.status(),
+                    savedAnalyzed.id());
+            return savedAnalyzed.id();
+        } catch (Exception ex) {
+            log.error("AI interpretation failed for newsEventId={}", savedIngested.id(), ex);
+            NewsEvent failed = copyWithAnalysisAndStatus(savedIngested, null, NewsStatus.FAILED);
+            NewsEvent savedFailed = newsEventRepository.save(failed);
+            log.info("NewsEvent final persisted status={} id={}", savedFailed.status(),
+                    savedFailed.id());
+            return savedFailed.id();
+        }
+    }
+
+    private NewsEvent copyWithAnalysisAndStatus(NewsEvent base, AnalysisResult analysisResult,
+            NewsStatus status) {
+        return NewsEvent.builder()
+                .id(base.id())
+                .externalId(base.externalId())
+                .source(base.source())
+                .title(base.title())
+                .summary(base.summary())
+                .content(base.content())
+                .url(base.url())
+                .publishedAt(base.publishedAt())
+                .ingestedAt(base.ingestedAt())
+                .status(status)
+                .analysisResult(analysisResult)
+                .duplicateOfId(base.duplicateOfId())
+                .ingestedBy(base.ingestedBy())
+                .build();
     }
 
     private String resolveIngestedBy(String ingestedBy) {
@@ -95,4 +138,3 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         return builder.toString();
     }
 }
-
