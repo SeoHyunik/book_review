@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -73,5 +74,20 @@ public class AdminNewsController {
             return "redirect:/admin/news";
         }
     }
-}
 
+    @PostMapping("/ingest-api")
+    public String ingestFromApi(@RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
+            RedirectAttributes redirectAttributes) {
+        try {
+            int createdCount = newsIngestionService.ingestLatestFromApi(pageSize);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "External ingestion completed. created=" + createdCount);
+            log.info("Admin external ingestion completed. createdCount={}", createdCount);
+        } catch (RuntimeException ex) {
+            log.error("Admin external ingestion failed", ex);
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "External ingestion failed. Please check logs/config.");
+        }
+        return "redirect:/admin/news";
+    }
+}

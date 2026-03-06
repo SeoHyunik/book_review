@@ -51,6 +51,11 @@ jasypt:
   encryptor:
     password: open_ai_secret
 
+
+news-api:
+  provider: RSS
+  rss-url: https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en
+  default-page-size: 10
 exchange-rate:
   api-key: b459b3ea4a98482e611335ce
   api-url: https://v6.exchangerate-api.com/v6/%s/latest/USD
