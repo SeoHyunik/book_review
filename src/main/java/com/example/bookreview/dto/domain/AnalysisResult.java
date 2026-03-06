@@ -11,3 +11,4 @@ public record AnalysisResult(
         @Field("marketImpacts") List<MarketImpact> marketImpacts
 ) {
 }
+

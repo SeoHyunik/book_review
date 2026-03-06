@@ -23,3 +23,4 @@ public record NewsEvent(
         String ingestedBy
 ) {
 }
+

@@ -11,3 +11,4 @@ public record MarketImpact(
         @Field("rationale") String rationale
 ) {
 }
+

@@ -6,3 +6,4 @@ public enum NewsStatus {
     FAILED,
     DUPLICATE
 }
+
