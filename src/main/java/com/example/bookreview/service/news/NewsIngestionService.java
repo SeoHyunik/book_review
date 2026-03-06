@@ -5,5 +5,6 @@ import com.example.bookreview.dto.request.AdminIngestionRequest;
 public interface NewsIngestionService {
 
     String ingestOne(AdminIngestionRequest request);
-}
 
+    int ingestLatestFromApi(int pageSize);
+}
