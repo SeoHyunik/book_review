@@ -1,0 +1,155 @@
+﻿:root {
+    --brand-gradient: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    --card-shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
+    --soft-border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-image: radial-gradient(circle at 10% 20%, rgba(124, 58, 237, 0.08), transparent 25%),
+    radial-gradient(circle at 90% 10%, rgba(37, 99, 235, 0.08), transparent 30%);
+    min-height: 100vh;
+}
+
+.navbar-brand {
+    letter-spacing: -0.4px;
+}
+
+main section {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    padding: 1.75rem;
+    border: var(--soft-border);
+}
+
+.hero-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    border: var(--soft-border);
+    box-shadow: var(--card-shadow);
+}
+
+.card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 35px rgba(17, 24, 39, 0.12);
+}
+
+.badge-soft-success {
+    color: #15803d;
+    background-color: rgba(34, 197, 94, 0.12);
+}
+
+.badge-soft-danger {
+    color: #b91c1c;
+    background-color: rgba(248, 113, 113, 0.15);
+}
+
+.badge-soft-warning {
+    color: #b45309;
+    background-color: rgba(251, 191, 36, 0.18);
+}
+
+.badge-soft-info {
+    color: #2563eb;
+    background-color: rgba(59, 130, 246, 0.14);
+}
+
+.alert-icon {
+    font-size: 1.1rem;
+}
+
+pre {
+    background: #f8fafc;
+    color: #0f172a;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    border: var(--soft-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+}
+
+.status-tile {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    border: var(--soft-border);
+}
+
+.form-floating > label {
+    color: var(--bs-secondary-color);
+}
+
+.form-control:focus, .form-control:focus-visible, .form-control.is-valid, .form-control.is-invalid {
+    box-shadow: 0 0 0 0.15rem rgba(37, 99, 235, 0.15);
+}
+
+.form-control:invalid:not(:placeholder-shown) {
+    border-color: #f59e0b;
+}
+
+.btn-gradient {
+    background-image: var(--brand-gradient);
+    color: #fff;
+    border: none;
+    box-shadow: var(--card-shadow);
+}
+
+.btn-gradient:hover {
+    color: #fff;
+    box-shadow: 0 12px 30px rgba(79, 70, 229, 0.3);
+}
+
+.spinner-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+@media (max-width: 991.98px) {
+    .navbar .navbar-collapse {
+        padding-top: 12px;
+        padding-bottom: 12px;
+    }
+
+    .navbar .navbar-nav {
+        width: 100%;
+        gap: 10px;
+        align-items: stretch;
+    }
+
+    .navbar .navbar-nav .nav-item {
+        width: 100%;
+    }
+
+    .navbar .nav-link {
+        text-align: center;
+        padding: 10px 12px;
+        border-radius: 999px;
+    }
+
+    .navbar .btn {
+        width: 100%;
+        justify-content: center;
+        border-radius: 999px;
+    }
+
+    .navbar .navbar-text {
+        text-align: center;
+        width: 100%;
+        margin-top: 6px;
+    }
+}
+
+
+

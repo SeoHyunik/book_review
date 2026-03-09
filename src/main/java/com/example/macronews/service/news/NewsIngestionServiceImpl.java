@@ -36,8 +36,13 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         }
 
         String resolvedExternalId = resolveExternalId(item);
+        log.info("[INGEST] start externalId={} source='{}' title='{}'", resolvedExternalId,
+                defaultText(item.source(), ""), defaultText(item.title(), ""));
+
         Optional<NewsEvent> existing = findDuplicate(item, resolvedExternalId);
         if (existing.isPresent()) {
+            log.info("[INGEST] duplicate detected existingId={} externalId={}", existing.get().id(),
+                    resolvedExternalId);
             return existing.get();
         }
 
@@ -55,23 +60,29 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
                 null
         );
 
-        return newsEventRepository.save(event);
+        NewsEvent saved = newsEventRepository.save(event);
+        log.info("[INGEST] completed id={} status={}", saved.id(), saved.status());
+        return saved;
     }
 
     @Override
     @Transactional
     public List<NewsEvent> ingestTopHeadlines(int limit) {
+        log.info("[INGEST] batch start limit={}", limit);
         List<ExternalNewsItem> externalItems = newsApiService.fetchTopHeadlines(limit);
         List<NewsEvent> results = new ArrayList<>();
         for (ExternalNewsItem item : externalItems) {
             results.add(ingestExternalItem(item));
         }
+        log.info("[INGEST] batch completed requested={} processed={}", limit, results.size());
         return results;
     }
 
     @Override
     @Transactional
     public NewsEvent ingestManual(AdminIngestionRequest request) {
+        log.info("[INGEST] manual start source='{}' title='{}'", defaultText(request.source(), ""),
+                defaultText(request.title(), ""));
         ExternalNewsItem item = new ExternalNewsItem(
                 null,
                 request.source(),
@@ -80,7 +91,9 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
                 request.url(),
                 toInstant(request.publishedAt())
         );
-        return ingestExternalItem(item);
+        NewsEvent saved = ingestExternalItem(item);
+        log.info("[INGEST] manual completed id={} status={}", saved.id(), saved.status());
+        return saved;
     }
 
     private Optional<NewsEvent> findDuplicate(ExternalNewsItem item, String resolvedExternalId) {

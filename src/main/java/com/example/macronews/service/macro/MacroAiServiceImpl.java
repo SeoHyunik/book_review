@@ -24,6 +24,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -69,6 +70,7 @@ public class MacroAiServiceImpl implements MacroAiService {
         if (event == null) {
             throw new IllegalArgumentException("event must not be null");
         }
+        log.info("[INTERPRET] start id={} status={}", event.id(), event.status());
 
         validateConfig();
 
@@ -92,22 +94,32 @@ public class MacroAiServiceImpl implements MacroAiService {
                     "OpenAI interpretation failed with status=" + apiResult.statusCode());
         }
 
-        return parseAnalysisResult(apiResult.body());
+        AnalysisResult result = parseAnalysisResult(apiResult.body());
+        log.info("[INTERPRET] success id={} macroImpacts={} marketImpacts={}", event.id(),
+                result.macroImpacts() == null ? 0 : result.macroImpacts().size(),
+                result.marketImpacts() == null ? 0 : result.marketImpacts().size());
+        return result;
     }
 
     @Override
+    @CacheEvict(cacheNames = "newsDetail", key = "#newsEventId", beforeInvocation = true)
     public NewsEvent interpretAndSave(String newsEventId) {
+        log.info("[INTERPRET] persist-start id={}", newsEventId);
         NewsEvent event = newsEventRepository.findById(newsEventId)
                 .orElseThrow(() -> new IllegalArgumentException("NewsEvent not found: " + newsEventId));
 
         try {
             AnalysisResult analysisResult = interpret(event);
             NewsEvent analyzed = copyWithStatusAndResult(event, NewsStatus.ANALYZED, analysisResult);
-            return newsEventRepository.save(analyzed);
+            NewsEvent saved = newsEventRepository.save(analyzed);
+            log.info("[INTERPRET] persist-success id={} status={}", saved.id(), saved.status());
+            return saved;
         } catch (Exception ex) {
-            log.error("AI interpretation failed for newsEventId={}", newsEventId, ex);
+            log.error("[INTERPRET] persist-failure id={}", newsEventId, ex);
             NewsEvent failed = copyWithStatusAndResult(event, NewsStatus.FAILED, null);
-            return newsEventRepository.save(failed);
+            NewsEvent saved = newsEventRepository.save(failed);
+            log.info("[INTERPRET] persisted-failed id={} status={}", saved.id(), saved.status());
+            return saved;
         }
     }
 

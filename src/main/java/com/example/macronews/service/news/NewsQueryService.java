@@ -8,6 +8,7 @@ import com.example.macronews.repository.NewsEventRepository;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -24,6 +25,7 @@ public class NewsQueryService {
                 .toList();
     }
 
+    @Cacheable(cacheNames = "newsDetail", key = "#id")
     public Optional<NewsDetailDto> getNewsDetail(String id) {
         return newsEventRepository.findById(id).map(this::toDetail);
     }
