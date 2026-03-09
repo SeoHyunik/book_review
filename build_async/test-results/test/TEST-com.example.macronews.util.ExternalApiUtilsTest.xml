@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.macronews.util.ExternalApiUtilsTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-03-09T08:42:17.663Z" hostname="DESKTOP-8J5CIDI" time="2.801">
+  <properties/>
+  <testcase name="callApi_returnsStatusForServerError()" classname="com.example.macronews.util.ExternalApiUtilsTest" time="2.801"/>
+  <system-out><![CDATA[2026-03-09 17:42:17.753 [INFO] ExternalApiUtils - [HTTP] Calling external API: method=GET, url=http://127.0.0.1:1626/error, headers=[]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

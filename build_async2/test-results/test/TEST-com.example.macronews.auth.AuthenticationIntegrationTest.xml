@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.macronews.auth.AuthenticationIntegrationTest" tests="7" skipped="7" failures="0" errors="0" timestamp="2026-03-09T08:59:41.619Z" hostname="DESKTOP-8J5CIDI" time="0.002">
+  <properties/>
+  <testcase name="loginAndRegisterPagesAreAccessible()" classname="com.example.macronews.auth.AuthenticationIntegrationTest" time="0.001">
+    <skipped/>
+  </testcase>
+  <testcase name="canRegisterNewUserAndLogin()" classname="com.example.macronews.auth.AuthenticationIntegrationTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="duplicateUsernameShowsValidationError()" classname="com.example.macronews.auth.AuthenticationIntegrationTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="passwordMismatchReturnsToForm()" classname="com.example.macronews.auth.AuthenticationIntegrationTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="seededAdminAccountAllowsLogin()" classname="com.example.macronews.auth.AuthenticationIntegrationTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="registerPageExposesSingleSubmitButton()" classname="com.example.macronews.auth.AuthenticationIntegrationTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="loginFailsWithWrongPassword()" classname="com.example.macronews.auth.AuthenticationIntegrationTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
