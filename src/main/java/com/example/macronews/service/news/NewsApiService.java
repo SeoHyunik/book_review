@@ -9,4 +9,6 @@ public interface NewsApiService {
     List<ExternalNewsItem> fetchTopHeadlines(int limit);
 
     Optional<ExternalNewsItem> fetchByUrl(String url);
+
+    boolean isConfigured();
 }

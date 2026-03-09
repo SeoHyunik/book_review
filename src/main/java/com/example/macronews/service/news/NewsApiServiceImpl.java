@@ -44,7 +44,7 @@ public class NewsApiServiceImpl implements NewsApiService {
 
     @Override
     public List<ExternalNewsItem> fetchTopHeadlines(int limit) {
-        if (!StringUtils.hasText(apiKey)) {
+        if (!isConfigured()) {
             log.warn("news.api.key is missing; returning empty top-headlines list");
             return List.of();
         }
@@ -81,6 +81,11 @@ public class NewsApiServiceImpl implements NewsApiService {
                 .filter(item -> StringUtils.hasText(item.url()))
                 .filter(item -> item.url().equals(url))
                 .findFirst();
+    }
+
+    @Override
+    public boolean isConfigured() {
+        return StringUtils.hasText(apiKey);
     }
 
     private List<ExternalNewsItem> parseArticles(String body, int limit) {
