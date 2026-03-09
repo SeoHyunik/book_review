@@ -1,6 +1,7 @@
 package com.example.macronews.controller;
 
-import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.dto.NewsDetailDto;
+import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.service.news.NewsQueryService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -23,19 +24,19 @@ public class NewsController {
 
     @GetMapping
     public String list(Model model) {
-        List<NewsEvent> newsEvents = newsQueryService.getRecentNews();
-        model.addAttribute("newsEvents", newsEvents);
+        List<NewsListItemDto> newsItems = newsQueryService.getRecentNews();
+        model.addAttribute("newsItems", newsItems);
         model.addAttribute("pageTitle", "Macro News");
-        log.debug("Rendering news list page with {} entries", newsEvents.size());
+        log.debug("Rendering news list page with {} entries", newsItems.size());
         return "news/list";
     }
 
     @GetMapping("/{id}")
     public String detail(@PathVariable String id, Model model) {
-        NewsEvent newsEvent = newsQueryService.getNewsDetail(id)
+        NewsDetailDto newsDetail = newsQueryService.getNewsDetail(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "News event not found"));
-        model.addAttribute("newsEvent", newsEvent);
+        model.addAttribute("newsDetail", newsDetail);
         model.addAttribute("pageTitle", "News Detail");
         log.debug("Rendering news detail page for id={}", id);
         return "news/detail";

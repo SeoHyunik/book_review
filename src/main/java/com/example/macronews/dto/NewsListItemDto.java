@@ -8,6 +8,8 @@ public record NewsListItemDto(
         String title,
         String source,
         Instant publishedAt,
-        NewsStatus status
+        NewsStatus status,
+        boolean hasAnalysis,
+        String macroSummary
 ) {
 }

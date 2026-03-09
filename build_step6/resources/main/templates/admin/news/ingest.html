@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <section class="mb-4 d-flex justify-content-between align-items-start gap-3">
+        <div>
+            <h1 class="h3 fw-bold mb-1">Admin News Ingestion</h1>
+            <p class="text-secondary mb-0">Manually ingest a single news event or fetch latest external news.</p>
+        </div>
+        <a class="btn btn-outline-primary" th:href="@{/news}">View News</a>
+    </section>
+
+    <section class="mb-4">
+        <form th:action="@{/admin/news/ingest-api}" method="post" class="card border-0 shadow-sm">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div class="card-body d-flex flex-column flex-md-row align-items-md-end gap-3">
+                <div>
+                    <label class="form-label" for="pageSize">Fetch Page Size</label>
+                    <input id="pageSize" name="pageSize" type="number" min="1" max="50" value="10" class="form-control">
+                </div>
+                <button class="btn btn-outline-primary" type="submit">Fetch Latest News</button>
+            </div>
+        </form>
+    </section>
+
+    <section>
+        <form th:action="@{/admin/news/ingest}" th:object="${adminIngestionRequest}" method="post"
+              class="card border-0 shadow-sm">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <div class="card-body d-flex flex-column gap-3">
+                <div>
+                    <label class="form-label" for="source">Source</label>
+                    <input id="source" type="text" class="form-control" th:field="*{source}" required>
+                </div>
+                <div>
+                    <label class="form-label" for="title">Title</label>
+                    <input id="title" type="text" class="form-control" th:field="*{title}" required>
+                </div>
+                <div>
+                    <label class="form-label" for="summary">Summary</label>
+                    <textarea id="summary" class="form-control" th:field="*{summary}" rows="3"></textarea>
+                </div>
+                <div>
+                    <label class="form-label" for="content">Content</label>
+                    <textarea id="content" class="form-control" th:field="*{content}" rows="8"></textarea>
+                </div>
+                <div>
+                    <label class="form-label" for="url">URL</label>
+                    <input id="url" type="url" class="form-control" th:field="*{url}">
+                </div>
+                <div>
+                    <label class="form-label" for="publishedAt">Published At</label>
+                    <input id="publishedAt" type="datetime-local" class="form-control" th:field="*{publishedAt}" required>
+                </div>
+            </div>
+            <div class="card-footer bg-white border-0 d-flex justify-content-end gap-2">
+                <a class="btn btn-outline-secondary" th:href="@{/news}">Cancel</a>
+                <button class="btn btn-primary" type="submit">Ingest Manually</button>
+            </div>
+        </form>
+    </section>
+</th:block>
+</html>
