@@ -5,6 +5,7 @@ import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.repository.NewsEventRepository;
+import com.example.macronews.service.macro.MacroAiService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -14,10 +15,14 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 @Service
@@ -27,6 +32,10 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
 
     private final NewsEventRepository newsEventRepository;
     private final NewsApiService newsApiService;
+    private final MacroAiService macroAiService;
+
+    @Qualifier("ingestionExecutor")
+    private final Executor ingestionExecutor;
 
     @Override
     @Transactional
@@ -71,10 +80,21 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         log.info("[INGEST] batch start limit={}", limit);
         List<ExternalNewsItem> externalItems = newsApiService.fetchTopHeadlines(limit);
         List<NewsEvent> results = new ArrayList<>();
+        List<String> interpretationTargets = new ArrayList<>();
+
         for (ExternalNewsItem item : externalItems) {
-            results.add(ingestExternalItem(item));
+            boolean duplicateBeforeIngest = findDuplicate(item, resolveExternalId(item)).isPresent();
+            NewsEvent ingested = ingestExternalItem(item);
+            results.add(ingested);
+
+            if (!duplicateBeforeIngest && isAsyncInterpretationTarget(ingested)) {
+                interpretationTargets.add(ingested.id());
+            }
         }
-        log.info("[INGEST] batch completed requested={} processed={}", limit, results.size());
+
+        submitAsyncInterpretations(interpretationTargets);
+        log.info("[INGEST] batch completed requested={} processed={} asyncSubmitted={}",
+                limit, results.size(), interpretationTargets.size());
         return results;
     }
 
@@ -94,6 +114,40 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         NewsEvent saved = ingestExternalItem(item);
         log.info("[INGEST] manual completed id={} status={}", saved.id(), saved.status());
         return saved;
+    }
+
+    private void submitAsyncInterpretations(List<String> eventIds) {
+        if (eventIds.isEmpty()) {
+            return;
+        }
+
+        Runnable submitTask = () -> {
+            for (String id : eventIds) {
+                ingestionExecutor.execute(() -> {
+                    log.info("[INTERPRET-ASYNC] submitted id={}", id);
+                    macroAiService.interpretAndSave(id);
+                });
+            }
+        };
+
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    submitTask.run();
+                }
+            });
+            return;
+        }
+
+        submitTask.run();
+    }
+
+    private boolean isAsyncInterpretationTarget(NewsEvent event) {
+        return event != null
+                && StringUtils.hasText(event.id())
+                && event.status() == NewsStatus.INGESTED
+                && event.analysisResult() == null;
     }
 
     private Optional<NewsEvent> findDuplicate(ExternalNewsItem item, String resolvedExternalId) {
