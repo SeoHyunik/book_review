@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content">
@@ -6,7 +6,7 @@
         <div class="card shadow-sm border-0 w-100" style="max-width: 560px;">
             <div class="card-body p-4 p-md-5">
                 <h1 class="h4 fw-bold mb-2 text-center">Create Account</h1>
-                <p class="text-secondary text-center mb-4">Register to create and manage your AI-powered reviews.</p>
+                <p class="text-secondary text-center mb-4">Register to access macro news analysis features.</p>
 
                 <form th:action="@{/register}" method="post" th:object="${registrationRequest}"
                       class="d-flex flex-column gap-3">
@@ -182,3 +182,4 @@
     </script>
 </th:block>
 </html>
+

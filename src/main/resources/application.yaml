@@ -1,4 +1,4 @@
-server:
+﻿server:
   port: 8082
 
 spring:
@@ -44,31 +44,16 @@ openai:
   model: gpt-4o-mini
   max-tokens: 800
   temperature: 0.7
-  prompt-file: classpath:ai/prompts/improve_review_prompt.json
   macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
 
 jasypt:
   encryptor:
     password: open_ai_secret
 
-
 news-api:
   provider: RSS
   rss-url: https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en
   default-page-size: 10
-exchange-rate:
-  api-key: b459b3ea4a98482e611335ce
-  api-url: https://v6.exchangerate-api.com/v6/%s/latest/USD
-
-google:
-  drive:
-    credentials-path: ${GOOGLE_CREDENTIALS_PATH:}
-    tokens-directory: ${GOOGLE_TOKENS_DIR:tokens}
-    parent-folder-id: ${GOOGLE_DRIVE_PARENT_ID:}
-    # Example encrypted values:
-    # credentials-path: ENC(example-encrypted-credentials-path)
-    # tokens-directory: tokens
-    # parent-folder-id: ENC(example-encrypted-parent-folder-id)
 
 logging:
   config: classpath:log4j2-spring.xml
