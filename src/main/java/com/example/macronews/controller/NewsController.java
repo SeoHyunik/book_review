@@ -1,6 +1,6 @@
 package com.example.macronews.controller;
 
-import com.example.macronews.dto.domain.NewsEvent;
+import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.service.news.NewsQueryService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -41,4 +41,3 @@ public class NewsController {
         return "news/detail";
     }
 }
-

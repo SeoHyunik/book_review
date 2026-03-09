@@ -1,7 +1,7 @@
 package com.example.macronews.repository;
 
-import com.example.macronews.dto.domain.NewsEvent;
-import com.example.macronews.dto.domain.NewsStatus;
+import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.domain.NewsStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.mongodb.repository.MongoRepository;
@@ -16,10 +16,5 @@ public interface NewsEventRepository extends MongoRepository<NewsEvent, String> 
 
     Optional<NewsEvent> findByUrl(String url);
 
-    // Existing scaffold compatibility methods
     Optional<NewsEvent> findByExternalId(String externalId);
-
-    List<NewsEvent> findTop20ByStatusOrderByPublishedAtDesc(NewsStatus status);
-
-    List<NewsEvent> findTop20ByOrderByIngestedAtDesc();
 }

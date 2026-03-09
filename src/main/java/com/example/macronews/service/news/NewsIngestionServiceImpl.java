@@ -1,17 +1,19 @@
 package com.example.macronews.service.news;
 
-import com.example.macronews.dto.domain.AnalysisResult;
-import com.example.macronews.dto.domain.NewsEvent;
-import com.example.macronews.dto.domain.NewsStatus;
-import com.example.macronews.dto.internal.ExternalNewsItem;
+import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.domain.NewsStatus;
+import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.repository.NewsEventRepository;
-import com.example.macronews.service.macro.MacroAiService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,186 +25,111 @@ import org.springframework.util.StringUtils;
 @Slf4j
 public class NewsIngestionServiceImpl implements NewsIngestionService {
 
-    private static final String DEFAULT_INGESTED_BY = "admin-manual";
-    private static final String EXTERNAL_INGESTED_BY = "external-api";
-
     private final NewsEventRepository newsEventRepository;
-    private final MacroAiService macroAiService;
     private final NewsApiService newsApiService;
 
     @Override
     @Transactional
-    public String ingestOne(AdminIngestionRequest request) {
-        String externalId = buildDeterministicExternalId(request.source(), request.title(),
-                request.publishedAt(), "");
-        log.info("Starting news ingestion: source='{}', title='{}', externalId='{}'", request.source(),
-                request.title(), externalId);
+    public NewsEvent ingestExternalItem(ExternalNewsItem item) {
+        if (item == null) {
+            throw new IllegalArgumentException("ExternalNewsItem must not be null");
+        }
 
-        return newsEventRepository.findByExternalId(externalId)
-                .map(original -> {
-                    log.info("Duplicate detected for externalId='{}', originalId={}", externalId,
-                            original.id());
-                    NewsEvent duplicate = NewsEvent.builder()
-                            .externalId(externalId)
-                            .source(request.source())
-                            .title(request.title())
-                            .summary(request.summary())
-                            .content(request.content())
-                            .url(request.url())
-                            .publishedAt(request.publishedAt())
-                            .ingestedAt(LocalDateTime.now())
-                            .status(NewsStatus.DUPLICATE)
-                            .duplicateOfId(original.id())
-                            .ingestedBy(resolveIngestedBy(request.ingestedBy()))
-                            .build();
-                    NewsEvent saved = newsEventRepository.save(duplicate);
-                    log.info("NewsEvent final persisted status={} id={}", saved.status(), saved.id());
-                    return saved.id();
-                })
-                .orElseGet(() -> {
-                    NewsEvent ingested = NewsEvent.builder()
-                            .externalId(externalId)
-                            .source(request.source())
-                            .title(request.title())
-                            .summary(request.summary())
-                            .content(request.content())
-                            .url(request.url())
-                            .publishedAt(request.publishedAt())
-                            .ingestedAt(LocalDateTime.now())
-                            .status(NewsStatus.INGESTED)
-                            .ingestedBy(resolveIngestedBy(request.ingestedBy()))
-                            .build();
-                    NewsEvent savedIngested = newsEventRepository.save(ingested);
-                    log.info("NewsEvent saved as INGESTED with id={}", savedIngested.id());
-                    return analyzeAndFinalize(savedIngested).id();
-                });
+        String resolvedExternalId = resolveExternalId(item);
+        Optional<NewsEvent> existing = findDuplicate(item, resolvedExternalId);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        Instant now = Instant.now();
+        NewsEvent event = new NewsEvent(
+                null,
+                resolvedExternalId,
+                defaultText(item.title(), "Untitled"),
+                defaultText(item.summary(), ""),
+                defaultText(item.source(), "External"),
+                defaultText(item.url(), ""),
+                item.publishedAt() == null ? now : item.publishedAt(),
+                now,
+                NewsStatus.INGESTED,
+                null
+        );
+
+        return newsEventRepository.save(event);
     }
 
     @Override
     @Transactional
-    public int ingestLatestFromApi(int pageSize) {
-        log.info("Starting external ingestion batch with pageSize={}", pageSize);
-        List<ExternalNewsItem> fetchedItems = newsApiService.fetchLatestNews(pageSize);
+    public List<NewsEvent> ingestTopHeadlines(int limit) {
+        List<ExternalNewsItem> externalItems = newsApiService.fetchTopHeadlines(limit);
+        List<NewsEvent> results = new ArrayList<>();
+        for (ExternalNewsItem item : externalItems) {
+            results.add(ingestExternalItem(item));
+        }
+        return results;
+    }
 
-        int duplicateCount = 0;
-        int createdCount = 0;
-        int analyzedCount = 0;
-        int failedCount = 0;
+    @Override
+    @Transactional
+    public NewsEvent ingestManual(AdminIngestionRequest request) {
+        ExternalNewsItem item = new ExternalNewsItem(
+                null,
+                request.source(),
+                request.title(),
+                request.summary(),
+                request.url(),
+                toInstant(request.publishedAt())
+        );
+        return ingestExternalItem(item);
+    }
 
-        for (ExternalNewsItem item : fetchedItems) {
-            String externalId = resolveExternalId(item);
-            if (newsEventRepository.findByExternalId(externalId).isPresent()) {
-                duplicateCount++;
-                continue;
-            }
-
-            NewsEvent ingested = NewsEvent.builder()
-                    .externalId(externalId)
-                    .source(defaultText(item.source(), "External RSS"))
-                    .title(defaultText(item.title(), "Untitled"))
-                    .summary(defaultText(item.summary(), ""))
-                    .content(defaultText(item.content(), ""))
-                    .url(defaultText(item.url(), ""))
-                    .publishedAt(item.publishedAt() == null ? LocalDateTime.now() : item.publishedAt())
-                    .ingestedAt(LocalDateTime.now())
-                    .status(NewsStatus.INGESTED)
-                    .ingestedBy(EXTERNAL_INGESTED_BY)
-                    .build();
-            NewsEvent savedIngested = newsEventRepository.save(ingested);
-            NewsEvent finalized = analyzeAndFinalize(savedIngested);
-
-            createdCount++;
-            if (finalized.status() == NewsStatus.ANALYZED) {
-                analyzedCount++;
-            } else if (finalized.status() == NewsStatus.FAILED) {
-                failedCount++;
+    private Optional<NewsEvent> findDuplicate(ExternalNewsItem item, String resolvedExternalId) {
+        if (StringUtils.hasText(resolvedExternalId)) {
+            Optional<NewsEvent> byExternalId = newsEventRepository.findByExternalId(resolvedExternalId);
+            if (byExternalId.isPresent()) {
+                return byExternalId;
             }
         }
 
-        log.info(
-                "Completed external ingestion batch fetched={} created={} duplicates={} analyzed={} failed={}",
-                fetchedItems.size(), createdCount, duplicateCount, analyzedCount, failedCount);
-        return createdCount;
-    }
-
-    private NewsEvent analyzeAndFinalize(NewsEvent savedIngested) {
-        try {
-            log.info("Starting AI interpretation for newsEventId={}", savedIngested.id());
-            AnalysisResult analysisResult = macroAiService.interpretNewsEvent(savedIngested);
-            NewsEvent analyzed = copyWithAnalysisAndStatus(savedIngested, analysisResult,
-                    NewsStatus.ANALYZED);
-            NewsEvent savedAnalyzed = newsEventRepository.save(analyzed);
-            log.info("AI interpretation success for newsEventId={}", savedAnalyzed.id());
-            log.info("NewsEvent final persisted status={} id={}", savedAnalyzed.status(),
-                    savedAnalyzed.id());
-            return savedAnalyzed;
-        } catch (Exception ex) {
-            log.error("AI interpretation failed for newsEventId={}", savedIngested.id(), ex);
-            NewsEvent failed = copyWithAnalysisAndStatus(savedIngested, null, NewsStatus.FAILED);
-            NewsEvent savedFailed = newsEventRepository.save(failed);
-            log.info("NewsEvent final persisted status={} id={}", savedFailed.status(),
-                    savedFailed.id());
-            return savedFailed;
+        if (StringUtils.hasText(item.url())) {
+            Optional<NewsEvent> byUrl = newsEventRepository.findByUrl(item.url());
+            if (byUrl.isPresent()) {
+                return byUrl;
+            }
         }
-    }
 
-    private NewsEvent copyWithAnalysisAndStatus(NewsEvent base, AnalysisResult analysisResult,
-            NewsStatus status) {
-        return NewsEvent.builder()
-                .id(base.id())
-                .externalId(base.externalId())
-                .source(base.source())
-                .title(base.title())
-                .summary(base.summary())
-                .content(base.content())
-                .url(base.url())
-                .publishedAt(base.publishedAt())
-                .ingestedAt(base.ingestedAt())
-                .status(status)
-                .analysisResult(analysisResult)
-                .duplicateOfId(base.duplicateOfId())
-                .ingestedBy(base.ingestedBy())
-                .build();
+        return Optional.empty();
     }
 
     private String resolveExternalId(ExternalNewsItem item) {
-        if (item != null && StringUtils.hasText(item.providerItemId())) {
-            return item.providerItemId().trim();
+        if (StringUtils.hasText(item.externalId())) {
+            return item.externalId().trim();
         }
-        String source = item == null ? "" : item.source();
-        String title = item == null ? "" : item.title();
-        LocalDateTime publishedAt = item == null ? null : item.publishedAt();
-        String url = item == null ? "" : item.url();
-        return buildDeterministicExternalId(source, title, publishedAt, url);
+        String seed = defaultText(item.source(), "") + "|"
+                + defaultText(item.title(), "") + "|"
+                + (item.publishedAt() == null ? "" : item.publishedAt().toString());
+        return sha256(seed);
     }
 
-    private String resolveIngestedBy(String ingestedBy) {
-        if (ingestedBy == null || ingestedBy.isBlank()) {
-            return DEFAULT_INGESTED_BY;
-        }
-        return ingestedBy;
-    }
-
-    private String buildDeterministicExternalId(String source, String title,
-            LocalDateTime publishedAt, String url) {
-        String seed = (defaultText(source, "") + "|" + defaultText(title, "") + "|"
-                + (publishedAt == null ? "" : publishedAt.toString()) + "|" + defaultText(url, ""))
-                .trim();
+    private String sha256(String seed) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(seed.getBytes(StandardCharsets.UTF_8));
-            return toHex(hash);
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 algorithm not available", ex);
         }
     }
 
-    private String toHex(byte[] bytes) {
-        StringBuilder builder = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) {
-            builder.append(String.format("%02x", b));
+    private Instant toInstant(LocalDateTime value) {
+        if (value == null) {
+            return null;
         }
-        return builder.toString();
+        return value.atZone(ZoneId.systemDefault()).toInstant();
     }
 
     private String defaultText(String value, String fallback) {

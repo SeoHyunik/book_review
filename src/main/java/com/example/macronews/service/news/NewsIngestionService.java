@@ -1,10 +1,15 @@
 package com.example.macronews.service.news;
 
+import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.AdminIngestionRequest;
+import java.util.List;
 
 public interface NewsIngestionService {
 
-    String ingestOne(AdminIngestionRequest request);
+    NewsEvent ingestExternalItem(ExternalNewsItem item);
 
-    int ingestLatestFromApi(int pageSize);
+    List<NewsEvent> ingestTopHeadlines(int limit);
+
+    NewsEvent ingestManual(AdminIngestionRequest request);
 }
