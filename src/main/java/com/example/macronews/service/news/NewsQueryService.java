@@ -14,11 +14,12 @@ public class NewsQueryService {
     private final NewsEventRepository newsEventRepository;
 
     public List<NewsEvent> getRecentNews() {
-        return newsEventRepository.findTop20ByOrderByIngestedAtDesc();
+        return newsEventRepository.findTop20ByOrderByPublishedAtDesc();
     }
 
     public Optional<NewsEvent> getNewsDetail(String id) {
         return newsEventRepository.findById(id);
     }
 }
+
 
