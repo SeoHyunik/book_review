@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <section class="mb-4 d-flex justify-content-between align-items-start gap-3">
+        <div>
+            <h1 class="h3 fw-bold mb-1" th:text="${newsDetail.title}">News Title</h1>
+            <p class="text-secondary mb-0"><span th:text="${newsDetail.source}">Source</span></p>
+        </div>
+        <a class="btn btn-outline-primary" th:href="@{/news}">Back to List</a>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4">
+        <div class="card-body d-flex flex-column gap-3">
+            <div><strong>Summary:</strong> <span th:text="${newsDetail.summary}"></span></div>
+            <div th:if="${newsDetail.url != null and !#strings.isEmpty(newsDetail.url)}">
+                <strong>URL:</strong> <a th:href="${newsDetail.url}" th:text="${newsDetail.url}" target="_blank" rel="noopener noreferrer"></a>
+            </div>
+            <div><strong>Published At:</strong> <span th:text="${newsDetail.publishedAt}"></span></div>
+            <div>
+                <strong>Status:</strong>
+                <span class="badge"
+                      th:classappend="${newsDetail.status.name() == 'ANALYZED' ? ' bg-success' : (newsDetail.status.name() == 'FAILED' ? ' bg-danger' : ' bg-secondary')}"
+                      th:text="${newsDetail.status}"></span>
+            </div>
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4"
+             th:if="${newsDetail.status.name() == 'INGESTED'}">
+        <div class="card-body text-secondary">
+            Analysis is pending for this event.
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4"
+             th:if="${newsDetail.status.name() == 'FAILED'}">
+        <div class="card-body text-danger">
+            Analysis failed for this event.
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm"
+             th:if="${newsDetail.status.name() == 'ANALYZED' and newsDetail.analysisResult != null}">
+        <div class="card-body d-flex flex-column gap-4">
+            <div>
+                <h2 class="h5 fw-bold mb-2">Analysis Model</h2>
+                <p class="mb-0" th:text="${newsDetail.analysisResult.model}"></p>
+            </div>
+
+            <div>
+                <h3 class="h6 fw-bold mb-2">Macro Impacts</h3>
+                <div th:if="${#lists.isEmpty(newsDetail.analysisResult.macroImpacts)}" class="text-secondary">No macro impacts.</div>
+                <div class="table-responsive" th:if="${!#lists.isEmpty(newsDetail.analysisResult.macroImpacts)}">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>Variable</th>
+                            <th>Direction</th>
+                            <th>Confidence</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="impact : ${newsDetail.analysisResult.macroImpacts}">
+                            <td th:text="${impact.variable}"></td>
+                            <td th:text="${impact.direction}"></td>
+                            <td th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="h6 fw-bold mb-2">Market Impacts</h3>
+                <div th:if="${#lists.isEmpty(newsDetail.analysisResult.marketImpacts)}" class="text-secondary">No market impacts.</div>
+                <div class="table-responsive" th:if="${!#lists.isEmpty(newsDetail.analysisResult.marketImpacts)}">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>Market</th>
+                            <th>Direction</th>
+                            <th>Confidence</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="impact : ${newsDetail.analysisResult.marketImpacts}">
+                            <td th:text="${impact.market}"></td>
+                            <td th:text="${impact.direction}"></td>
+                            <td th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm"
+             th:if="${newsDetail.status.name() == 'ANALYZED' and newsDetail.analysisResult == null}">
+        <div class="card-body text-secondary">
+            Analysis result is missing for this event.
+        </div>
+    </section>
+</th:block>
+</html>

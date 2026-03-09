@@ -1,9 +1,11 @@
 package com.example.macronews.controller;
 
 import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.news.NewsIngestionService;
+import com.example.macronews.service.news.NewsQueryService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +14,7 @@ import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,14 +30,17 @@ public class AdminNewsController {
 
     private final NewsIngestionService newsIngestionService;
     private final MacroAiService macroAiService;
+    private final NewsQueryService newsQueryService;
 
     @GetMapping
     public String ingestForm(Model model) {
         if (!model.containsAttribute("adminIngestionRequest")) {
             model.addAttribute("adminIngestionRequest", AdminIngestionRequest.empty());
         }
+        List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews();
+        model.addAttribute("recentNewsItems", recentNewsItems);
         model.addAttribute("pageTitle", "Admin News Ingestion");
-        log.debug("Rendering admin news ingestion form");
+        log.debug("Rendering admin news ingestion form with {} recent items", recentNewsItems.size());
         return "admin/news/ingest";
     }
 
@@ -65,6 +71,20 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("adminIngestionRequest", request);
             return "redirect:/admin/news";
         }
+    }
+
+    @PostMapping("/{id}/reinterpret")
+    public String reinterpret(@PathVariable String id, RedirectAttributes redirectAttributes) {
+        try {
+            NewsEvent interpreted = macroAiService.interpretAndSave(id);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "Re-interpretation completed. id=" + interpreted.id() + " status=" + interpreted.status());
+        } catch (RuntimeException ex) {
+            log.error("Admin reinterpretation failed for id={}", id, ex);
+            redirectAttributes.addFlashAttribute("errorMessage",
+                    "Re-interpretation failed. id=" + id);
+        }
+        return "redirect:/admin/news";
     }
 
     @PostMapping("/ingest-api")
