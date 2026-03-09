@@ -2,6 +2,7 @@ package com.example.macronews.controller;
 
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.dto.request.AdminIngestionRequest;
+import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.news.NewsIngestionService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ public class AdminNewsController {
     private static final int DEFAULT_LIMIT = 10;
 
     private final NewsIngestionService newsIngestionService;
+    private final MacroAiService macroAiService;
 
     @GetMapping
     public String ingestForm(Model model) {
@@ -42,10 +44,11 @@ public class AdminNewsController {
 
         try {
             if (hasManualPayload(request)) {
-                NewsEvent saved = newsIngestionService.ingestManual(request);
+                NewsEvent ingested = newsIngestionService.ingestManual(request);
+                NewsEvent interpreted = macroAiService.interpretAndSave(ingested.id());
                 redirectAttributes.addFlashAttribute("successMessage",
-                        "News ingested successfully. id=" + saved.id());
-                return "redirect:/news/" + saved.id();
+                        "News ingested and interpreted. id=" + interpreted.id());
+                return "redirect:/news/" + interpreted.id();
             }
 
             int limit = request.limit() != null && request.limit() > 0
