@@ -75,8 +75,10 @@ public class AdminNewsController {
 
     @PostMapping("/{id}/reinterpret")
     public String reinterpret(@PathVariable String id, RedirectAttributes redirectAttributes) {
+        log.info("[ADMIN] reinterpret requested id={}", id);
         try {
             NewsEvent interpreted = macroAiService.interpretAndSave(id);
+            log.info("[ADMIN] reinterpret completed id={} status={}", interpreted.id(), interpreted.status());
             redirectAttributes.addFlashAttribute("successMessage",
                     "Re-interpretation completed. id=" + interpreted.id() + " status=" + interpreted.status());
         } catch (RuntimeException ex) {
