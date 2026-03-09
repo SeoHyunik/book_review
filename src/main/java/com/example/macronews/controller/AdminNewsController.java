@@ -4,6 +4,7 @@ import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
+import com.example.macronews.service.news.NewsApiService;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
 import java.util.List;
@@ -31,6 +32,7 @@ public class AdminNewsController {
     private static final int DEFAULT_LIMIT = 10;
 
     private final NewsIngestionService newsIngestionService;
+    private final NewsApiService newsApiService;
     private final MacroAiService macroAiService;
     private final NewsQueryService newsQueryService;
 
@@ -42,6 +44,7 @@ public class AdminNewsController {
         List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews();
         model.addAttribute("recentNewsItems", recentNewsItems);
         model.addAttribute("pageTitle", "Admin News Ingestion");
+        model.addAttribute("newsApiConfigured", newsApiService.isConfigured());
         log.debug("Rendering admin news ingestion form with {} recent items", recentNewsItems.size());
         return "admin/news/ingest";
     }
@@ -95,6 +98,13 @@ public class AdminNewsController {
     public String ingestFromApi(@RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
             RedirectAttributes redirectAttributes) {
         try {
+            if (!newsApiService.isConfigured()) {
+                log.info("Admin external ingestion skipped because news.api.key is not configured");
+                redirectAttributes.addFlashAttribute("warningMessage",
+                        "Automatic ingestion requires external news API configuration (news.api.key). Manual ingestion is still available.");
+                return "redirect:/admin/news";
+            }
+
             List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(pageSize);
             redirectAttributes.addFlashAttribute("successMessage",
                     "External ingestion completed. total=" + ingested.size());
