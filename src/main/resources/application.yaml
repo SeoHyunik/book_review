@@ -56,7 +56,7 @@ jasypt:
 news:
   api:
     base-url: https://newsapi.org/v2/top-headlines
-    key: ${NEWS_API_KEY:}
+    key: af544c09e17a4b3b9a8e2245f75c0d8a
     country: us
     category: business
     default-limit: 10
