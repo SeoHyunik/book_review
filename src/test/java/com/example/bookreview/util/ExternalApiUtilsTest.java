@@ -11,7 +11,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -44,10 +43,10 @@ class ExternalApiUtilsTest {
                 mockWebServer.url("/error").toString(),
                 null);
 
-        ResponseEntity<String> response = externalApiUtils.callAPI(request);
+        ExternalApiResult response = externalApiUtils.callAPI(request);
 
         assertThat(response).isNotNull();
-        assertThat(response.getStatusCode().value()).isEqualTo(500);
-        assertThat(response.getBody()).contains("server error");
+        assertThat(response.statusCode()).isEqualTo(500);
+        assertThat(response.body()).contains("server error");
     }
 }

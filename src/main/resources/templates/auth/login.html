@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content">
@@ -6,7 +6,7 @@
         <div class="card shadow-sm border-0 w-100" style="max-width: 520px;">
             <div class="card-body p-4 p-md-5">
                 <h1 class="h4 fw-bold mb-2 text-center">Sign in</h1>
-                <p class="text-secondary text-center mb-4">Only signed-in users can create reviews.</p>
+                <p class="text-secondary text-center mb-4">Only signed-in users can access news dashboards.</p>
 
                 <div th:if="${param.error}" class="alert alert-danger" role="alert">
                     Invalid username or password.
@@ -41,3 +41,4 @@
     </section>
 </th:block>
 </html>
+

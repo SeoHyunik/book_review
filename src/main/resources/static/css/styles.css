@@ -1,4 +1,4 @@
-:root {
+﻿:root {
     --brand-gradient: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
     --card-shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
     --soft-border: 1px solid rgba(17, 24, 39, 0.08);
@@ -110,79 +110,10 @@ pre {
     box-shadow: 0 12px 30px rgba(79, 70, 229, 0.3);
 }
 
-.delete-confirm-modal {
-    border-radius: 18px;
-    box-shadow: var(--card-shadow);
-    border: var(--soft-border);
-    overflow: hidden;
-}
-
-.delete-confirm-modal .modal-header {
-    background-image: var(--brand-gradient);
-    color: #fff;
-    border-bottom: none;
-    padding: 1.25rem 1.5rem;
-}
-
-.delete-confirm-modal .modal-body {
-    background: #f8fafc;
-    padding: 1.25rem 1.5rem;
-}
-
-.delete-confirm-modal .modal-footer {
-    border-top: var(--soft-border);
-    padding: 1rem 1.5rem;
-}
-
-#deleteConfirmModal .btn {
-    border-radius: 12px;
-    padding-inline: 1.1rem;
-    font-weight: 600;
-}
-
-#review-grid .card {
-    height: 100%;
-}
-
-#review-grid .card-title {
-    font-weight: 700;
-    letter-spacing: -0.2px;
-}
-
-#review-grid .badge {
-    font-weight: 600;
-}
-
-#form-message,
-#detail-message,
-#list-message {
-    display: none;
-}
-
 .spinner-inline {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-}
-
-.improved-content {
-    background: #f8fafc;
-    border: var(--soft-border);
-    border-radius: 12px;
-    padding: 1.25rem;
-    color: var(--bs-body-color);
-    white-space: pre-wrap;
-    line-height: 1.6;
-    font-size: 1rem;
-    /* Limit height and allow internal scrolling so long reviews don't stretch the entire page */
-    max-height: 40vh;
-    overflow-y: auto;
-}
-
-/* 새 리뷰 작성 폼의 원본 독후감 textarea는 스크롤바 없이 내용에 따라 세로 길이가 늘어나도록 한다. */
-#originalContent {
-    overflow-y: hidden;
-    resize: none;
 }
 
 @media (max-width: 991.98px) {
@@ -220,55 +151,5 @@ pre {
     }
 }
 
-/* Loading overlay for review submission */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1055;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    /* Smooth fade and blur transitions when the overlay appears or disappears */
-    opacity: 1;
-    transition: opacity 300ms ease, backdrop-filter 300ms ease;
-}
 
-.loading-overlay .note-icon {
-    font-size: 4rem;
-    color: inherit; /* 실제 색상은 theme-overrides.css에서 data-bs-theme별로 지정 */
-}
 
-.loading-overlay .pen-icon {
-    font-size: 2rem;
-    color: inherit; /* 실제 색상은 theme-overrides.css에서 data-bs-theme별로 지정 */
-    position: absolute;
-    top: 40%;
-    left: 0;
-    animation: pen-write 1.6s ease-in-out infinite;
-}
-
-@keyframes pen-write {
-    0%   { transform: translateX(0) translateY(-0.6rem) rotate(0deg); }
-    25%  { transform: translateX(1rem) translateY(0.2rem) rotate(-5deg); }
-    50%  { transform: translateX(2rem) translateY(-0.2rem) rotate(0deg); }
-    75%  { transform: translateX(3rem) translateY(0.3rem) rotate(5deg); }
-    100% { transform: translateX(4rem) translateY(-0.3rem) rotate(0deg); }
-}
-
-/* Additional classes for overlay fade out and wrapper */
-.loading-overlay.fade-out {
-    opacity: 0;
-    backdrop-filter: blur(0);
-}
-
-/* Wrapper for animated note and pen icons */
-.loading-animation {
-    position: relative;
-    width: 5rem;
-    height: 3rem;
-}

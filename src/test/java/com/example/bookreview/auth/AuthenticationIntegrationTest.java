@@ -86,7 +86,7 @@ class AuthenticationIntegrationTest {
                         .param("username", "newuser1")
                         .param("password", "newpass123"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/reviews"));
+                .andExpect(redirectedUrl("/news"));
     }
 
     @Test
@@ -145,6 +145,6 @@ class AuthenticationIntegrationTest {
                         .param("username", "admin")
                         .param("password", "password"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/reviews"));
+                .andExpect(redirectedUrl("/news"));
     }
 }

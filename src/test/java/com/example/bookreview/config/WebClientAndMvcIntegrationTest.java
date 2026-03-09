@@ -33,7 +33,7 @@ class WebClientAndMvcIntegrationTest {
 
         mockMvc.perform(get("/"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/reviews"));
+                .andExpect(redirectedUrl("/news"));
 
         WebClient localClient = webClientBuilder.build();
         assertThat(localClient).isNotSameAs(webClient);

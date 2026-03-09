@@ -1,4 +1,4 @@
-import org.gradle.internal.jvm.Jvm
+﻿import org.gradle.internal.jvm.Jvm
 
 plugins {
     id("java")
@@ -22,7 +22,7 @@ if (gradleForceOffline && !gradle.startParameter.isOffline) {
 
 group = "com.example"
 version = "0.0.1-SNAPSHOT"
-description = "AI 독후감 관리 서비스"
+description = "Macro news monolith"
 
 /**
  * Java Toolchain (compile/runtime for tasks)
@@ -51,22 +51,22 @@ configurations {
         extendsFrom(configurations.annotationProcessor.get())
     }
     all {
-        // logback 제외하고 log4j2 사용
+        // logback ?쒖쇅?섍퀬 log4j2 ?ъ슜
         exclude(group = "org.springframework.boot", module = "spring-boot-starter-logging")
     }
 }
 
 repositories {
-    // 사내망/오프라인 환경에서 libs 폴더로 수동 주입 가능
+    // ?щ궡留??ㅽ봽?쇱씤 ?섍꼍?먯꽌 libs ?대뜑濡??섎룞 二쇱엯 媛??
     flatDir { dirs("libs") }
 
-    // 사내 Nexus/Artifactory를 mavenLocal로 미러링하는 경우가 있어 유지
+    // ?щ궡 Nexus/Artifactory瑜?mavenLocal濡?誘몃윭留곹븯??寃쎌슦媛 ?덉뼱 ?좎?
     mavenLocal()
 
-    // 기본 공개 저장소
+    // 湲곕낯 怨듦컻 ??μ냼
     mavenCentral()
 
-    // Spring Boot 4.x SNAPSHOT 사용 중이므로 유지
+    // Spring Boot 4.x SNAPSHOT ?ъ슜 以묒씠誘濡??좎?
     maven(url = "https://repo.spring.io/snapshot")
 }
 
@@ -130,7 +130,7 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
 
     /**
-     * ✅ Fix: Testcontainers version resolution
+     * ??Fix: Testcontainers version resolution
      * - Without a BOM (or explicit versions), Gradle ends up with "org.testcontainers:junit-jupiter:" (blank version)
      * - Pin via BOM so junit-jupiter/mongodb get versions consistently.
      */
@@ -166,3 +166,4 @@ tasks.register("printTestCompileClasspath") {
         configurations.testCompileClasspath.get().forEach { println(it) }
     }
 }
+
