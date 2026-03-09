@@ -1,6 +1,6 @@
 package com.example.macronews.service.news;
 
-import com.example.macronews.dto.domain.NewsEvent;
+import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.repository.NewsEventRepository;
 import java.util.List;
 import java.util.Optional;
@@ -21,5 +21,3 @@ public class NewsQueryService {
         return newsEventRepository.findById(id);
     }
 }
-
-

@@ -1,14 +1,14 @@
 package com.example.macronews.controller;
 
+import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.news.NewsIngestionService;
-import jakarta.validation.Valid;
-import java.security.Principal;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.validation.BindingResult;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,6 +21,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequiredArgsConstructor
 @Slf4j
 public class AdminNewsController {
+
+    private static final int DEFAULT_LIMIT = 10;
 
     private final NewsIngestionService newsIngestionService;
 
@@ -35,39 +37,26 @@ public class AdminNewsController {
     }
 
     @PostMapping("/ingest")
-    public String ingest(@Valid @ModelAttribute("adminIngestionRequest") AdminIngestionRequest request,
-            BindingResult bindingResult,
-            RedirectAttributes redirectAttributes,
-            Principal principal) {
-        if (bindingResult.hasErrors()) {
-            log.warn("Admin news ingestion validation failed: {}", bindingResult.getAllErrors());
-            redirectAttributes.addFlashAttribute("errorMessage",
-                    "News ingestion failed: invalid input.");
-            redirectAttributes.addFlashAttribute("org.springframework.validation.BindingResult.adminIngestionRequest",
-                    bindingResult);
-            redirectAttributes.addFlashAttribute("adminIngestionRequest", request);
-            log.info("Redirecting to /admin/news due to validation errors");
-            return "redirect:/admin/news";
-        }
+    public String ingest(@ModelAttribute("adminIngestionRequest") AdminIngestionRequest request,
+            RedirectAttributes redirectAttributes) {
 
         try {
-            String ingestedBy = principal == null ? "" : principal.getName();
-            AdminIngestionRequest requestWithUser = new AdminIngestionRequest(
-                    request.source(),
-                    request.title(),
-                    request.summary(),
-                    request.content(),
-                    request.url(),
-                    request.publishedAt(),
-                    ingestedBy
-            );
-            String savedId = newsIngestionService.ingestOne(requestWithUser);
+            if (hasManualPayload(request)) {
+                NewsEvent saved = newsIngestionService.ingestManual(request);
+                redirectAttributes.addFlashAttribute("successMessage",
+                        "News ingested successfully. id=" + saved.id());
+                return "redirect:/news/" + saved.id();
+            }
+
+            int limit = request.limit() != null && request.limit() > 0
+                    ? request.limit()
+                    : DEFAULT_LIMIT;
+            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(limit);
             redirectAttributes.addFlashAttribute("successMessage",
-                    "News ingested successfully. id=" + savedId);
-            log.info("Admin news ingestion succeeded, redirecting to detail id={}", savedId);
-            return "redirect:/news/" + savedId;
+                    "External ingestion completed. total=" + ingested.size());
+            return "redirect:/admin/news";
         } catch (RuntimeException ex) {
-            log.error("Admin news ingestion failed; redirecting back to form", ex);
+            log.error("Admin news ingestion failed", ex);
             redirectAttributes.addFlashAttribute("errorMessage",
                     "News ingestion failed. Please try again.");
             redirectAttributes.addFlashAttribute("adminIngestionRequest", request);
@@ -79,15 +68,19 @@ public class AdminNewsController {
     public String ingestFromApi(@RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
             RedirectAttributes redirectAttributes) {
         try {
-            int createdCount = newsIngestionService.ingestLatestFromApi(pageSize);
+            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(pageSize);
             redirectAttributes.addFlashAttribute("successMessage",
-                    "External ingestion completed. created=" + createdCount);
-            log.info("Admin external ingestion completed. createdCount={}", createdCount);
+                    "External ingestion completed. total=" + ingested.size());
         } catch (RuntimeException ex) {
             log.error("Admin external ingestion failed", ex);
             redirectAttributes.addFlashAttribute("errorMessage",
                     "External ingestion failed. Please check logs/config.");
         }
         return "redirect:/admin/news";
+    }
+
+    private boolean hasManualPayload(AdminIngestionRequest request) {
+        return StringUtils.hasText(request.source())
+                && StringUtils.hasText(request.title());
     }
 }

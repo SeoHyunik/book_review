@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document(collection = "news_events")
 public record NewsEvent(
         @Id String id,
+        String externalId,
         String title,
         String summary,
         String source,
