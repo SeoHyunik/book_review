@@ -1,12 +1,15 @@
 package com.example.macronews.service.macro;
 
-import com.example.macronews.dto.domain.AnalysisResult;
-import com.example.macronews.dto.domain.ImpactConfidence;
-import com.example.macronews.dto.domain.ImpactDirection;
-import com.example.macronews.dto.domain.MacroImpact;
-import com.example.macronews.dto.domain.MarketImpact;
-import com.example.macronews.dto.domain.NewsEvent;
+import com.example.macronews.domain.AnalysisResult;
+import com.example.macronews.domain.ImpactDirection;
+import com.example.macronews.domain.MacroImpact;
+import com.example.macronews.domain.MacroVariable;
+import com.example.macronews.domain.MarketImpact;
+import com.example.macronews.domain.MarketType;
+import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -35,12 +39,12 @@ public class MacroAiServiceImpl implements MacroAiService {
     private static final String SOURCE_PLACEHOLDER = "{{source}}";
     private static final String TITLE_PLACEHOLDER = "{{title}}";
     private static final String SUMMARY_PLACEHOLDER = "{{summary}}";
-    private static final String CONTENT_PLACEHOLDER = "{{content}}";
     private static final String URL_PLACEHOLDER = "{{url}}";
     private static final String PUBLISHED_AT_PLACEHOLDER = "{{publishedAt}}";
 
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
+    private final NewsEventRepository newsEventRepository;
 
     @Value("${openai.api-key:}")
     private String openAiApiKey;
@@ -61,40 +65,66 @@ public class MacroAiServiceImpl implements MacroAiService {
     private Resource macroPromptFile;
 
     @Override
-    public AnalysisResult interpretNewsEvent(NewsEvent newsEvent) {
-        if (newsEvent == null) {
-            throw new IllegalArgumentException("newsEvent must not be null");
+    public AnalysisResult interpret(NewsEvent event) {
+        if (event == null) {
+            throw new IllegalArgumentException("event must not be null");
         }
-        log.info("Starting AI interpretation for newsEventId={}, externalId={}", newsEvent.id(),
-                newsEvent.externalId());
 
         validateConfig();
 
-        String payload = buildPayload(newsEvent);
+        String payload = buildPayload(event);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(openAiApiKey);
 
-        ExternalApiRequest request = new ExternalApiRequest(
+        ExternalApiResult apiResult = externalApiUtils.callAPI(new ExternalApiRequest(
                 HttpMethod.POST,
                 headers,
                 openAiUrl,
                 payload
-        );
+        ));
 
-        ExternalApiResult apiResult = externalApiUtils.callAPI(request);
         if (apiResult == null) {
             throw new IllegalStateException("OpenAI interpretation response was null");
         }
-
         if (apiResult.statusCode() < 200 || apiResult.statusCode() >= 300) {
             throw new IllegalStateException(
                     "OpenAI interpretation failed with status=" + apiResult.statusCode());
         }
 
-        AnalysisResult result = parseAnalysisResult(apiResult.body());
-        log.info("AI interpretation succeeded for newsEventId={}", newsEvent.id());
-        return result;
+        return parseAnalysisResult(apiResult.body());
+    }
+
+    @Override
+    public NewsEvent interpretAndSave(String newsEventId) {
+        NewsEvent event = newsEventRepository.findById(newsEventId)
+                .orElseThrow(() -> new IllegalArgumentException("NewsEvent not found: " + newsEventId));
+
+        try {
+            AnalysisResult analysisResult = interpret(event);
+            NewsEvent analyzed = copyWithStatusAndResult(event, NewsStatus.ANALYZED, analysisResult);
+            return newsEventRepository.save(analyzed);
+        } catch (Exception ex) {
+            log.error("AI interpretation failed for newsEventId={}", newsEventId, ex);
+            NewsEvent failed = copyWithStatusAndResult(event, NewsStatus.FAILED, null);
+            return newsEventRepository.save(failed);
+        }
+    }
+
+    private NewsEvent copyWithStatusAndResult(NewsEvent base, NewsStatus status,
+            AnalysisResult result) {
+        return new NewsEvent(
+                base.id(),
+                base.externalId(),
+                base.title(),
+                base.summary(),
+                base.source(),
+                base.url(),
+                base.publishedAt(),
+                base.ingestedAt(),
+                status,
+                result
+        );
     }
 
     private void validateConfig() {
@@ -109,7 +139,7 @@ public class MacroAiServiceImpl implements MacroAiService {
         }
     }
 
-    private String buildPayload(NewsEvent newsEvent) {
+    private String buildPayload(NewsEvent event) {
         try {
             JsonNode promptRoot = loadPromptTemplate();
             JsonNode promptMessages = promptRoot.get("messages");
@@ -128,17 +158,13 @@ public class MacroAiServiceImpl implements MacroAiService {
                 if (node.has("content")) {
                     content = node.get("content").asText("");
                 } else {
-                    String template = node.path("template").asText("");
-                    content = fillTemplate(template, newsEvent);
+                    content = fillTemplate(node.path("template").asText(""), event);
                 }
                 if (!StringUtils.hasText(content)) {
                     continue;
                 }
 
-                messages.add(java.util.Map.of(
-                        "role", role,
-                        "content", content
-                ));
+                messages.add(java.util.Map.of("role", role, "content", content));
             }
 
             java.util.Map<String, Object> root = new java.util.LinkedHashMap<>();
@@ -161,14 +187,13 @@ public class MacroAiServiceImpl implements MacroAiService {
         }
     }
 
-    private String fillTemplate(String template, NewsEvent newsEvent) {
+    private String fillTemplate(String template, NewsEvent event) {
         return template
-                .replace(SOURCE_PLACEHOLDER, safe(newsEvent.source()))
-                .replace(TITLE_PLACEHOLDER, safe(newsEvent.title()))
-                .replace(SUMMARY_PLACEHOLDER, safe(newsEvent.summary()))
-                .replace(CONTENT_PLACEHOLDER, safe(newsEvent.content()))
-                .replace(URL_PLACEHOLDER, safe(newsEvent.url()))
-                .replace(PUBLISHED_AT_PLACEHOLDER, String.valueOf(newsEvent.publishedAt()));
+                .replace(SOURCE_PLACEHOLDER, safe(event.source()))
+                .replace(TITLE_PLACEHOLDER, safe(event.title()))
+                .replace(SUMMARY_PLACEHOLDER, safe(event.summary()))
+                .replace(URL_PLACEHOLDER, safe(event.url()))
+                .replace(PUBLISHED_AT_PLACEHOLDER, String.valueOf(event.publishedAt()));
     }
 
     private AnalysisResult parseAnalysisResult(String responseBody) {
@@ -183,14 +208,23 @@ public class MacroAiServiceImpl implements MacroAiService {
                 throw new IllegalStateException("OpenAI response message content was empty");
             }
 
-            JsonNode analysisNode = extractJsonNode(content);
-            return AnalysisResult.builder()
-                    .summary(analysisNode.path("summary").asText(""))
-                    .macroImpacts(parseMacroImpacts(analysisNode.path("macroImpacts")))
-                    .marketImpacts(parseMarketImpacts(analysisNode.path("marketImpacts")))
-                    .build();
+            JsonNode node = extractJsonNode(content);
+            JsonNode macroImpactsNode = node.path("macroImpacts");
+            JsonNode marketImpactsNode = node.path("marketImpacts");
+            if (!macroImpactsNode.isArray() || !marketImpactsNode.isArray()) {
+                throw new IllegalStateException("Required impact arrays are missing");
+            }
+
+            List<MacroImpact> macroImpacts = parseMacroImpacts(macroImpactsNode);
+            List<MarketImpact> marketImpacts = parseMarketImpacts(marketImpactsNode);
+
+            return new AnalysisResult(
+                    openAiModel,
+                    Instant.now(),
+                    macroImpacts,
+                    marketImpacts
+            );
         } catch (Exception ex) {
-            log.error("Failed to parse macro interpretation response. rawBody={}", responseBody, ex);
             throw new IllegalStateException("Failed to parse macro interpretation response", ex);
         }
     }
@@ -202,64 +236,88 @@ public class MacroAiServiceImpl implements MacroAiService {
             int start = content.indexOf('{');
             int end = content.lastIndexOf('}');
             if (start >= 0 && end > start) {
-                String jsonBlock = content.substring(start, end + 1);
-                return objectMapper.readTree(jsonBlock);
+                return objectMapper.readTree(content.substring(start, end + 1));
             }
             throw new IOException("No JSON object found in model response");
         }
     }
 
     private List<MacroImpact> parseMacroImpacts(JsonNode arrayNode) {
-        if (arrayNode == null || !arrayNode.isArray()) {
-            return List.of();
-        }
         List<MacroImpact> impacts = new ArrayList<>();
         for (JsonNode node : arrayNode) {
-            impacts.add(MacroImpact.builder()
-                    .indicator(node.path("indicator").asText(""))
-                    .direction(parseDirection(node.path("direction").asText(null)))
-                    .confidence(parseConfidence(node.path("confidence").asText(null)))
-                    .rationale(node.path("rationale").asText(""))
-                    .build());
+            MacroVariable variable = parseMacroVariable(node.path("variable").asText(null));
+            ImpactDirection direction = parseDirection(node.path("direction").asText(null));
+            double confidence = parseConfidence(node.path("confidence"));
+            if (variable == null) {
+                continue;
+            }
+            impacts.add(new MacroImpact(variable, direction, confidence));
         }
         return impacts;
     }
 
     private List<MarketImpact> parseMarketImpacts(JsonNode arrayNode) {
-        if (arrayNode == null || !arrayNode.isArray()) {
-            return List.of();
-        }
         List<MarketImpact> impacts = new ArrayList<>();
         for (JsonNode node : arrayNode) {
-            impacts.add(MarketImpact.builder()
-                    .asset(node.path("asset").asText(""))
-                    .direction(parseDirection(node.path("direction").asText(null)))
-                    .confidence(parseConfidence(node.path("confidence").asText(null)))
-                    .rationale(node.path("rationale").asText(""))
-                    .build());
+            MarketType market = parseMarketType(node.path("market").asText(null));
+            ImpactDirection direction = parseDirection(node.path("direction").asText(null));
+            double confidence = parseConfidence(node.path("confidence"));
+            if (market == null) {
+                continue;
+            }
+            impacts.add(new MarketImpact(market, direction, confidence));
         }
         return impacts;
     }
 
-    private ImpactDirection parseDirection(String direction) {
-        if (!StringUtils.hasText(direction)) {
+    private MacroVariable parseMacroVariable(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return MacroVariable.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private MarketType parseMarketType(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return MarketType.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private ImpactDirection parseDirection(String value) {
+        if (!StringUtils.hasText(value)) {
             return ImpactDirection.NEUTRAL;
         }
         try {
-            return ImpactDirection.valueOf(direction.trim().toUpperCase());
+            return ImpactDirection.valueOf(value.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
             return ImpactDirection.NEUTRAL;
         }
     }
 
-    private ImpactConfidence parseConfidence(String confidence) {
-        if (!StringUtils.hasText(confidence)) {
-            return ImpactConfidence.MEDIUM;
+    private double parseConfidence(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return 0.5d;
         }
         try {
-            return ImpactConfidence.valueOf(confidence.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            return ImpactConfidence.MEDIUM;
+            double raw = node.isNumber() ? node.asDouble() : Double.parseDouble(node.asText("0.5"));
+            if (raw < 0d) {
+                return 0d;
+            }
+            if (raw > 1d) {
+                return 1d;
+            }
+            return raw;
+        } catch (Exception ex) {
+            return 0.5d;
         }
     }
 
