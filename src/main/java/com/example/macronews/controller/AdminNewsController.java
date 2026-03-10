@@ -34,6 +34,7 @@ public class AdminNewsController {
     private static final int DEFAULT_LIMIT = 10;
     private static final String MANUAL_PAGE = "/admin/news/manual";
     private static final String AUTO_PAGE = "/admin/news/auto";
+    private static final String NEWS_PAGE = "/news";
 
     private final NewsIngestionService newsIngestionService;
     private final NewsApiService newsApiService;
@@ -178,7 +179,16 @@ public class AdminNewsController {
     }
 
     private String resolveAdminRedirect(String returnTo, String status) {
-        String basePath = AUTO_PAGE.equals(returnTo) ? AUTO_PAGE : MANUAL_PAGE;
-        return StringUtils.hasText(status) ? basePath + "?status=" + status : basePath;
+        String basePath;
+        if (NEWS_PAGE.equals(returnTo)) {
+            basePath = NEWS_PAGE;
+        } else if (AUTO_PAGE.equals(returnTo)) {
+            basePath = AUTO_PAGE;
+        } else {
+            basePath = MANUAL_PAGE;
+        }
+        return MANUAL_PAGE.equals(basePath) || AUTO_PAGE.equals(basePath)
+                ? (StringUtils.hasText(status) ? basePath + "?status=" + status : basePath)
+                : basePath;
     }
 }
