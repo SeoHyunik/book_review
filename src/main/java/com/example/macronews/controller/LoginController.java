@@ -35,11 +35,17 @@ public class LoginController {
             session.removeAttribute(ContinueAwareAuthenticationSuccessHandler.CONTINUE_URL_SESSION_KEY);
         }
 
-        boolean googleLoginEnabled = StringUtils.hasText(environment.getProperty(
+        model.addAttribute("googleLoginEnabled", isGoogleLoginEnabled());
+        return "auth/login";
+    }
+
+    private boolean isGoogleLoginEnabled() {
+        boolean featureEnabled = Boolean.parseBoolean(environment.getProperty(
+                "app.auth.google-login-enabled", "false"));
+        boolean configured = StringUtils.hasText(environment.getProperty(
                 "spring.security.oauth2.client.registration.google.client-id"))
                 && StringUtils.hasText(environment.getProperty(
                         "spring.security.oauth2.client.registration.google.client-secret"));
-        model.addAttribute("googleLoginEnabled", googleLoginEnabled);
-        return "auth/login";
+        return featureEnabled && configured;
     }
 }

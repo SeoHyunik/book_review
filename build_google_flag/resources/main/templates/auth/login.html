@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <section class="d-flex justify-content-center">
+        <div class="card shadow-sm border-0 w-100 overflow-hidden" style="max-width: 560px;">
+            <div class="card-body p-4 p-md-5">
+                <div class="text-center mb-4">
+                    <span class="badge rounded-pill text-bg-primary px-3 py-2 mb-3" th:text="#{auth.login.kicker}">Continue Reading</span>
+                    <h1 class="h4 fw-bold mb-2" th:text="#{auth.login.heading}">Sign in</h1>
+                    <p class="text-secondary mb-0" th:text="${param.gated} ? #{auth.login.gated.subtitle} : #{auth.login.subtitle}">
+                        Sign in to keep reading AI-powered market interpretation.
+                    </p>
+                </div>
+
+                <div th:if="${param.gated}" class="alert alert-warning border-0 shadow-sm mb-3" role="alert">
+                    <div class="fw-semibold mb-1" th:text="#{auth.login.gated.title}">Free detail access reached</div>
+                    <div class="small mb-0" th:text="#{auth.login.gated}">
+                        You have reached the free detail-view limit. Sign in to keep reading full market interpretation reports.
+                    </div>
+                </div>
+                <div th:if="${continueUrl != null and !#strings.isEmpty(continueUrl)}" class="alert alert-light border small text-secondary mb-3" role="alert">
+                    <span th:text="#{auth.login.continue}">After sign-in, you will return to the article you were reading.</span>
+                </div>
+                <div th:if="${param.error}" class="alert alert-danger" role="alert">
+                    <span th:text="#{auth.login.error}">Invalid username or password.</span>
+                </div>
+                <div th:if="${param.logout}" class="alert alert-info" role="alert">
+                    <span th:text="#{auth.login.logout}">You have been logged out.</span>
+                </div>
+                <div th:if="${param.registered}" class="alert alert-success" role="alert">
+                    <span th:text="#{auth.login.registered}">Registration successful. Please sign in.</span>
+                </div>
+
+                <div th:if="${googleLoginEnabled}" class="d-grid gap-2 mb-3">
+                    <a class="btn btn-outline-dark py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-2"
+                       th:href="@{/oauth2/authorization/google}"
+                       th:text="#{auth.login.google}">
+                        Continue with Google
+                    </a>
+                </div>
+                <div th:if="${googleLoginEnabled}" class="text-center text-secondary small mb-3" th:text="#{auth.login.or}">or</div>
+
+                <form th:action="@{/login}" method="post" class="d-flex flex-column gap-3">
+                    <div class="form-floating">
+                        <input id="username" name="username" type="text" class="form-control" placeholder="Username" required>
+                        <label for="username" th:text="#{auth.login.username}">Username</label>
+                    </div>
+                    <div class="form-floating">
+                        <input id="password" name="password" type="password" class="form-control" placeholder="Password" required>
+                        <label for="password" th:text="#{auth.login.password}">Password</label>
+                    </div>
+                    <input type="hidden" th:if="${continueUrl != null and !#strings.isEmpty(continueUrl)}" name="continue" th:value="${continueUrl}"/>
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                    <div class="pt-1">
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" th:text="#{auth.login.submit}">Sign in</button>
+                    </div>
+                    <div class="d-flex justify-content-center align-items-center flex-wrap gap-2 pt-2">
+                        <span class="text-secondary small" th:text="#{auth.login.signup.prompt}">Need an account?</span>
+                        <a class="btn btn-sm btn-outline-secondary rounded-pill px-3" th:href="@{/register}" th:text="#{auth.login.signup.cta}">Create account</a>
+                    </div>
+                    <div th:if="${param.gated}" class="text-center small text-secondary pt-1" th:text="#{auth.login.gated.benefit}">
+                        Sign in to continue reading deeper AI market interpretation and return right where you left off.
+                    </div>
+                    <div th:if="${!param.gated}" class="text-center small text-secondary pt-1" th:text="#{auth.login.benefit}">
+                        Track macro headlines with AI-guided market context in one place.
+                    </div>
+                    <div class="text-center">
+                        <a class="small text-secondary text-decoration-none" th:href="@{/news}" th:text="#{auth.login.back}">Back to news</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+</th:block>
+</html>
