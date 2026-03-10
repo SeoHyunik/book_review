@@ -233,6 +233,8 @@ public class MacroAiServiceImpl implements MacroAiService {
             return new AnalysisResult(
                     openAiModel,
                     Instant.now(),
+                    readOptionalText(node, "summaryKo"),
+                    readOptionalText(node, "summaryEn"),
                     macroImpacts,
                     marketImpacts
             );
@@ -313,6 +315,14 @@ public class MacroAiServiceImpl implements MacroAiService {
         } catch (IllegalArgumentException ex) {
             return ImpactDirection.NEUTRAL;
         }
+    }
+
+    private String readOptionalText(JsonNode node, String fieldName) {
+        if (node == null || !node.has(fieldName)) {
+            return null;
+        }
+        String value = node.path(fieldName).asText("").trim();
+        return StringUtils.hasText(value) ? value : null;
     }
 
     private double parseConfidence(JsonNode node) {

@@ -248,6 +248,7 @@ class NewsQueryServiceTest {
     }
 
     private AnalysisResult analyzedResult() {
-        return new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), List.of(), List.of());
+        return new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), null, null, List.of(), List.of());
     }
 }
+
