@@ -315,14 +315,14 @@ class NewsQueryServiceTest {
                 "2026-03-10T09:30:00Z",
                 "2026-03-10T09:40:00Z",
                 NewsStatus.ANALYZED,
-                analyzedResult("한국어 요약", "English summary"));
+                analyzedResult("?쒓뎅???붿빟", "English summary"));
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
                 .willReturn(List.of(analyzed));
 
         var result = newsQueryService.getRecentNews().get(0);
 
-        assertThat(result.interpretationSummary()).isEqualTo("한국어 요약");
+        assertThat(result.interpretationSummary()).isEqualTo("?쒓뎅???붿빟");
     }
 
     @Test
@@ -338,7 +338,7 @@ class NewsQueryServiceTest {
                 "2026-03-10T09:30:00Z",
                 "2026-03-10T09:40:00Z",
                 NewsStatus.ANALYZED,
-                analyzedResult("한국어만 있음", null));
+                analyzedResult("?쒓뎅?대쭔 ?덉쓬", null));
         NewsEvent macroFallback = newsEvent(
                 "localized-fallback-macro",
                 "Oil prices climb on supply concerns",
@@ -357,7 +357,7 @@ class NewsQueryServiceTest {
 
         var results = newsQueryService.getRecentNews();
 
-        assertThat(results.get(0).interpretationSummary()).isEqualTo("한국어만 있음");
+        assertThat(results.get(0).interpretationSummary()).isEqualTo("?쒓뎅?대쭔 ?덉쓬");
         assertThat(results.get(1).interpretationSummary()).isEqualTo("OIL UP");
     }
 
@@ -408,7 +408,64 @@ class NewsQueryServiceTest {
         assertThat(snapshot.items()).extracting(item -> item.id())
                 .containsExactly("batch-1", "batch-2", "batch-3");
     }
+    @Test
+    @DisplayName("Market signal overview should aggregate dominant directions from recent analyzed news")
+    void getMarketSignalOverview_aggregatesDominantDirections() {
+        NewsEvent analyzedOne = newsEvent(
+                "signal-1",
+                "Oil and rates move",
+                "Summary",
+                "Reuters",
+                "https://example.com/signal-1",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), null, null,
+                        List.of(
+                                new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.9d),
+                                new MacroImpact(MacroVariable.INTEREST_RATE, ImpactDirection.UP, 0.8d),
+                                new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.7d)
+                        ),
+                        List.of()));
+        NewsEvent analyzedTwo = newsEvent(
+                "signal-2",
+                "More inflation pressure",
+                "Summary",
+                "Bloomberg",
+                "https://example.com/signal-2",
+                "2026-03-10T08:30:00Z",
+                "2026-03-10T08:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), null, null,
+                        List.of(
+                                new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.6d),
+                                new MacroImpact(MacroVariable.INFLATION, ImpactDirection.DOWN, 0.6d),
+                                new MacroImpact(MacroVariable.VOLATILITY, ImpactDirection.NEUTRAL, 0.5d)
+                        ),
+                        List.of()));
 
+        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+                .willReturn(List.of(analyzedOne, analyzedTwo));
+
+        var overview = newsQueryService.getMarketSignalOverview(null, NewsListSort.PUBLISHED_DESC);
+
+        assertThat(overview.items()).hasSize(5);
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.OIL)
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
+                    assertThat(item.sampleCount()).isEqualTo(2);
+                });
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.USD)
+                .singleElement()
+                .satisfies(item -> assertThat(item.direction()).isEqualTo(ImpactDirection.DOWN));
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.VOLATILITY)
+                .singleElement()
+                .satisfies(item -> assertThat(item.direction()).isEqualTo(ImpactDirection.NEUTRAL));
+    }
     private NewsEvent newsEvent(String id, String title, String summary, String source, String url,
             String publishedAt, String ingestedAt, NewsStatus status, AnalysisResult analysisResult) {
         return new NewsEvent(
@@ -433,3 +490,4 @@ class NewsQueryServiceTest {
         return new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), summaryKo, summaryEn, List.of(), List.of());
     }
 }
+

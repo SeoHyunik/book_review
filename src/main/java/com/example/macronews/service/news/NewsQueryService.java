@@ -1,14 +1,20 @@
 package com.example.macronews.service.news;
 
 import com.example.macronews.domain.AnalysisResult;
+import com.example.macronews.domain.ImpactDirection;
 import com.example.macronews.domain.MacroImpact;
+import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.AutoIngestionBatchStatusDto;
+import com.example.macronews.dto.MarketSignalItemDto;
+import com.example.macronews.dto.MarketSignalOverviewDto;
 import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.repository.NewsEventRepository;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,15 +44,26 @@ public class NewsQueryService {
     }
 
     public List<NewsListItemDto> getRecentNews(NewsStatus status, NewsListSort sort) {
-        List<NewsEvent> candidates = status == null
-                ? newsEventRepository.findTop20ByOrderByPublishedAtDesc()
-                : newsEventRepository.findByStatus(status);
-
-        return candidates.stream()
+        return loadCandidates(status).stream()
                 .sorted(buildComparator(sort))
                 .limit(20)
                 .map(this::toListItem)
                 .toList();
+    }
+
+    public MarketSignalOverviewDto getMarketSignalOverview(NewsStatus status, NewsListSort sort) {
+        List<NewsEvent> recentAnalyzed = loadCandidates(status).stream()
+                .sorted(buildComparator(sort))
+                .limit(20)
+                .filter(event -> event.status() == NewsStatus.ANALYZED)
+                .filter(event -> event.analysisResult() != null)
+                .toList();
+
+        List<MarketSignalItemDto> items = Arrays.stream(MacroVariable.values())
+                .map(variable -> aggregateSignal(variable, recentAnalyzed))
+                .toList();
+
+        return new MarketSignalOverviewDto(items);
     }
 
     public AutoIngestionBatchStatusDto getAutoIngestionBatchStatus(int requestedCount, int returnedCount, List<String> itemIds) {
@@ -81,6 +98,12 @@ public class NewsQueryService {
     @Cacheable(cacheNames = "newsDetail", key = "#id")
     public Optional<NewsDetailDto> getNewsDetail(String id) {
         return newsEventRepository.findById(id).map(this::toDetail);
+    }
+
+    private List<NewsEvent> loadCandidates(NewsStatus status) {
+        return status == null
+                ? newsEventRepository.findTop20ByOrderByPublishedAtDesc()
+                : newsEventRepository.findByStatus(status);
     }
 
     private Comparator<NewsEvent> buildComparator(NewsListSort sort) {
@@ -163,6 +186,43 @@ public class NewsQueryService {
         }
         String summary = first.variable().name() + " " + first.direction().name();
         return StringUtils.hasText(summary) ? summary : "";
+    }
+
+    private MarketSignalItemDto aggregateSignal(MacroVariable variable, List<NewsEvent> recentAnalyzed) {
+        Map<ImpactDirection, Integer> counts = new EnumMap<>(ImpactDirection.class);
+        counts.put(ImpactDirection.UP, 0);
+        counts.put(ImpactDirection.DOWN, 0);
+        counts.put(ImpactDirection.NEUTRAL, 0);
+
+        int sampleCount = 0;
+        for (NewsEvent event : recentAnalyzed) {
+            if (event.analysisResult() == null || event.analysisResult().macroImpacts() == null) {
+                continue;
+            }
+            for (MacroImpact impact : event.analysisResult().macroImpacts()) {
+                if (impact == null || impact.variable() != variable || impact.direction() == null) {
+                    continue;
+                }
+                counts.computeIfPresent(impact.direction(), (key, value) -> value + 1);
+                sampleCount++;
+            }
+        }
+
+        return new MarketSignalItemDto(variable, resolveDominantDirection(counts), sampleCount);
+    }
+
+    private ImpactDirection resolveDominantDirection(Map<ImpactDirection, Integer> counts) {
+        int up = counts.getOrDefault(ImpactDirection.UP, 0);
+        int down = counts.getOrDefault(ImpactDirection.DOWN, 0);
+        int neutral = counts.getOrDefault(ImpactDirection.NEUTRAL, 0);
+
+        if (up > down && up > neutral) {
+            return ImpactDirection.UP;
+        }
+        if (down > up && down > neutral) {
+            return ImpactDirection.DOWN;
+        }
+        return ImpactDirection.NEUTRAL;
     }
 
     private int calculatePriorityScore(NewsEvent event) {

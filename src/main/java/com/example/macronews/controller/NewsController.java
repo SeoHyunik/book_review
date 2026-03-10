@@ -1,6 +1,7 @@
 package com.example.macronews.controller;
 
 import com.example.macronews.domain.NewsStatus;
+import com.example.macronews.dto.MarketSignalOverviewDto;
 import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.service.news.NewsListSort;
@@ -32,7 +33,10 @@ public class NewsController {
         NewsStatus selectedStatus = resolveStatus(status);
         NewsListSort selectedSort = resolveSort(sort);
         List<NewsListItemDto> newsItems = newsQueryService.getRecentNews(selectedStatus, selectedSort);
+        MarketSignalOverviewDto marketSignalOverview =
+                newsQueryService.getMarketSignalOverview(selectedStatus, selectedSort);
         model.addAttribute("newsItems", newsItems);
+        model.addAttribute("marketSignalOverview", marketSignalOverview);
         model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());
         model.addAttribute("selectedSort", selectedSort.name().toLowerCase());
         model.addAttribute("pageTitleKey", "page.news.list.title");
