@@ -8,7 +8,9 @@ import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.news.NewsApiService;
 import com.example.macronews.service.news.NewsIngestionService;
+import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -119,6 +121,7 @@ public class AdminNewsController {
     public String reinterpret(@PathVariable String id,
             @RequestParam(name = "returnTo", required = false) String returnTo,
             @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "sort", required = false) String sort,
             RedirectAttributes redirectAttributes) {
         log.info("[ADMIN] reinterpret requested id={}", id);
         try {
@@ -131,13 +134,14 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("errorMessage",
                     "Re-interpretation failed. id=" + id);
         }
-        return "redirect:" + resolveAdminRedirect(returnTo, status);
+        return "redirect:" + resolveAdminRedirect(returnTo, status, sort);
     }
 
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable String id,
             @RequestParam(name = "returnTo", required = false) String returnTo,
             @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "sort", required = false) String sort,
             RedirectAttributes redirectAttributes) {
         log.info("[ADMIN] delete requested id={}", id);
         boolean deleted = newsIngestionService.deleteById(id);
@@ -146,7 +150,7 @@ public class AdminNewsController {
         } else {
             redirectAttributes.addFlashAttribute("warningMessage", "News item not found. id=" + id);
         }
-        return "redirect:" + resolveAdminRedirect(returnTo, status);
+        return "redirect:" + resolveAdminRedirect(returnTo, status, sort);
     }
 
     @PostMapping("/ingest-api")
@@ -243,8 +247,9 @@ public class AdminNewsController {
         }
     }
 
-    private String resolveAdminRedirect(String returnTo, String status) {
+    private String resolveAdminRedirect(String returnTo, String status, String sort) {
         String normalizedStatus = normalizeStatus(status);
+        String normalizedSort = normalizeSort(sort);
         String basePath;
         if (NEWS_PAGE.equals(returnTo)) {
             basePath = NEWS_PAGE;
@@ -253,11 +258,31 @@ public class AdminNewsController {
         } else {
             basePath = MANUAL_PAGE;
         }
-        return StringUtils.hasText(normalizedStatus) ? basePath + "?status=" + normalizedStatus : basePath;
+
+        List<String> queryParts = new ArrayList<>();
+        if (StringUtils.hasText(normalizedStatus)) {
+            queryParts.add("status=" + normalizedStatus);
+        }
+        if (NEWS_PAGE.equals(basePath) && StringUtils.hasText(normalizedSort)) {
+            queryParts.add("sort=" + normalizedSort);
+        }
+        return queryParts.isEmpty() ? basePath : basePath + "?" + String.join("&", queryParts);
     }
 
     private String normalizeStatus(String status) {
         NewsStatus newsStatus = resolveStatus(status);
         return newsStatus == null ? "" : newsStatus.name();
+    }
+
+    private String normalizeSort(String sort) {
+        if (!StringUtils.hasText(sort)) {
+            return "";
+        }
+        try {
+            return NewsListSort.valueOf(sort.trim().toUpperCase()).name().toLowerCase();
+        } catch (IllegalArgumentException ex) {
+            log.debug("Ignoring unsupported admin sort={}", sort);
+            return "";
+        }
     }
 }

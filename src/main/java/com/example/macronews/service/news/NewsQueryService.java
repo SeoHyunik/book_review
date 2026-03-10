@@ -30,19 +30,20 @@ public class NewsQueryService {
     private final NewsEventRepository newsEventRepository;
 
     public List<NewsListItemDto> getRecentNews() {
-        return getRecentNews(null);
+        return getRecentNews(null, NewsListSort.PUBLISHED_DESC);
     }
 
     public List<NewsListItemDto> getRecentNews(NewsStatus status) {
+        return getRecentNews(status, NewsListSort.PUBLISHED_DESC);
+    }
+
+    public List<NewsListItemDto> getRecentNews(NewsStatus status, NewsListSort sort) {
         List<NewsEvent> candidates = status == null
                 ? newsEventRepository.findTop20ByOrderByPublishedAtDesc()
                 : newsEventRepository.findByStatus(status);
 
         return candidates.stream()
-                .sorted(Comparator
-                        .comparingInt(this::calculatePriorityScore)
-                        .reversed()
-                        .thenComparing(NewsEvent::publishedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .sorted(buildComparator(sort))
                 .limit(20)
                 .map(this::toListItem)
                 .toList();
@@ -82,6 +83,24 @@ public class NewsQueryService {
         return newsEventRepository.findById(id).map(this::toDetail);
     }
 
+    private Comparator<NewsEvent> buildComparator(NewsListSort sort) {
+        NewsListSort resolvedSort = sort == null ? NewsListSort.PUBLISHED_DESC : sort;
+        return switch (resolvedSort) {
+            case PUBLISHED_ASC -> Comparator.comparing(NewsEvent::publishedAt,
+                    Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(NewsEvent::ingestedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+            case PRIORITY -> Comparator.comparingInt(this::calculatePriorityScore)
+                    .reversed()
+                    .thenComparing(NewsEvent::publishedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+            case INGESTED_DESC -> Comparator.comparing(NewsEvent::ingestedAt,
+                    Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(NewsEvent::publishedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+            case PUBLISHED_DESC -> Comparator.comparing(NewsEvent::publishedAt,
+                    Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(NewsEvent::ingestedAt, Comparator.nullsLast(Comparator.reverseOrder()));
+        };
+    }
+
     private NewsListItemDto toListItem(NewsEvent event) {
         boolean hasAnalysis = event.analysisResult() != null;
         String macroSummary = buildMacroSummary(event);
@@ -90,6 +109,7 @@ public class NewsQueryService {
                 event.title(),
                 event.source(),
                 event.publishedAt(),
+                event.ingestedAt(),
                 event.status(),
                 hasAnalysis,
                 StringUtils.hasText(event.url()),

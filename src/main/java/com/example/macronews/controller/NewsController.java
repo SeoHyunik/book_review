@@ -3,6 +3,7 @@ package com.example.macronews.controller;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.NewsListItemDto;
+import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -25,16 +26,21 @@ public class NewsController {
     private final NewsQueryService newsQueryService;
 
     @GetMapping
-    public String list(@RequestParam(name = "status", required = false) String status, Model model) {
+    public String list(@RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "sort", required = false) String sort,
+            Model model) {
         NewsStatus selectedStatus = resolveStatus(status);
-        List<NewsListItemDto> newsItems = newsQueryService.getRecentNews(selectedStatus);
+        NewsListSort selectedSort = resolveSort(sort);
+        List<NewsListItemDto> newsItems = newsQueryService.getRecentNews(selectedStatus, selectedSort);
         model.addAttribute("newsItems", newsItems);
         model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());
+        model.addAttribute("selectedSort", selectedSort.name().toLowerCase());
         model.addAttribute("pageTitleKey", "page.news.list.title");
         model.addAttribute("pageDescriptionKey", "page.news.list.description");
         model.addAttribute("ogTitleKey", "page.news.list.title");
         model.addAttribute("ogDescriptionKey", "page.news.list.description");
-        log.debug("Rendering news list page with {} entries statusFilter={}", newsItems.size(), selectedStatus);
+        log.debug("Rendering news list page with {} entries statusFilter={} sort={}",
+                newsItems.size(), selectedStatus, selectedSort);
         return "news/list";
     }
 
@@ -69,6 +75,18 @@ public class NewsController {
         } catch (IllegalArgumentException ex) {
             log.debug("Ignoring unsupported news list status filter={}", status);
             return null;
+        }
+    }
+
+    private NewsListSort resolveSort(String sort) {
+        if (!StringUtils.hasText(sort)) {
+            return NewsListSort.PUBLISHED_DESC;
+        }
+        try {
+            return NewsListSort.valueOf(sort.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            log.debug("Ignoring unsupported news list sort={}", sort);
+            return NewsListSort.PUBLISHED_DESC;
         }
     }
 }

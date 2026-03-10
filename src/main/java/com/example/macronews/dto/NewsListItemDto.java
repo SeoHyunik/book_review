@@ -8,6 +8,7 @@ public record NewsListItemDto(
         String title,
         String source,
         Instant publishedAt,
+        Instant ingestedAt,
         NewsStatus status,
         boolean hasAnalysis,
         boolean hasUrl,

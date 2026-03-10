@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
 import com.example.macronews.domain.AnalysisResult;
+import com.example.macronews.domain.ImpactDirection;
+import com.example.macronews.domain.MacroImpact;
+import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.repository.NewsEventRepository;
@@ -34,7 +37,7 @@ class NewsQueryServiceTest {
     }
 
     @Test
-    @DisplayName("Korea semiconductor news should rank above generic US market news")
+    @DisplayName("Priority sort should rank Korea semiconductor news above generic US market news")
     void getRecentNews_prioritizesKoreaSemiconductorOverGenericUsMarket() {
         NewsEvent koreaSemiconductor = newsEvent(
                 "korea-semiconductor",
@@ -43,6 +46,7 @@ class NewsQueryServiceTest {
                 "Yonhap",
                 "https://example.com/korea-semiconductor",
                 "2026-03-10T09:00:00Z",
+                "2026-03-10T09:10:00Z",
                 NewsStatus.INGESTED,
                 null);
         NewsEvent genericUsMarket = newsEvent(
@@ -52,13 +56,14 @@ class NewsQueryServiceTest {
                 "Reuters",
                 "https://example.com/generic-us-market",
                 "2026-03-10T10:00:00Z",
+                "2026-03-10T10:10:00Z",
                 NewsStatus.INGESTED,
                 null);
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
                 .willReturn(List.of(genericUsMarket, koreaSemiconductor));
 
-        List<String> orderedIds = newsQueryService.getRecentNews().stream()
+        List<String> orderedIds = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY).stream()
                 .map(item -> item.id())
                 .toList();
 
@@ -66,7 +71,7 @@ class NewsQueryServiceTest {
     }
 
     @Test
-    @DisplayName("Korea trade/export news should rank above generic macro news")
+    @DisplayName("Priority sort should rank Korea trade/export news above generic macro news")
     void getRecentNews_prioritizesKoreaTradeExportOverGenericMacro() {
         NewsEvent koreaTrade = newsEvent(
                 "korea-trade",
@@ -75,6 +80,7 @@ class NewsQueryServiceTest {
                 "Korea Times",
                 "https://example.com/korea-trade",
                 "2026-03-10T07:00:00Z",
+                "2026-03-10T07:05:00Z",
                 NewsStatus.INGESTED,
                 null);
         NewsEvent genericMacro = newsEvent(
@@ -84,13 +90,14 @@ class NewsQueryServiceTest {
                 "Bloomberg",
                 "https://example.com/generic-macro",
                 "2026-03-10T11:00:00Z",
+                "2026-03-10T11:05:00Z",
                 NewsStatus.INGESTED,
                 null);
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
                 .willReturn(List.of(genericMacro, koreaTrade));
 
-        List<String> orderedIds = newsQueryService.getRecentNews().stream()
+        List<String> orderedIds = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY).stream()
                 .map(item -> item.id())
                 .toList();
 
@@ -98,7 +105,7 @@ class NewsQueryServiceTest {
     }
 
     @Test
-    @DisplayName("KOSPI headline should receive priority boost over similar generic headline")
+    @DisplayName("Priority sort should boost KOSPI headline over similar generic headline")
     void getRecentNews_boostsKospiHeadline() {
         NewsEvent kospiHeadline = newsEvent(
                 "kospi-boosted",
@@ -107,6 +114,7 @@ class NewsQueryServiceTest {
                 "Yonhap",
                 "https://example.com/kospi-boosted",
                 "2026-03-10T08:00:00Z",
+                "2026-03-10T08:05:00Z",
                 NewsStatus.INGESTED,
                 null);
         NewsEvent genericKoreaHeadline = newsEvent(
@@ -116,20 +124,21 @@ class NewsQueryServiceTest {
                 "Yonhap",
                 "https://example.com/generic-korea",
                 "2026-03-10T08:30:00Z",
+                "2026-03-10T08:35:00Z",
                 NewsStatus.INGESTED,
                 null);
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
                 .willReturn(List.of(genericKoreaHeadline, kospiHeadline));
 
-        var results = newsQueryService.getRecentNews();
+        var results = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
 
         assertThat(results.get(0).id()).isEqualTo("kospi-boosted");
         assertThat(results.get(0).priorityScore()).isGreaterThan(results.get(1).priorityScore());
     }
 
     @Test
-    @DisplayName("Newer item should sort first when priority score is tied")
+    @DisplayName("Priority sort should use newer publishedAt when score is tied")
     void getRecentNews_sortsByPublishedAtWhenPriorityTied() {
         NewsEvent older = newsEvent(
                 "older-korea-chip",
@@ -138,6 +147,7 @@ class NewsQueryServiceTest {
                 "Reuters",
                 "https://example.com/older-korea-chip",
                 "2026-03-10T05:00:00Z",
+                "2026-03-10T05:10:00Z",
                 NewsStatus.INGESTED,
                 null);
         NewsEvent newer = newsEvent(
@@ -147,17 +157,113 @@ class NewsQueryServiceTest {
                 "Reuters",
                 "https://example.com/newer-korea-chip",
                 "2026-03-10T06:00:00Z",
+                "2026-03-10T06:10:00Z",
                 NewsStatus.INGESTED,
                 null);
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
                 .willReturn(List.of(older, newer));
 
-        List<String> orderedIds = newsQueryService.getRecentNews().stream()
+        List<String> orderedIds = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY).stream()
                 .map(item -> item.id())
                 .toList();
 
         assertThat(orderedIds).containsExactly("newer-korea-chip", "older-korea-chip");
+    }
+
+    @Test
+    @DisplayName("Default list sort should be newest published first")
+    void getRecentNews_defaultsToPublishedDesc() {
+        NewsEvent older = newsEvent(
+                "published-older",
+                "Older article",
+                "Older summary",
+                "Reuters",
+                "https://example.com/published-older",
+                "2026-03-10T05:00:00Z",
+                "2026-03-10T07:00:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent newer = newsEvent(
+                "published-newer",
+                "Newer article",
+                "Newer summary",
+                "Reuters",
+                "https://example.com/published-newer",
+                "2026-03-10T06:00:00Z",
+                "2026-03-10T06:30:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+                .willReturn(List.of(older, newer));
+
+        assertThat(newsQueryService.getRecentNews()).extracting(item -> item.id())
+                .containsExactly("published-newer", "published-older");
+    }
+
+    @Test
+    @DisplayName("Published ascending sort should show oldest first")
+    void getRecentNews_supportsPublishedAscSort() {
+        NewsEvent older = newsEvent(
+                "published-older",
+                "Older article",
+                "Older summary",
+                "Reuters",
+                "https://example.com/published-older",
+                "2026-03-10T05:00:00Z",
+                "2026-03-10T07:00:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent newer = newsEvent(
+                "published-newer",
+                "Newer article",
+                "Newer summary",
+                "Reuters",
+                "https://example.com/published-newer",
+                "2026-03-10T06:00:00Z",
+                "2026-03-10T06:30:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+                .willReturn(List.of(newer, older));
+
+        assertThat(newsQueryService.getRecentNews(null, NewsListSort.PUBLISHED_ASC)).extracting(item -> item.id())
+                .containsExactly("published-older", "published-newer");
+    }
+
+    @Test
+    @DisplayName("Ingested descending sort should show most recently ingested first")
+    void getRecentNews_supportsIngestedDescSort() {
+        NewsEvent olderIngested = newsEvent(
+                "ingested-older",
+                "Same published older ingested",
+                "Summary",
+                "Reuters",
+                "https://example.com/ingested-older",
+                "2026-03-10T06:00:00Z",
+                "2026-03-10T06:10:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent newerIngested = newsEvent(
+                "ingested-newer",
+                "Same published newer ingested",
+                "Summary",
+                "Reuters",
+                "https://example.com/ingested-newer",
+                "2026-03-10T05:00:00Z",
+                "2026-03-10T08:10:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+                .willReturn(List.of(olderIngested, newerIngested));
+
+        var results = newsQueryService.getRecentNews(null, NewsListSort.INGESTED_DESC);
+
+        assertThat(results).extracting(item -> item.id()).containsExactly("ingested-newer", "ingested-older");
+        assertThat(results.get(0).ingestedAt()).isEqualTo(Instant.parse("2026-03-10T08:10:00Z"));
     }
 
     @Test
@@ -170,6 +276,7 @@ class NewsQueryServiceTest {
                 "Yonhap",
                 "https://example.com/analyzed-news",
                 "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
                 NewsStatus.ANALYZED,
                 analyzedResult());
         NewsEvent analyzedWithoutUrl = newsEvent(
@@ -179,13 +286,14 @@ class NewsQueryServiceTest {
                 "Reuters",
                 "",
                 "2026-03-10T08:30:00Z",
+                "2026-03-10T08:40:00Z",
                 NewsStatus.ANALYZED,
                 analyzedResult());
 
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(analyzedWithoutUrl, analyzedWithUrl));
 
-        var results = newsQueryService.getRecentNews(NewsStatus.ANALYZED);
+        var results = newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC);
 
         assertThat(results).hasSize(2);
         assertThat(results).allMatch(item -> item.status() == NewsStatus.ANALYZED);
@@ -205,6 +313,7 @@ class NewsQueryServiceTest {
                 "Yonhap",
                 "https://example.com/localized-ko",
                 "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
                 NewsStatus.ANALYZED,
                 analyzedResult("한국어 요약", "English summary"));
 
@@ -227,6 +336,7 @@ class NewsQueryServiceTest {
                 "Yonhap",
                 "https://example.com/localized-fallback-en",
                 "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
                 NewsStatus.ANALYZED,
                 analyzedResult("한국어만 있음", null));
         NewsEvent macroFallback = newsEvent(
@@ -236,12 +346,10 @@ class NewsQueryServiceTest {
                 "Bloomberg",
                 "https://example.com/localized-fallback-macro",
                 "2026-03-10T09:20:00Z",
+                "2026-03-10T09:25:00Z",
                 NewsStatus.ANALYZED,
                 new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), null, null,
-                        List.of(new com.example.macronews.domain.MacroImpact(
-                                com.example.macronews.domain.MacroVariable.OIL,
-                                com.example.macronews.domain.ImpactDirection.UP,
-                                0.9d)),
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.9d)),
                         List.of()));
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
@@ -263,6 +371,7 @@ class NewsQueryServiceTest {
                 "Yonhap",
                 "https://example.com/batch-1",
                 "2026-03-10T09:00:00Z",
+                "2026-03-10T09:05:00Z",
                 NewsStatus.INGESTED,
                 null);
         NewsEvent analyzed = newsEvent(
@@ -272,6 +381,7 @@ class NewsQueryServiceTest {
                 "Reuters",
                 "https://example.com/batch-2",
                 "2026-03-10T09:05:00Z",
+                "2026-03-10T09:06:00Z",
                 NewsStatus.ANALYZED,
                 analyzedResult());
         NewsEvent failed = newsEvent(
@@ -281,6 +391,7 @@ class NewsQueryServiceTest {
                 "Bloomberg",
                 "https://example.com/batch-3",
                 "2026-03-10T09:10:00Z",
+                "2026-03-10T09:11:00Z",
                 NewsStatus.FAILED,
                 null);
 
@@ -299,7 +410,7 @@ class NewsQueryServiceTest {
     }
 
     private NewsEvent newsEvent(String id, String title, String summary, String source, String url,
-            String publishedAt, NewsStatus status, AnalysisResult analysisResult) {
+            String publishedAt, String ingestedAt, NewsStatus status, AnalysisResult analysisResult) {
         return new NewsEvent(
                 id,
                 null,
@@ -308,7 +419,7 @@ class NewsQueryServiceTest {
                 source,
                 url,
                 Instant.parse(publishedAt),
-                Instant.parse(publishedAt),
+                Instant.parse(ingestedAt),
                 status,
                 analysisResult
         );
