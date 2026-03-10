@@ -13,6 +13,24 @@
         </div>
     </section>
 
+    <section class="mb-3">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="text-secondary small">Filter</span>
+            <a class="btn btn-sm"
+               th:classappend="${#strings.isEmpty(selectedStatus) ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news}">All</a>
+            <a class="btn btn-sm"
+               th:classappend="${selectedStatus == 'INGESTED' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status='INGESTED')}">Ingested</a>
+            <a class="btn btn-sm"
+               th:classappend="${selectedStatus == 'ANALYZED' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status='ANALYZED')}">Analyzed</a>
+            <a class="btn btn-sm"
+               th:classappend="${selectedStatus == 'FAILED' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status='FAILED')}">Failed</a>
+        </div>
+    </section>
+
     <section>
         <div class="table-responsive">
             <table class="table table-sm table-striped align-middle mb-0">
@@ -57,12 +75,14 @@
                                 <form th:action="@{'/admin/news/' + ${news.id} + '/reinterpret'}" method="post" class="d-inline">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <input type="hidden" name="returnTo" value="/news"/>
+                                    <input type="hidden" name="status" th:value="${selectedStatus}"/>
                                     <button type="submit" class="btn btn-sm btn-outline-warning">Re-interpret</button>
                                 </form>
                                 <form th:action="@{'/admin/news/' + ${news.id} + '/delete'}" method="post" class="d-inline"
                                       onsubmit="return confirm('Delete this news item?');">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <input type="hidden" name="returnTo" value="/news"/>
+                                    <input type="hidden" name="status" th:value="${selectedStatus}"/>
                                     <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                 </form>
                             </th:block>

@@ -179,6 +179,7 @@ public class AdminNewsController {
     }
 
     private String resolveAdminRedirect(String returnTo, String status) {
+        String normalizedStatus = normalizeStatus(status);
         String basePath;
         if (NEWS_PAGE.equals(returnTo)) {
             basePath = NEWS_PAGE;
@@ -187,8 +188,11 @@ public class AdminNewsController {
         } else {
             basePath = MANUAL_PAGE;
         }
-        return MANUAL_PAGE.equals(basePath) || AUTO_PAGE.equals(basePath)
-                ? (StringUtils.hasText(status) ? basePath + "?status=" + status : basePath)
-                : basePath;
+        return StringUtils.hasText(normalizedStatus) ? basePath + "?status=" + normalizedStatus : basePath;
+    }
+
+    private String normalizeStatus(String status) {
+        NewsStatus newsStatus = resolveStatus(status);
+        return newsStatus == null ? "" : newsStatus.name();
     }
 }

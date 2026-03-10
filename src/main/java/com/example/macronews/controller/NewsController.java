@@ -1,5 +1,6 @@
 package com.example.macronews.controller;
 
+import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.service.news.NewsQueryService;
@@ -8,9 +9,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -22,14 +25,16 @@ public class NewsController {
     private final NewsQueryService newsQueryService;
 
     @GetMapping
-    public String list(Model model) {
-        List<NewsListItemDto> newsItems = newsQueryService.getRecentNews();
+    public String list(@RequestParam(name = "status", required = false) String status, Model model) {
+        NewsStatus selectedStatus = resolveStatus(status);
+        List<NewsListItemDto> newsItems = newsQueryService.getRecentNews(selectedStatus);
         model.addAttribute("newsItems", newsItems);
+        model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());
         model.addAttribute("pageTitle", "Macro News");
         model.addAttribute("pageDescription", "Recent macro news with AI interpretation status.");
         model.addAttribute("ogTitle", "Macro News");
         model.addAttribute("ogDescription", "Recent macro news with AI interpretation status.");
-        log.debug("Rendering news list page with {} entries", newsItems.size());
+        log.debug("Rendering news list page with {} entries statusFilter={}", newsItems.size(), selectedStatus);
         return "news/list";
     }
 
@@ -53,5 +58,17 @@ public class NewsController {
         model.addAttribute("ogUrl", "/news/" + newsDetail.id());
         log.debug("Rendering news detail page for id={}", id);
         return "news/detail";
+    }
+
+    private NewsStatus resolveStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+        try {
+            return NewsStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            log.debug("Ignoring unsupported news list status filter={}", status);
+            return null;
+        }
     }
 }
