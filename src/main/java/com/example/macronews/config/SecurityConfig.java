@@ -21,6 +21,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.util.StringUtils;
 
 @Slf4j
 @Configuration
@@ -32,7 +33,7 @@ public class SecurityConfig {
     private final LoggingAuthenticationFailureHandler loggingAuthenticationFailureHandler;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) {
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         log.info(
                 "Configuring SecurityFilterChain with authentication, CSRF protection, and role-based access control");
         http
@@ -59,7 +60,14 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .loginProcessingUrl("/login")
-                        .defaultSuccessUrl("/news", true)
+                        .successHandler((request, response, authentication) -> {
+                            String continueUrl = request.getParameter("continue");
+                            if (StringUtils.hasText(continueUrl) && continueUrl.startsWith("/")) {
+                                response.sendRedirect(continueUrl);
+                                return;
+                            }
+                            response.sendRedirect("/news");
+                        })
                         .failureHandler(loggingAuthenticationFailureHandler)
                         .permitAll())
                 .logout(logout -> logout.logoutSuccessUrl("/news"))

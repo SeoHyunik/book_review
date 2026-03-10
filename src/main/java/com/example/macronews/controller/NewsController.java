@@ -1,14 +1,18 @@
 package com.example.macronews.controller;
 
+import com.example.macronews.dto.NewsDetailDto;
+import com.example.macronews.service.auth.AnonymousDetailViewGateService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.MarketSignalOverviewDto;
-import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
 import java.util.List;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
@@ -25,6 +29,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class NewsController {
 
     private final NewsQueryService newsQueryService;
+    private final AnonymousDetailViewGateService anonymousDetailViewGateService;
 
     @GetMapping
     public String list(@RequestParam(name = "status", required = false) String status,
@@ -49,12 +54,25 @@ public class NewsController {
     }
 
     @GetMapping("/{id}")
-    public String detail(@PathVariable String id, Model model, RedirectAttributes redirectAttributes) {
+    public String detail(@PathVariable String id,
+            Authentication authentication,
+            HttpSession session,
+            Model model,
+            RedirectAttributes redirectAttributes) {
         NewsDetailDto newsDetail = newsQueryService.getNewsDetail(id).orElse(null);
         if (newsDetail == null) {
             log.warn("News detail requested with invalid id={}", id);
             redirectAttributes.addFlashAttribute("errorMessage", "News event not found.");
             return "redirect:/news";
+        }
+
+        if (isAnonymous(authentication) && !anonymousDetailViewGateService.canAccess(id, session)) {
+            redirectAttributes.addAttribute("continue", "/news/" + id);
+            redirectAttributes.addAttribute("gated", "1");
+            return "redirect:/login";
+        }
+        if (isAnonymous(authentication)) {
+            anonymousDetailViewGateService.recordAccess(id, session);
         }
 
         model.addAttribute("newsDetail", newsDetail);
@@ -68,6 +86,12 @@ public class NewsController {
         model.addAttribute("ogUrl", "/news/" + newsDetail.id());
         log.debug("Rendering news detail page for id={}", id);
         return "news/detail";
+    }
+
+    private boolean isAnonymous(Authentication authentication) {
+        return authentication == null
+                || authentication instanceof AnonymousAuthenticationToken
+                || !authentication.isAuthenticated();
     }
 
     private NewsStatus resolveStatus(String status) {
