@@ -186,6 +186,51 @@ class NewsQueryServiceTest {
         assertThat(results.get(1).hasUrl()).isFalse();
     }
 
+    @Test
+    @DisplayName("Auto ingestion snapshot should summarize current batch status counts")
+    void getAutoIngestionBatchStatus_summarizesBatch() {
+        NewsEvent ingested = newsEvent(
+                "batch-1",
+                "Korea export data improves",
+                "Exports picked up this month.",
+                "Yonhap",
+                "https://example.com/batch-1",
+                "2026-03-10T09:00:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent analyzed = newsEvent(
+                "batch-2",
+                "KOSPI rises on tech strength",
+                "Samsung and SK hynix advanced.",
+                "Reuters",
+                "https://example.com/batch-2",
+                "2026-03-10T09:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+        NewsEvent failed = newsEvent(
+                "batch-3",
+                "Oil prices climb",
+                "Energy costs moved higher.",
+                "Bloomberg",
+                "https://example.com/batch-3",
+                "2026-03-10T09:10:00Z",
+                NewsStatus.FAILED,
+                null);
+
+        given(newsEventRepository.findAllById(List.of("batch-1", "batch-2", "batch-3")))
+                .willReturn(List.of(analyzed, failed, ingested));
+
+        var snapshot = newsQueryService.getAutoIngestionBatchStatus(10, 3, List.of("batch-1", "batch-2", "batch-3"));
+
+        assertThat(snapshot.requestedCount()).isEqualTo(10);
+        assertThat(snapshot.returnedCount()).isEqualTo(3);
+        assertThat(snapshot.ingestedCount()).isEqualTo(1);
+        assertThat(snapshot.analyzedCount()).isEqualTo(1);
+        assertThat(snapshot.failedCount()).isEqualTo(1);
+        assertThat(snapshot.items()).extracting(item -> item.id())
+                .containsExactly("batch-1", "batch-2", "batch-3");
+    }
+
     private NewsEvent newsEvent(String id, String title, String summary, String source, String url,
             String publishedAt, NewsStatus status, AnalysisResult analysisResult) {
         return new NewsEvent(

@@ -2,6 +2,7 @@ package com.example.macronews.controller;
 
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
+import com.example.macronews.dto.AutoIngestionBatchStatusDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
@@ -10,6 +11,7 @@ import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -64,6 +66,7 @@ public class AdminNewsController {
         NewsStatus selectedStatus = resolveStatus(status);
         List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews(selectedStatus);
         populateAdminListModel(model, recentNewsItems, selectedStatus);
+        populateAutoBatchStatus(model);
         model.addAttribute("pageTitle", "Admin News Automatic Ingestion");
         model.addAttribute("newsApiConfigured", newsApiService.isConfigured());
         log.debug("Rendering admin automatic news ingestion form with {} recent items", recentNewsItems.size());
@@ -147,6 +150,9 @@ public class AdminNewsController {
             List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(pageSize);
             redirectAttributes.addFlashAttribute("successMessage",
                     "External ingestion completed. total=" + ingested.size());
+            redirectAttributes.addFlashAttribute("autoBatchRequestedCount", pageSize);
+            redirectAttributes.addFlashAttribute("autoBatchReturnedCount", ingested.size());
+            redirectAttributes.addFlashAttribute("autoBatchItemIds", ingested.stream().map(NewsEvent::id).toList());
         } catch (RuntimeException ex) {
             log.error("Admin external ingestion failed", ex);
             redirectAttributes.addFlashAttribute("errorMessage",
@@ -164,6 +170,33 @@ public class AdminNewsController {
         model.addAttribute("recentNewsItems", recentNewsItems);
         model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());
         model.addAttribute("statusOptions", Arrays.stream(NewsStatus.values()).map(Enum::name).toList());
+    }
+
+    private void populateAutoBatchStatus(Model model) {
+        Map<String, Object> attributes = model.asMap();
+        Integer requestedCount = asInteger(attributes.get("autoBatchRequestedCount"));
+        Integer returnedCount = asInteger(attributes.get("autoBatchReturnedCount"));
+        List<String> itemIds = asStringList(attributes.get("autoBatchItemIds"));
+        if (requestedCount == null || returnedCount == null || itemIds.isEmpty()) {
+            return;
+        }
+        AutoIngestionBatchStatusDto autoBatchStatus =
+                newsQueryService.getAutoIngestionBatchStatus(requestedCount, returnedCount, itemIds);
+        model.addAttribute("autoBatchStatus", autoBatchStatus);
+    }
+
+    private Integer asInteger(Object value) {
+        return value instanceof Integer integer ? integer : null;
+    }
+
+    private List<String> asStringList(Object value) {
+        if (!(value instanceof List<?> items)) {
+            return List.of();
+        }
+        return items.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .toList();
     }
 
     private NewsStatus resolveStatus(String status) {

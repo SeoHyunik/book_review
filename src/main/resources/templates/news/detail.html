@@ -7,7 +7,7 @@
             <h1 class="h3 fw-bold mb-1" th:text="${newsDetail.title ?: 'News Title'}">News Title</h1>
             <p class="text-secondary mb-0"><span th:text="${newsDetail.source ?: '-'}">Source</span></p>
         </div>
-        <a class="btn btn-outline-primary" th:href="@{/news}">Back to List</a>
+        <a class="btn btn-sm btn-outline-primary text-nowrap" th:href="@{/news}">Back to List</a>
     </section>
 
     <section class="card border-0 shadow-sm mb-4">

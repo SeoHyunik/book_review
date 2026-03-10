@@ -3,13 +3,19 @@ package com.example.macronews.service.news;
 import com.example.macronews.domain.MacroImpact;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
+import com.example.macronews.dto.AutoIngestionBatchStatusDto;
 import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.repository.NewsEventRepository;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -38,6 +44,35 @@ public class NewsQueryService {
                 .limit(20)
                 .map(this::toListItem)
                 .toList();
+    }
+
+    public AutoIngestionBatchStatusDto getAutoIngestionBatchStatus(int requestedCount, int returnedCount, List<String> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            return new AutoIngestionBatchStatusDto(requestedCount, returnedCount, 0, 0, 0, List.of());
+        }
+
+        Map<String, NewsEvent> eventsById = StreamSupport
+                .stream(newsEventRepository.findAllById(itemIds).spliterator(), false)
+                .collect(Collectors.toMap(NewsEvent::id, Function.identity()));
+
+        List<NewsListItemDto> items = itemIds.stream()
+                .map(eventsById::get)
+                .filter(Objects::nonNull)
+                .map(this::toListItem)
+                .toList();
+
+        int ingestedCount = countByStatus(items, NewsStatus.INGESTED);
+        int analyzedCount = countByStatus(items, NewsStatus.ANALYZED);
+        int failedCount = countByStatus(items, NewsStatus.FAILED);
+
+        return new AutoIngestionBatchStatusDto(
+                requestedCount,
+                returnedCount,
+                ingestedCount,
+                analyzedCount,
+                failedCount,
+                items
+        );
     }
 
     @Cacheable(cacheNames = "newsDetail", key = "#id")
@@ -169,5 +204,9 @@ public class NewsQueryService {
 
     private String normalize(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private int countByStatus(List<NewsListItemDto> items, NewsStatus status) {
+        return (int) items.stream().filter(item -> item.status() == status).count();
     }
 }
