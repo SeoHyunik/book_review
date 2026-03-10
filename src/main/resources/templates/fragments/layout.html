@@ -47,7 +47,10 @@
             <ul class="navbar-nav ms-auto gap-lg-2 align-items-lg-center">
                 <li class="nav-item"><a class="nav-link" th:href="@{/news}">News</a></li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
-                    <a class="btn btn-light text-primary fw-semibold ms-lg-2" th:href="@{/admin/news}">Admin News</a>
+                    <a class="nav-link" th:href="@{/admin/news/manual}">Admin Manual</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('ADMIN')">
+                    <a class="btn btn-light text-primary fw-semibold ms-lg-1" th:href="@{/admin/news/auto}">Admin Auto</a>
                 </li>
                 <li class="nav-item" sec:authorize="isAnonymous()">
                     <a class="nav-link" th:href="@{/login}">Login</a>

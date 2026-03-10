@@ -38,15 +38,29 @@ public class AdminNewsController {
 
     @GetMapping
     public String ingestForm(Model model) {
+        return "redirect:/admin/news/manual";
+    }
+
+    @GetMapping("/manual")
+    public String manualIngestForm(Model model) {
         if (!model.containsAttribute("adminIngestionRequest")) {
             model.addAttribute("adminIngestionRequest", AdminIngestionRequest.empty());
         }
         List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews();
         model.addAttribute("recentNewsItems", recentNewsItems);
-        model.addAttribute("pageTitle", "Admin News Ingestion");
+        model.addAttribute("pageTitle", "Admin News Manual Ingestion");
+        log.debug("Rendering admin manual news ingestion form with {} recent items", recentNewsItems.size());
+        return "admin/news/ingest-manual";
+    }
+
+    @GetMapping("/auto")
+    public String autoIngestForm(Model model) {
+        List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews();
+        model.addAttribute("recentNewsItems", recentNewsItems);
+        model.addAttribute("pageTitle", "Admin News Automatic Ingestion");
         model.addAttribute("newsApiConfigured", newsApiService.isConfigured());
-        log.debug("Rendering admin news ingestion form with {} recent items", recentNewsItems.size());
-        return "admin/news/ingest";
+        log.debug("Rendering admin automatic news ingestion form with {} recent items", recentNewsItems.size());
+        return "admin/news/ingest-api";
     }
 
     @PostMapping("/ingest")
@@ -68,13 +82,13 @@ public class AdminNewsController {
             List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(limit);
             redirectAttributes.addFlashAttribute("successMessage",
                     "External ingestion completed. total=" + ingested.size());
-            return "redirect:/admin/news";
+            return "redirect:/admin/news/manual";
         } catch (RuntimeException ex) {
             log.error("Admin news ingestion failed", ex);
             redirectAttributes.addFlashAttribute("errorMessage",
                     "News ingestion failed. Please try again.");
             redirectAttributes.addFlashAttribute("adminIngestionRequest", request);
-            return "redirect:/admin/news";
+            return "redirect:/admin/news/manual";
         }
     }
 
@@ -91,7 +105,7 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("errorMessage",
                     "Re-interpretation failed. id=" + id);
         }
-        return "redirect:/admin/news";
+        return "redirect:/admin/news/manual";
     }
 
     @PostMapping("/ingest-api")
@@ -102,7 +116,7 @@ public class AdminNewsController {
                 log.info("Admin external ingestion skipped because news.api.key is not configured");
                 redirectAttributes.addFlashAttribute("warningMessage",
                         "Automatic ingestion requires external news API configuration (news.api.key). Manual ingestion is still available.");
-                return "redirect:/admin/news";
+                return "redirect:/admin/news/auto";
             }
 
             List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(pageSize);
@@ -113,7 +127,7 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("errorMessage",
                     "External ingestion failed. Please check logs/config.");
         }
-        return "redirect:/admin/news";
+        return "redirect:/admin/news/auto";
     }
 
     private boolean hasManualPayload(AdminIngestionRequest request) {

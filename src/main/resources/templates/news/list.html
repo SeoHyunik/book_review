@@ -7,7 +7,10 @@
             <h1 class="h3 fw-bold mb-1">Macro News</h1>
             <p class="text-secondary mb-0">Recent ingested and interpreted news events.</p>
         </div>
-        <a class="btn btn-outline-primary" th:href="@{/admin/news}" sec:authorize="hasRole('ADMIN')">Admin Ingestion</a>
+        <div class="d-flex flex-wrap gap-2" sec:authorize="hasRole('ADMIN')">
+            <a class="btn btn-outline-primary" th:href="@{/admin/news/manual}">Manual Ingestion</a>
+            <a class="btn btn-primary" th:href="@{/admin/news/auto}">Automatic Ingestion</a>
+        </div>
     </section>
 
     <section>
