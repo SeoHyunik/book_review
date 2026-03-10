@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <section class="mb-4 d-flex justify-content-between align-items-start gap-3">
+        <div>
+            <h1 class="h3 fw-bold mb-1" th:text="${newsDetail.title ?: #messages.msg('news.untitled')}">News Title</h1>
+            <p class="text-secondary mb-0" th:text="#{news.detail.subheading}">AI market interpretation built from the latest news context.</p>
+        </div>
+        <a class="btn btn-sm btn-outline-primary text-nowrap" th:href="@{/news}" th:text="#{news.detail.back}">Back to List</a>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4"
+             th:if="${newsDetail.status != null and newsDetail.status.name() == 'ANALYZED' and newsDetail.analysisResult != null}"
+             th:with="localizedSummary=${#locale.language == 'ko'
+                ? (!#strings.isEmpty(newsDetail.analysisResult.summaryKo) ? newsDetail.analysisResult.summaryKo
+                    : (!#strings.isEmpty(newsDetail.analysisResult.summaryEn) ? newsDetail.analysisResult.summaryEn : newsDetail.summary))
+                : (!#strings.isEmpty(newsDetail.analysisResult.summaryEn) ? newsDetail.analysisResult.summaryEn
+                    : (!#strings.isEmpty(newsDetail.analysisResult.summaryKo) ? newsDetail.analysisResult.summaryKo : newsDetail.summary))}">
+        <div class="card-body p-4 d-flex flex-column gap-3">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge text-bg-primary" th:text="#{news.detail.interpretationBadge}">AI Market Take</span>
+                <span th:switch="${newsDetail.status != null ? newsDetail.status.name() : 'UNKNOWN'}">
+                    <span th:case="'ANALYZED'" class="badge bg-success" th:text="#{status.analyzed}">Analyzed</span>
+                    <span th:case="'FAILED'" class="badge bg-danger" th:text="#{status.failed}">Failed</span>
+                    <span th:case="'INGESTED'" class="badge bg-secondary" th:text="#{status.ingested}">Ingested</span>
+                    <span th:case="*" class="badge bg-secondary" th:text="#{status.unknown}">Unknown</span>
+                </span>
+            </div>
+            <div>
+                <h2 class="h5 fw-bold mb-2" th:text="#{news.detail.interpretationSummary}">Interpretation Summary</h2>
+                <p class="mb-0 lh-base" th:text="${localizedSummary ?: '-'}"></p>
+            </div>
+            <div class="d-flex flex-wrap gap-3 small text-secondary border-top pt-3">
+                <div><strong class="text-body" th:text="#{news.detail.source}">Source</strong>: <span th:text="${newsDetail.source ?: '-'}">Source</span></div>
+                <div><strong class="text-body" th:text="#{news.detail.publishedAt}">Published At</strong>: <span th:text="${newsDetail.publishedAt ?: '-'}">Published</span></div>
+                <div><strong class="text-body" th:text="#{news.detail.analysisModel}">Analysis Model</strong>: <span th:text="${newsDetail.analysisResult.model ?: '-'}">Model</span></div>
+                <div th:if="${newsDetail.url != null and !#strings.isEmpty(newsDetail.url)}"><strong class="text-body" th:text="#{news.detail.url}">URL</strong>: <a th:href="${newsDetail.url}" target="_blank" rel="noopener noreferrer" th:text="#{news.detail.openSource}">Open source</a></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4"
+             th:if="${newsDetail.status != null and newsDetail.status.name() == 'INGESTED'}">
+        <div class="card-body text-secondary" th:text="#{news.detail.pending}">
+            Analysis is pending for this event.
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4"
+             th:if="${newsDetail.status != null and newsDetail.status.name() == 'FAILED'}">
+        <div class="card-body text-danger" th:text="#{news.detail.failed}">
+            Analysis failed for this event.
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4"
+             th:if="${newsDetail.status == null or newsDetail.status.name() != 'ANALYZED' or newsDetail.analysisResult == null}">
+        <div class="card-body d-flex flex-column gap-3">
+            <div class="d-flex flex-wrap gap-3 small text-secondary">
+                <div><strong class="text-body" th:text="#{news.detail.source}">Source</strong>: <span th:text="${newsDetail.source ?: '-'}">Source</span></div>
+                <div><strong class="text-body" th:text="#{news.detail.publishedAt}">Published At</strong>: <span th:text="${newsDetail.publishedAt ?: '-'}">Published</span></div>
+                <div>
+                    <strong class="text-body" th:text="#{news.detail.status}">Status</strong>:
+                    <span th:switch="${newsDetail.status != null ? newsDetail.status.name() : 'UNKNOWN'}">
+                        <span th:case="'ANALYZED'" class="badge bg-success" th:text="#{status.analyzed}">Analyzed</span>
+                        <span th:case="'FAILED'" class="badge bg-danger" th:text="#{status.failed}">Failed</span>
+                        <span th:case="'INGESTED'" class="badge bg-secondary" th:text="#{status.ingested}">Ingested</span>
+                        <span th:case="*" class="badge bg-secondary" th:text="#{status.unknown}">Unknown</span>
+                    </span>
+                </div>
+                <div th:if="${newsDetail.url != null and !#strings.isEmpty(newsDetail.url)}"><strong class="text-body" th:text="#{news.detail.url}">URL</strong>: <a th:href="${newsDetail.url}" target="_blank" rel="noopener noreferrer" th:text="#{news.detail.openSource}">Open source</a></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h2 class="h6 fw-bold mb-2" th:text="#{news.detail.originalSummary}">Original News Summary</h2>
+            <p class="mb-0 text-secondary lh-base" th:text="${newsDetail.summary ?: '-'}"></p>
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4"
+             th:if="${newsDetail.status != null and newsDetail.status.name() == 'ANALYZED' and newsDetail.analysisResult != null}">
+        <div class="card-body d-flex flex-column gap-4">
+            <div>
+                <h3 class="h6 fw-bold mb-2" th:text="#{news.detail.macroImpacts}">Macro Signals</h3>
+                <div th:if="${newsDetail.analysisResult.macroImpacts == null or #lists.isEmpty(newsDetail.analysisResult.macroImpacts)}" class="text-secondary" th:text="#{news.detail.noMacroImpacts}">No macro impacts.</div>
+                <div class="table-responsive" th:if="${newsDetail.analysisResult.macroImpacts != null and !#lists.isEmpty(newsDetail.analysisResult.macroImpacts)}">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th th:text="#{news.detail.variable}">Variable</th>
+                            <th th:text="#{news.detail.direction}">Direction</th>
+                            <th class="text-end" th:text="#{news.detail.confidence}">Likelihood</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="impact : ${newsDetail.analysisResult.macroImpacts}">
+                            <td th:text="${impact.variable ?: '-'}"></td>
+                            <td th:text="${impact.direction ?: '-'}"></td>
+                            <td class="text-end" th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="h6 fw-bold mb-2" th:text="#{news.detail.marketImpacts}">Market Signals</h3>
+                <div th:if="${newsDetail.analysisResult.marketImpacts == null or #lists.isEmpty(newsDetail.analysisResult.marketImpacts)}" class="text-secondary" th:text="#{news.detail.noMarketImpacts}">No market impacts.</div>
+                <div class="table-responsive" th:if="${newsDetail.analysisResult.marketImpacts != null and !#lists.isEmpty(newsDetail.analysisResult.marketImpacts)}">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th th:text="#{news.detail.market}">Market</th>
+                            <th th:text="#{news.detail.direction}">Direction</th>
+                            <th class="text-end" th:text="#{news.detail.confidence}">Likelihood</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="impact : ${newsDetail.analysisResult.marketImpacts}">
+                            <td th:text="${impact.market ?: '-'}"></td>
+                            <td th:text="${impact.direction ?: '-'}"></td>
+                            <td class="text-end" th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm"
+             th:if="${newsDetail.status != null and newsDetail.status.name() == 'ANALYZED' and newsDetail.analysisResult == null}">
+        <div class="card-body text-secondary" th:text="#{news.detail.analysisMissing}">
+            Analysis result is missing for this event.
+        </div>
+    </section>
+</th:block>
+</html>
