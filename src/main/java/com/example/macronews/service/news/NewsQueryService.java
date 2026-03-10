@@ -2,6 +2,7 @@ package com.example.macronews.service.news;
 
 import com.example.macronews.domain.MacroImpact;
 import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.repository.NewsEventRepository;
@@ -21,12 +22,20 @@ public class NewsQueryService {
     private final NewsEventRepository newsEventRepository;
 
     public List<NewsListItemDto> getRecentNews() {
-        return newsEventRepository.findTop20ByOrderByPublishedAtDesc()
-                .stream()
+        return getRecentNews(null);
+    }
+
+    public List<NewsListItemDto> getRecentNews(NewsStatus status) {
+        List<NewsEvent> candidates = status == null
+                ? newsEventRepository.findTop20ByOrderByPublishedAtDesc()
+                : newsEventRepository.findByStatus(status);
+
+        return candidates.stream()
                 .sorted(Comparator
                         .comparingInt(this::calculatePriorityScore)
                         .reversed()
                         .thenComparing(NewsEvent::publishedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(20)
                 .map(this::toListItem)
                 .toList();
     }
@@ -45,6 +54,7 @@ public class NewsQueryService {
                 event.publishedAt(),
                 event.status(),
                 hasAnalysis,
+                StringUtils.hasText(event.url()),
                 buildMacroSummary(event),
                 calculatePriorityScore(event)
         );

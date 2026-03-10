@@ -1,12 +1,14 @@
 package com.example.macronews.controller;
 
 import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.news.NewsApiService;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
+import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,21 +46,23 @@ public class AdminNewsController {
     }
 
     @GetMapping("/manual")
-    public String manualIngestForm(Model model) {
+    public String manualIngestForm(@RequestParam(name = "status", required = false) String status, Model model) {
         if (!model.containsAttribute("adminIngestionRequest")) {
             model.addAttribute("adminIngestionRequest", AdminIngestionRequest.empty());
         }
-        List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews();
-        model.addAttribute("recentNewsItems", recentNewsItems);
+        NewsStatus selectedStatus = resolveStatus(status);
+        List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews(selectedStatus);
+        populateAdminListModel(model, recentNewsItems, selectedStatus);
         model.addAttribute("pageTitle", "Admin News Manual Ingestion");
         log.debug("Rendering admin manual news ingestion form with {} recent items", recentNewsItems.size());
         return "admin/news/ingest-manual";
     }
 
     @GetMapping("/auto")
-    public String autoIngestForm(Model model) {
-        List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews();
-        model.addAttribute("recentNewsItems", recentNewsItems);
+    public String autoIngestForm(@RequestParam(name = "status", required = false) String status, Model model) {
+        NewsStatus selectedStatus = resolveStatus(status);
+        List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews(selectedStatus);
+        populateAdminListModel(model, recentNewsItems, selectedStatus);
         model.addAttribute("pageTitle", "Admin News Automatic Ingestion");
         model.addAttribute("newsApiConfigured", newsApiService.isConfigured());
         log.debug("Rendering admin automatic news ingestion form with {} recent items", recentNewsItems.size());
@@ -95,7 +99,10 @@ public class AdminNewsController {
     }
 
     @PostMapping("/{id}/reinterpret")
-    public String reinterpret(@PathVariable String id, RedirectAttributes redirectAttributes) {
+    public String reinterpret(@PathVariable String id,
+            @RequestParam(name = "returnTo", required = false) String returnTo,
+            @RequestParam(name = "status", required = false) String status,
+            RedirectAttributes redirectAttributes) {
         log.info("[ADMIN] reinterpret requested id={}", id);
         try {
             NewsEvent interpreted = macroAiService.interpretAndSave(id);
@@ -107,12 +114,13 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("errorMessage",
                     "Re-interpretation failed. id=" + id);
         }
-        return "redirect:" + MANUAL_PAGE;
+        return "redirect:" + resolveAdminRedirect(returnTo, status);
     }
 
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable String id,
             @RequestParam(name = "returnTo", required = false) String returnTo,
+            @RequestParam(name = "status", required = false) String status,
             RedirectAttributes redirectAttributes) {
         log.info("[ADMIN] delete requested id={}", id);
         boolean deleted = newsIngestionService.deleteById(id);
@@ -121,7 +129,7 @@ public class AdminNewsController {
         } else {
             redirectAttributes.addFlashAttribute("warningMessage", "News item not found. id=" + id);
         }
-        return "redirect:" + resolveAdminRedirect(returnTo);
+        return "redirect:" + resolveAdminRedirect(returnTo, status);
     }
 
     @PostMapping("/ingest-api")
@@ -151,7 +159,26 @@ public class AdminNewsController {
                 && StringUtils.hasText(request.title());
     }
 
-    private String resolveAdminRedirect(String returnTo) {
-        return AUTO_PAGE.equals(returnTo) ? AUTO_PAGE : MANUAL_PAGE;
+    private void populateAdminListModel(Model model, List<NewsListItemDto> recentNewsItems, NewsStatus selectedStatus) {
+        model.addAttribute("recentNewsItems", recentNewsItems);
+        model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());
+        model.addAttribute("statusOptions", Arrays.stream(NewsStatus.values()).map(Enum::name).toList());
+    }
+
+    private NewsStatus resolveStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+        try {
+            return NewsStatus.valueOf(status.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            log.debug("Ignoring unsupported admin status filter={}", status);
+            return null;
+        }
+    }
+
+    private String resolveAdminRedirect(String returnTo, String status) {
+        String basePath = AUTO_PAGE.equals(returnTo) ? AUTO_PAGE : MANUAL_PAGE;
+        return StringUtils.hasText(status) ? basePath + "?status=" + status : basePath;
     }
 }

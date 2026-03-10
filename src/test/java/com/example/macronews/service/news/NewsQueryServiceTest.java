@@ -3,6 +3,7 @@ package com.example.macronews.service.news;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
+import com.example.macronews.domain.AnalysisResult;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.repository.NewsEventRepository;
@@ -32,13 +33,19 @@ class NewsQueryServiceTest {
                 "South Korea semiconductor exports rise as Samsung memory demand jumps",
                 "Korea chip and memory producers benefit from export recovery.",
                 "Yonhap",
-                "2026-03-10T09:00:00Z");
+                "https://example.com/korea-semiconductor",
+                "2026-03-10T09:00:00Z",
+                NewsStatus.INGESTED,
+                null);
         NewsEvent genericUsMarket = newsEvent(
                 "generic-us-market",
                 "US stocks close mixed ahead of earnings",
                 "Wall Street indices were mixed in regular trading.",
                 "Reuters",
-                "2026-03-10T10:00:00Z");
+                "https://example.com/generic-us-market",
+                "2026-03-10T10:00:00Z",
+                NewsStatus.INGESTED,
+                null);
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
                 .willReturn(List.of(genericUsMarket, koreaSemiconductor));
@@ -58,13 +65,19 @@ class NewsQueryServiceTest {
                 "Korea export outlook improves as trade demand recovers",
                 "South Korea exporters see stronger shipments to China and the US.",
                 "Korea Times",
-                "2026-03-10T07:00:00Z");
+                "https://example.com/korea-trade",
+                "2026-03-10T07:00:00Z",
+                NewsStatus.INGESTED,
+                null);
         NewsEvent genericMacro = newsEvent(
                 "generic-macro",
                 "Global inflation expectations steady before central bank comments",
                 "Investors await fresh macro signals this week.",
                 "Bloomberg",
-                "2026-03-10T11:00:00Z");
+                "https://example.com/generic-macro",
+                "2026-03-10T11:00:00Z",
+                NewsStatus.INGESTED,
+                null);
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
                 .willReturn(List.of(genericMacro, koreaTrade));
@@ -84,13 +97,19 @@ class NewsQueryServiceTest {
                 "KOSPI rebounds on foreign buying after policy signals",
                 "Foreign investors returned to Korean equities.",
                 "Yonhap",
-                "2026-03-10T08:00:00Z");
+                "https://example.com/kospi-boosted",
+                "2026-03-10T08:00:00Z",
+                NewsStatus.INGESTED,
+                null);
         NewsEvent genericKoreaHeadline = newsEvent(
                 "generic-korea",
                 "Korea market rebounds on foreign buying after policy signals",
                 "Foreign investors returned to Korean equities.",
                 "Yonhap",
-                "2026-03-10T08:30:00Z");
+                "https://example.com/generic-korea",
+                "2026-03-10T08:30:00Z",
+                NewsStatus.INGESTED,
+                null);
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
                 .willReturn(List.of(genericKoreaHeadline, kospiHeadline));
@@ -109,13 +128,19 @@ class NewsQueryServiceTest {
                 "Korea semiconductor demand improves on AI orders",
                 "Samsung and SK hynix benefit from chip demand.",
                 "Reuters",
-                "2026-03-10T05:00:00Z");
+                "https://example.com/older-korea-chip",
+                "2026-03-10T05:00:00Z",
+                NewsStatus.INGESTED,
+                null);
         NewsEvent newer = newsEvent(
                 "newer-korea-chip",
                 "Korea semiconductor demand improves on AI orders",
                 "Samsung and SK hynix benefit from chip demand.",
                 "Reuters",
-                "2026-03-10T06:00:00Z");
+                "https://example.com/newer-korea-chip",
+                "2026-03-10T06:00:00Z",
+                NewsStatus.INGESTED,
+                null);
 
         given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
                 .willReturn(List.of(older, newer));
@@ -127,18 +152,57 @@ class NewsQueryServiceTest {
         assertThat(orderedIds).containsExactly("newer-korea-chip", "older-korea-chip");
     }
 
-    private NewsEvent newsEvent(String id, String title, String summary, String source, String publishedAt) {
+    @Test
+    @DisplayName("Status filter should use matching repository query and expose cheap signals")
+    void getRecentNews_filtersByStatusAndExposesSignals() {
+        NewsEvent analyzedWithUrl = newsEvent(
+                "analyzed-news",
+                "Korea battery export gains momentum",
+                "Battery makers benefit from export demand.",
+                "Yonhap",
+                "https://example.com/analyzed-news",
+                "2026-03-10T09:30:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+        NewsEvent analyzedWithoutUrl = newsEvent(
+                "analyzed-no-url",
+                "Korea auto makers watch trade talks",
+                "Manufacturers monitor export conditions.",
+                "Reuters",
+                "",
+                "2026-03-10T08:30:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(analyzedWithoutUrl, analyzedWithUrl));
+
+        var results = newsQueryService.getRecentNews(NewsStatus.ANALYZED);
+
+        assertThat(results).hasSize(2);
+        assertThat(results).allMatch(item -> item.status() == NewsStatus.ANALYZED);
+        assertThat(results.get(0).hasAnalysis()).isTrue();
+        assertThat(results.get(0).hasUrl()).isTrue();
+        assertThat(results.get(1).hasUrl()).isFalse();
+    }
+
+    private NewsEvent newsEvent(String id, String title, String summary, String source, String url,
+            String publishedAt, NewsStatus status, AnalysisResult analysisResult) {
         return new NewsEvent(
                 id,
                 null,
                 title,
                 summary,
                 source,
-                "https://example.com/" + id,
+                url,
                 Instant.parse(publishedAt),
                 Instant.parse(publishedAt),
-                NewsStatus.INGESTED,
-                null
+                status,
+                analysisResult
         );
+    }
+
+    private AnalysisResult analyzedResult() {
+        return new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), List.of(), List.of());
     }
 }

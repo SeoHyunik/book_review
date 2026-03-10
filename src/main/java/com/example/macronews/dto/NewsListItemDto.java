@@ -10,6 +10,7 @@ public record NewsListItemDto(
         Instant publishedAt,
         NewsStatus status,
         boolean hasAnalysis,
+        boolean hasUrl,
         String macroSummary,
         int priorityScore
 ) {
