@@ -14,6 +14,7 @@ public class GlobalUiModelAttributes {
     public void addLocaleAttributes(Model model, HttpServletRequest request, Locale locale) {
         model.addAttribute("currentPath", request.getRequestURI());
         model.addAttribute("currentStatus", request.getParameter("status"));
+        model.addAttribute("currentSort", request.getParameter("sort"));
         model.addAttribute("currentLang", locale.getLanguage());
     }
 }
