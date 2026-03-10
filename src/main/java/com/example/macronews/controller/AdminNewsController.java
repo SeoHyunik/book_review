@@ -66,11 +66,22 @@ public class AdminNewsController {
         NewsStatus selectedStatus = resolveStatus(status);
         List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews(selectedStatus);
         populateAdminListModel(model, recentNewsItems, selectedStatus);
-        populateAutoBatchStatus(model);
+        populateAutoBatchStatusFromFlash(model);
         model.addAttribute("pageTitle", "Admin News Automatic Ingestion");
         model.addAttribute("newsApiConfigured", newsApiService.isConfigured());
         log.debug("Rendering admin automatic news ingestion form with {} recent items", recentNewsItems.size());
         return "admin/news/ingest-api";
+    }
+
+    @GetMapping("/auto/batch-status")
+    public String autoBatchStatus(
+            @RequestParam(name = "requestedCount") int requestedCount,
+            @RequestParam(name = "returnedCount") int returnedCount,
+            @RequestParam(name = "itemIds") String itemIds,
+            Model model) {
+        populateAutoBatchStatus(model, requestedCount, returnedCount, parseItemIds(itemIds));
+        model.addAttribute("autoBatchStatusUrl", "/admin/news/auto/batch-status");
+        return "admin/news/fragments/auto-batch-status :: autoBatchStatusPanel";
     }
 
     @PostMapping("/ingest")
@@ -172,7 +183,7 @@ public class AdminNewsController {
         model.addAttribute("statusOptions", Arrays.stream(NewsStatus.values()).map(Enum::name).toList());
     }
 
-    private void populateAutoBatchStatus(Model model) {
+    private void populateAutoBatchStatusFromFlash(Model model) {
         Map<String, Object> attributes = model.asMap();
         Integer requestedCount = asInteger(attributes.get("autoBatchRequestedCount"));
         Integer returnedCount = asInteger(attributes.get("autoBatchReturnedCount"));
@@ -180,9 +191,18 @@ public class AdminNewsController {
         if (requestedCount == null || returnedCount == null || itemIds.isEmpty()) {
             return;
         }
+        populateAutoBatchStatus(model, requestedCount, returnedCount, itemIds);
+    }
+
+    private void populateAutoBatchStatus(Model model, int requestedCount, int returnedCount, List<String> itemIds) {
+        if (itemIds.isEmpty()) {
+            return;
+        }
         AutoIngestionBatchStatusDto autoBatchStatus =
                 newsQueryService.getAutoIngestionBatchStatus(requestedCount, returnedCount, itemIds);
         model.addAttribute("autoBatchStatus", autoBatchStatus);
+        model.addAttribute("autoBatchItemIdsCsv", String.join(",", itemIds));
+        model.addAttribute("autoBatchStatusUrl", "/admin/news/auto/batch-status");
     }
 
     private Integer asInteger(Object value) {
@@ -196,6 +216,16 @@ public class AdminNewsController {
         return items.stream()
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
+                .toList();
+    }
+
+    private List<String> parseItemIds(String value) {
+        if (!StringUtils.hasText(value)) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
                 .toList();
     }
 
