@@ -31,7 +31,10 @@
                     <td colspan="6" class="text-secondary">No news events found.</td>
                 </tr>
                 <tr th:each="news : ${newsItems}">
-                    <td th:text="${news.title ?: 'Untitled'}"></td>
+                    <td>
+                        <div th:text="${news.title ?: 'Untitled'}"></div>
+                        <div class="text-secondary small" th:if="${news.priorityScore > 0}" th:text="${'Priority ' + news.priorityScore}"></div>
+                    </td>
                     <td th:text="${news.source ?: '-'}"></td>
                     <td th:text="${news.publishedAt ?: '-'}"></td>
                     <td>

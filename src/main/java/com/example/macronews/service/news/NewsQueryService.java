@@ -5,7 +5,9 @@ import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.repository.NewsEventRepository;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
@@ -21,6 +23,10 @@ public class NewsQueryService {
     public List<NewsListItemDto> getRecentNews() {
         return newsEventRepository.findTop20ByOrderByPublishedAtDesc()
                 .stream()
+                .sorted(Comparator
+                        .comparingInt(this::calculatePriorityScore)
+                        .reversed()
+                        .thenComparing(NewsEvent::publishedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(this::toListItem)
                 .toList();
     }
@@ -39,7 +45,8 @@ public class NewsQueryService {
                 event.publishedAt(),
                 event.status(),
                 hasAnalysis,
-                buildMacroSummary(event)
+                buildMacroSummary(event),
+                calculatePriorityScore(event)
         );
     }
 
@@ -67,5 +74,90 @@ public class NewsQueryService {
         }
         String summary = first.variable().name() + " " + first.direction().name();
         return StringUtils.hasText(summary) ? summary : "";
+    }
+
+    private int calculatePriorityScore(NewsEvent event) {
+        String title = normalize(event.title());
+        String summary = normalize(event.summary());
+        String source = normalize(event.source());
+
+        int score = 0;
+        score += scoreKeywords(title, 8,
+                "south korea", "korea", "kospi", "krw", "won");
+        score += scoreKeywords(summary, 5,
+                "south korea", "korea", "kospi", "krw", "won");
+        score += scoreKeywords(source, 3,
+                "south korea", "korea", "kospi", "krw", "won");
+
+        score += scoreKeywords(title, 6,
+                "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
+                "shipbuilding", "ai");
+        score += scoreKeywords(summary, 4,
+                "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
+                "shipbuilding", "ai");
+        score += scoreKeywords(source, 2,
+                "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
+                "shipbuilding", "ai");
+
+        score += scoreKeywords(title, 4,
+                "oil", "energy", "inflation", "cpi", "ppi", "rate", "interest rate", "fed", "usd",
+                "dollar", "fx");
+        score += scoreKeywords(summary, 3,
+                "oil", "energy", "inflation", "cpi", "ppi", "rate", "interest rate", "fed", "usd",
+                "dollar", "fx");
+        score += scoreKeywords(source, 1,
+                "oil", "energy", "inflation", "cpi", "ppi", "rate", "interest rate", "fed", "usd",
+                "dollar", "fx");
+
+        score += scoreKeywords(title, 5,
+                "tariff", "trade", "export", "china", "us", "sanctions", "defense", "geopolitics");
+        score += scoreKeywords(summary, 3,
+                "tariff", "trade", "export", "china", "us", "sanctions", "defense", "geopolitics");
+        score += scoreKeywords(source, 1,
+                "tariff", "trade", "export", "china", "us", "sanctions", "defense", "geopolitics");
+
+        if (containsKeyword(title, "korea")
+                && containsAnyKeyword(title, "semiconductor", "chip", "memory", "samsung", "sk hynix")) {
+            score += 5;
+        }
+        if (containsKeyword(summary, "korea")
+                && containsAnyKeyword(summary, "trade", "export", "china", "us", "tariff")) {
+            score += 4;
+        }
+        if (containsAnyKeyword(title, "kospi", "krw", "won")) {
+            score += 6;
+        }
+
+        return score;
+    }
+
+    private int scoreKeywords(String text, int weight, String... keywords) {
+        if (!StringUtils.hasText(text)) {
+            return 0;
+        }
+        int score = 0;
+        for (String keyword : keywords) {
+            if (containsKeyword(text, keyword)) {
+                score += weight;
+            }
+        }
+        return score;
+    }
+
+    private boolean containsAnyKeyword(String text, String... keywords) {
+        for (String keyword : keywords) {
+            if (containsKeyword(text, keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsKeyword(String text, String keyword) {
+        return StringUtils.hasText(text) && text.contains(keyword);
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 }

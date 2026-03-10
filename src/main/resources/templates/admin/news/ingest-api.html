@@ -55,7 +55,10 @@
                             <td colspan="5" class="text-secondary">No recent items.</td>
                         </tr>
                         <tr th:each="item : ${recentNewsItems}">
-                            <td th:text="${item.title ?: 'Untitled'}"></td>
+                            <td>
+                                <div th:text="${item.title ?: 'Untitled'}"></div>
+                                <div class="text-secondary small" th:if="${item.priorityScore > 0}" th:text="${'Priority ' + item.priorityScore}"></div>
+                            </td>
                             <td th:text="${item.source ?: '-'}"></td>
                             <td th:text="${item.publishedAt ?: '-'}"></td>
                             <td>
