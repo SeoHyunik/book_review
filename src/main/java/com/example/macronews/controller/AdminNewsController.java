@@ -30,6 +30,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AdminNewsController {
 
     private static final int DEFAULT_LIMIT = 10;
+    private static final String MANUAL_PAGE = "/admin/news/manual";
+    private static final String AUTO_PAGE = "/admin/news/auto";
 
     private final NewsIngestionService newsIngestionService;
     private final NewsApiService newsApiService;
@@ -38,7 +40,7 @@ public class AdminNewsController {
 
     @GetMapping
     public String ingestForm(Model model) {
-        return "redirect:/admin/news/manual";
+        return "redirect:" + MANUAL_PAGE;
     }
 
     @GetMapping("/manual")
@@ -82,13 +84,13 @@ public class AdminNewsController {
             List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(limit);
             redirectAttributes.addFlashAttribute("successMessage",
                     "External ingestion completed. total=" + ingested.size());
-            return "redirect:/admin/news/manual";
+            return "redirect:" + MANUAL_PAGE;
         } catch (RuntimeException ex) {
             log.error("Admin news ingestion failed", ex);
             redirectAttributes.addFlashAttribute("errorMessage",
                     "News ingestion failed. Please try again.");
             redirectAttributes.addFlashAttribute("adminIngestionRequest", request);
-            return "redirect:/admin/news/manual";
+            return "redirect:" + MANUAL_PAGE;
         }
     }
 
@@ -105,7 +107,21 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("errorMessage",
                     "Re-interpretation failed. id=" + id);
         }
-        return "redirect:/admin/news/manual";
+        return "redirect:" + MANUAL_PAGE;
+    }
+
+    @PostMapping("/{id}/delete")
+    public String delete(@PathVariable String id,
+            @RequestParam(name = "returnTo", required = false) String returnTo,
+            RedirectAttributes redirectAttributes) {
+        log.info("[ADMIN] delete requested id={}", id);
+        boolean deleted = newsIngestionService.deleteById(id);
+        if (deleted) {
+            redirectAttributes.addFlashAttribute("successMessage", "News item deleted. id=" + id);
+        } else {
+            redirectAttributes.addFlashAttribute("warningMessage", "News item not found. id=" + id);
+        }
+        return "redirect:" + resolveAdminRedirect(returnTo);
     }
 
     @PostMapping("/ingest-api")
@@ -116,7 +132,7 @@ public class AdminNewsController {
                 log.info("Admin external ingestion skipped because news.api.key is not configured");
                 redirectAttributes.addFlashAttribute("warningMessage",
                         "Automatic ingestion requires external news API configuration (news.api.key). Manual ingestion is still available.");
-                return "redirect:/admin/news/auto";
+                return "redirect:" + AUTO_PAGE;
             }
 
             List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(pageSize);
@@ -127,11 +143,15 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("errorMessage",
                     "External ingestion failed. Please check logs/config.");
         }
-        return "redirect:/admin/news/auto";
+        return "redirect:" + AUTO_PAGE;
     }
 
     private boolean hasManualPayload(AdminIngestionRequest request) {
         return StringUtils.hasText(request.source())
                 && StringUtils.hasText(request.title());
+    }
+
+    private String resolveAdminRedirect(String returnTo) {
+        return AUTO_PAGE.equals(returnTo) ? AUTO_PAGE : MANUAL_PAGE;
     }
 }

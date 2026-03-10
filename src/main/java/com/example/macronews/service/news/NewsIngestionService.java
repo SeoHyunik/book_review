@@ -12,4 +12,6 @@ public interface NewsIngestionService {
     List<NewsEvent> ingestTopHeadlines(int limit);
 
     NewsEvent ingestManual(AdminIngestionRequest request);
+
+    boolean deleteById(String id);
 }

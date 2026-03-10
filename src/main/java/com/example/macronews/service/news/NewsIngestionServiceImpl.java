@@ -19,6 +19,7 @@ import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -114,6 +115,19 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         NewsEvent saved = ingestExternalItem(item);
         log.info("[INGEST] manual completed id={} status={}", saved.id(), saved.status());
         return saved;
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = "newsDetail", key = "#id", beforeInvocation = true)
+    public boolean deleteById(String id) {
+        if (!StringUtils.hasText(id) || !newsEventRepository.existsById(id)) {
+            log.info("[ADMIN] delete skipped missing id={}", id);
+            return false;
+        }
+        newsEventRepository.deleteById(id);
+        log.info("[ADMIN] delete completed id={}", id);
+        return true;
     }
 
     private void submitAsyncInterpretations(List<String> eventIds) {
