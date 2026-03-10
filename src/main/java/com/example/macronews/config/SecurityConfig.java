@@ -1,6 +1,7 @@
 package com.example.macronews.config;
 
 import com.example.macronews.filter.LogUuidFilter;
+import com.example.macronews.security.ContinueAwareAuthenticationSuccessHandler;
 import com.example.macronews.security.CustomAccessDeniedHandler;
 import com.example.macronews.security.CustomUserDetailsService;
 import com.example.macronews.security.LoggingAuthenticationFailureHandler;
@@ -21,7 +22,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.util.StringUtils;
 
 @Slf4j
 @Configuration
@@ -31,6 +31,7 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
     private final LoggingAuthenticationFailureHandler loggingAuthenticationFailureHandler;
+    private final ContinueAwareAuthenticationSuccessHandler continueAwareAuthenticationSuccessHandler;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -44,6 +45,8 @@ public class SecurityConfig {
                 .authenticationProvider(daoAuthenticationProvider())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/login", "/register", "/error", "/access-denied")
+                        .permitAll()
+                        .requestMatchers("/oauth2/**", "/login/oauth2/**")
                         .permitAll()
                         .requestMatchers("/css/**", "/js/**", "/images/**", "/webjars/**")
                         .permitAll()
@@ -60,16 +63,12 @@ public class SecurityConfig {
                 .formLogin(form -> form
                         .loginPage("/login")
                         .loginProcessingUrl("/login")
-                        .successHandler((request, response, authentication) -> {
-                            String continueUrl = request.getParameter("continue");
-                            if (StringUtils.hasText(continueUrl) && continueUrl.startsWith("/")) {
-                                response.sendRedirect(continueUrl);
-                                return;
-                            }
-                            response.sendRedirect("/news");
-                        })
+                        .successHandler(continueAwareAuthenticationSuccessHandler)
                         .failureHandler(loggingAuthenticationFailureHandler)
                         .permitAll())
+                .oauth2Login(oauth2 -> oauth2
+                        .loginPage("/login")
+                        .successHandler(continueAwareAuthenticationSuccessHandler))
                 .logout(logout -> logout.logoutSuccessUrl("/news"))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"))

@@ -1,6 +1,9 @@
 package com.example.macronews.controller;
 
+import com.example.macronews.security.ContinueAwareAuthenticationSuccessHandler;
+import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
@@ -11,11 +14,32 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Controller
 public class LoginController {
 
+    private final Environment environment;
+
+    public LoginController(Environment environment) {
+        this.environment = environment;
+    }
+
     @GetMapping("/login")
-    public String login(@RequestParam(name = "continue", required = false) String continueUrl, Model model) {
+    public String login(@RequestParam(name = "continue", required = false) String continueUrl, Model model,
+            HttpSession session) {
         log.debug("Rendering login page");
         model.addAttribute("pageTitle", "Login");
-        model.addAttribute("continueUrl", StringUtils.hasText(continueUrl) ? continueUrl : "");
+
+        if (StringUtils.hasText(continueUrl) && continueUrl.startsWith("/")) {
+            model.addAttribute("continueUrl", continueUrl);
+            session.setAttribute(ContinueAwareAuthenticationSuccessHandler.CONTINUE_URL_SESSION_KEY,
+                    continueUrl);
+        } else {
+            model.addAttribute("continueUrl", "");
+            session.removeAttribute(ContinueAwareAuthenticationSuccessHandler.CONTINUE_URL_SESSION_KEY);
+        }
+
+        boolean googleLoginEnabled = StringUtils.hasText(environment.getProperty(
+                "spring.security.oauth2.client.registration.google.client-id"))
+                && StringUtils.hasText(environment.getProperty(
+                        "spring.security.oauth2.client.registration.google.client-secret"));
+        model.addAttribute("googleLoginEnabled", googleLoginEnabled);
         return "auth/login";
     }
 }
