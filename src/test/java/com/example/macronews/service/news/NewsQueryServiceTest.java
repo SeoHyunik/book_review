@@ -9,12 +9,15 @@ import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.repository.NewsEventRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.i18n.LocaleContextHolder;
 
 @ExtendWith(MockitoExtension.class)
 class NewsQueryServiceTest {
@@ -24,6 +27,11 @@ class NewsQueryServiceTest {
 
     @InjectMocks
     private NewsQueryService newsQueryService;
+
+    @AfterEach
+    void tearDown() {
+        LocaleContextHolder.resetLocaleContext();
+    }
 
     @Test
     @DisplayName("Korea semiconductor news should rank above generic US market news")
@@ -187,6 +195,65 @@ class NewsQueryServiceTest {
     }
 
     @Test
+    @DisplayName("List should prefer Korean interpretation summary for ko locale")
+    void getRecentNews_prefersKoreanInterpretationSummaryForKoLocale() {
+        LocaleContextHolder.setLocale(Locale.KOREAN);
+        NewsEvent analyzed = newsEvent(
+                "localized-ko",
+                "Korea battery export gains momentum",
+                "Battery makers benefit from export demand.",
+                "Yonhap",
+                "https://example.com/localized-ko",
+                "2026-03-10T09:30:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult("한국어 요약", "English summary"));
+
+        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+                .willReturn(List.of(analyzed));
+
+        var result = newsQueryService.getRecentNews().get(0);
+
+        assertThat(result.interpretationSummary()).isEqualTo("한국어 요약");
+    }
+
+    @Test
+    @DisplayName("List should fall back to English summary then macro summary")
+    void getRecentNews_fallsBackToAvailableInterpretationSummary() {
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        NewsEvent englishFallback = newsEvent(
+                "localized-fallback-en",
+                "Korea battery export gains momentum",
+                "Battery makers benefit from export demand.",
+                "Yonhap",
+                "https://example.com/localized-fallback-en",
+                "2026-03-10T09:30:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult("한국어만 있음", null));
+        NewsEvent macroFallback = newsEvent(
+                "localized-fallback-macro",
+                "Oil prices climb on supply concerns",
+                "Energy costs moved higher.",
+                "Bloomberg",
+                "https://example.com/localized-fallback-macro",
+                "2026-03-10T09:20:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), null, null,
+                        List.of(new com.example.macronews.domain.MacroImpact(
+                                com.example.macronews.domain.MacroVariable.OIL,
+                                com.example.macronews.domain.ImpactDirection.UP,
+                                0.9d)),
+                        List.of()));
+
+        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+                .willReturn(List.of(englishFallback, macroFallback));
+
+        var results = newsQueryService.getRecentNews();
+
+        assertThat(results.get(0).interpretationSummary()).isEqualTo("한국어만 있음");
+        assertThat(results.get(1).interpretationSummary()).isEqualTo("OIL UP");
+    }
+
+    @Test
     @DisplayName("Auto ingestion snapshot should summarize current batch status counts")
     void getAutoIngestionBatchStatus_summarizesBatch() {
         NewsEvent ingested = newsEvent(
@@ -248,7 +315,10 @@ class NewsQueryServiceTest {
     }
 
     private AnalysisResult analyzedResult() {
-        return new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), null, null, List.of(), List.of());
+        return analyzedResult(null, null);
+    }
+
+    private AnalysisResult analyzedResult(String summaryKo, String summaryEn) {
+        return new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"), summaryKo, summaryEn, List.of(), List.of());
     }
 }
-

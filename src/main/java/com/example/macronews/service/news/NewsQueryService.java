@@ -1,5 +1,6 @@
 package com.example.macronews.service.news;
 
+import com.example.macronews.domain.AnalysisResult;
 import com.example.macronews.domain.MacroImpact;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -82,6 +84,7 @@ public class NewsQueryService {
 
     private NewsListItemDto toListItem(NewsEvent event) {
         boolean hasAnalysis = event.analysisResult() != null;
+        String macroSummary = buildMacroSummary(event);
         return new NewsListItemDto(
                 event.id(),
                 event.title(),
@@ -90,7 +93,8 @@ public class NewsQueryService {
                 event.status(),
                 hasAnalysis,
                 StringUtils.hasText(event.url()),
-                buildMacroSummary(event),
+                macroSummary,
+                buildInterpretationSummary(event, macroSummary),
                 calculatePriorityScore(event)
         );
     }
@@ -106,6 +110,26 @@ public class NewsQueryService {
                 event.status(),
                 event.analysisResult()
         );
+    }
+
+    private String buildInterpretationSummary(NewsEvent event, String macroSummary) {
+        AnalysisResult analysisResult = event.analysisResult();
+        if (analysisResult == null) {
+            return macroSummary;
+        }
+
+        Locale locale = LocaleContextHolder.getLocale();
+        boolean korean = locale != null && "ko".equalsIgnoreCase(locale.getLanguage());
+        String preferred = korean ? analysisResult.summaryKo() : analysisResult.summaryEn();
+        String fallback = korean ? analysisResult.summaryEn() : analysisResult.summaryKo();
+
+        if (StringUtils.hasText(preferred)) {
+            return preferred;
+        }
+        if (StringUtils.hasText(fallback)) {
+            return fallback;
+        }
+        return macroSummary;
     }
 
     private String buildMacroSummary(NewsEvent event) {
