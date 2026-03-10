@@ -30,10 +30,10 @@ public class NewsController {
         List<NewsListItemDto> newsItems = newsQueryService.getRecentNews(selectedStatus);
         model.addAttribute("newsItems", newsItems);
         model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());
-        model.addAttribute("pageTitle", "Macro News");
-        model.addAttribute("pageDescription", "Recent macro news with AI interpretation status.");
-        model.addAttribute("ogTitle", "Macro News");
-        model.addAttribute("ogDescription", "Recent macro news with AI interpretation status.");
+        model.addAttribute("pageTitleKey", "page.news.list.title");
+        model.addAttribute("pageDescriptionKey", "page.news.list.description");
+        model.addAttribute("ogTitleKey", "page.news.list.title");
+        model.addAttribute("ogDescriptionKey", "page.news.list.description");
         log.debug("Rendering news list page with {} entries statusFilter={}", newsItems.size(), selectedStatus);
         return "news/list";
     }

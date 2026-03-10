@@ -56,7 +56,8 @@ public class AdminNewsController {
         NewsStatus selectedStatus = resolveStatus(status);
         List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews(selectedStatus);
         populateAdminListModel(model, recentNewsItems, selectedStatus);
-        model.addAttribute("pageTitle", "Admin News Manual Ingestion");
+        model.addAttribute("pageTitleKey", "page.admin.manual.title");
+        model.addAttribute("pageDescriptionKey", "page.admin.manual.description");
         log.debug("Rendering admin manual news ingestion form with {} recent items", recentNewsItems.size());
         return "admin/news/ingest-manual";
     }
@@ -67,7 +68,8 @@ public class AdminNewsController {
         List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews(selectedStatus);
         populateAdminListModel(model, recentNewsItems, selectedStatus);
         populateAutoBatchStatusFromFlash(model);
-        model.addAttribute("pageTitle", "Admin News Automatic Ingestion");
+        model.addAttribute("pageTitleKey", "page.admin.auto.title");
+        model.addAttribute("pageDescriptionKey", "page.admin.auto.description");
         model.addAttribute("newsApiConfigured", newsApiService.isConfigured());
         log.debug("Rendering admin automatic news ingestion form with {} recent items", recentNewsItems.size());
         return "admin/news/ingest-api";
