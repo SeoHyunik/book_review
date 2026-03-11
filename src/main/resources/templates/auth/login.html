@@ -8,12 +8,12 @@
                 <div class="text-center mb-4">
                     <span class="badge rounded-pill text-bg-primary px-3 py-2 mb-3" th:text="#{auth.login.kicker}">Continue Reading</span>
                     <h1 class="h4 fw-bold mb-2" th:text="#{auth.login.heading}">Sign in</h1>
-                    <p class="text-secondary mb-0" th:text="${param.gated} ? #{auth.login.gated.subtitle} : #{auth.login.subtitle}">
+                    <p class="text-secondary mb-0" th:text="${param.gated != null} ? #{auth.login.gated.subtitle} : #{auth.login.subtitle}">
                         Sign in to keep reading AI-powered market interpretation.
                     </p>
                 </div>
 
-                <div th:if="${param.gated}" class="alert alert-warning border-0 shadow-sm mb-3" role="alert">
+                <div th:if="${param.gated != null}" class="alert alert-warning border-0 shadow-sm mb-3" role="alert">
                     <div class="fw-semibold mb-1" th:text="#{auth.login.gated.title}">Free detail access reached</div>
                     <div class="small mb-0" th:text="#{auth.login.gated}">
                         You have reached the free detail-view limit. Sign in to keep reading full market interpretation reports.
@@ -22,13 +22,13 @@
                 <div th:if="${continueUrl != null and !#strings.isEmpty(continueUrl)}" class="alert alert-light border small text-secondary mb-3" role="alert">
                     <span th:text="#{auth.login.continue}">After sign-in, you will return to the article you were reading.</span>
                 </div>
-                <div th:if="${param.error}" class="alert alert-danger" role="alert">
+                <div th:if="${param.error != null}" class="alert alert-danger" role="alert">
                     <span th:text="#{auth.login.error}">Invalid username or password.</span>
                 </div>
-                <div th:if="${param.logout}" class="alert alert-info" role="alert">
+                <div th:if="${param.logout != null}" class="alert alert-info" role="alert">
                     <span th:text="#{auth.login.logout}">You have been logged out.</span>
                 </div>
-                <div th:if="${param.registered}" class="alert alert-success" role="alert">
+                <div th:if="${param.registered != null}" class="alert alert-success" role="alert">
                     <span th:text="#{auth.login.registered}">Registration successful. Please sign in.</span>
                 </div>
 
@@ -60,10 +60,10 @@
                         <span class="text-secondary small" th:text="#{auth.login.signup.prompt}">Need an account?</span>
                         <a class="btn btn-sm btn-outline-secondary rounded-pill px-3" th:href="@{/register}" th:text="#{auth.login.signup.cta}">Create account</a>
                     </div>
-                    <div th:if="${param.gated}" class="text-center small text-secondary pt-1" th:text="#{auth.login.gated.benefit}">
+                    <div th:if="${param.gated != null}" class="text-center small text-secondary pt-1" th:text="#{auth.login.gated.benefit}">
                         Sign in to continue reading deeper AI market interpretation and return right where you left off.
                     </div>
-                    <div th:if="${!param.gated}" class="text-center small text-secondary pt-1" th:text="#{auth.login.benefit}">
+                    <div th:if="${param.gated == null}" class="text-center small text-secondary pt-1" th:text="#{auth.login.benefit}">
                         Track macro headlines with AI-guided market context in one place.
                     </div>
                     <div class="text-center">
