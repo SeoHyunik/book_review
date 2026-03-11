@@ -1,5 +1,5 @@
 server:
-  port: 8082
+  port: ${PORT:8080}
 
 spring:
   application:
@@ -8,13 +8,10 @@ spring:
   messages:
     encoding: UTF-8
 
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/macro_news
-
   mongodb:
+    uri: ${MONGODB_URI:mongodb://localhost:27017/macro_news}
     transactions:
-      enabled: true # Replica set required in production for this to take effect
+      enabled: true Replica set required in production for this to take effecteplica set required in production for this to take effect
 
   cache:
     type: simple
