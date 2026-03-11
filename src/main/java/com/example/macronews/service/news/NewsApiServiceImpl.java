@@ -100,7 +100,8 @@ public class NewsApiServiceImpl implements NewsApiService {
                 .queryParam("pageSize", limit)
                 .queryParam("from", cutoff.toString())
                 .queryParam("apiKey", apiKey)
-                .build(true)
+                .build()
+                .encode()
                 .toUriString();
         return fetchFromUrl(url, limit, "everything");
     }
@@ -111,7 +112,8 @@ public class NewsApiServiceImpl implements NewsApiService {
                 .queryParam("category", category)
                 .queryParam("pageSize", limit)
                 .queryParam("apiKey", apiKey)
-                .build(true)
+                .build()
+                .encode()
                 .toUriString();
     }
 

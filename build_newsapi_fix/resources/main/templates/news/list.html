@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content" th:with="featuredNews=${#lists.isEmpty(newsItems) ? null : newsItems[0]}">
+    <style>
+        .news-surface {
+            border: 1px solid color-mix(in srgb, var(--bs-border-color) 72%, transparent);
+            box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.06);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+
+        .news-surface:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 1.2rem 2.75rem rgba(15, 23, 42, 0.09);
+            border-color: color-mix(in srgb, var(--bs-primary) 18%, var(--bs-border-color));
+        }
+
+        .featured-card {
+            background:
+                radial-gradient(circle at top right, rgba(13, 110, 253, 0.12), transparent 34%),
+                linear-gradient(180deg, color-mix(in srgb, var(--bs-body-bg) 92%, var(--bs-primary) 8%), var(--bs-body-bg));
+        }
+
+        .featured-summary,
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            word-break: break-word;
+            -webkit-line-clamp: 2;
+        }
+
+        .featured-meta {
+            font-size: 0.85rem;
+        }
+
+        .signal-tile {
+            background: color-mix(in srgb, var(--bs-tertiary-bg) 88%, var(--bs-body-bg));
+            min-height: 124px;
+        }
+
+        .signal-arrow {
+            min-width: 2rem;
+        }
+
+        .news-toolbar-chip {
+            border-radius: 999px;
+        }
+
+        .news-table-card {
+            border: 1px solid color-mix(in srgb, var(--bs-border-color) 75%, transparent);
+            overflow: hidden;
+        }
+
+        .news-table-card thead th {
+            background: color-mix(in srgb, var(--bs-tertiary-bg) 88%, var(--bs-body-bg));
+            color: var(--bs-secondary-color);
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border-bottom-width: 1px;
+        }
+
+        .news-table-card tbody tr {
+            transition: background-color 0.16s ease;
+        }
+
+        .news-table-card tbody tr:hover {
+            background-color: color-mix(in srgb, var(--bs-primary-bg-subtle) 30%, transparent);
+        }
+
+        .news-title,
+        .news-summary {
+            line-height: 1.35;
+            max-height: 2.7em;
+        }
+
+        .news-action-stack .btn {
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+
+        .news-action-stack .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0.35rem 0.8rem rgba(15, 23, 42, 0.08);
+        }
+    </style>
+
+    <section class="mb-4 d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+        <div>
+            <h1 class="h3 fw-bold mb-1" th:text="#{news.list.heading}">Macro News</h1>
+            <p class="text-secondary mb-0" th:text="#{news.list.subheading}">AI-guided market impact reading for the macro headlines moving the tape.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2" sec:authorize="hasRole('ADMIN')">
+            <a class="btn btn-outline-primary" th:href="@{/admin/news/manual}" th:text="#{admin.news.manual.tab}">Manual Ingestion</a>
+            <a class="btn btn-primary" th:href="@{/admin/news/auto}" th:text="#{admin.news.auto.tab}">Automatic Ingestion</a>
+        </div>
+    </section>
+
+    <section class="mb-4" th:if="${featuredNews != null}"
+             th:with="featuredSignal=${featuredNews.macroSummary != null and #strings.contains(featuredNews.macroSummary, ' DOWN') ? 'bearish' : (featuredNews.macroSummary != null and #strings.contains(featuredNews.macroSummary, ' UP') ? 'bullish' : 'mixed')}">
+        <div class="card border-0 overflow-hidden news-surface featured-card">
+            <div class="card-body p-4">
+                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3">
+                    <div class="flex-grow-1">
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-3 featured-meta">
+                            <span class="badge rounded-pill text-bg-primary px-3 py-2 shadow-sm" th:text="#{news.featured.label}">Featured</span>
+                            <span class="badge rounded-pill"
+                                  th:classappend="${featuredSignal == 'bullish' ? ' text-bg-success' : (featuredSignal == 'bearish' ? ' text-bg-danger' : ' text-bg-secondary')}"
+                                  th:text="${featuredSignal == 'bullish' ? #messages.msg('news.signal.bullish') : (featuredSignal == 'bearish' ? #messages.msg('news.signal.bearish') : #messages.msg('news.signal.mixed'))}">Bullish</span>
+                            <span class="text-secondary fw-medium" th:text="${featuredNews.source ?: '-'}">Source</span>
+                            <span class="text-secondary opacity-50">&middot;</span>
+                            <span class="text-secondary" th:text="${featuredNews.publishedAt ?: '-'}">Published At</span>
+                        </div>
+                        <h2 class="h3 fw-bold mb-3 lh-sm line-clamp-2"
+                            style="max-height: 2.9em;"
+                            th:text="${featuredNews.title ?: #messages.msg('news.untitled')}">Featured News</h2>
+                        <p class="text-secondary mb-0 lh-sm featured-summary"
+                           style="max-height: 2.9em;"
+                           th:text="${featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? featuredNews.interpretationSummary : #messages.msg('news.featured.fallback')}">AI summary</p>
+                    </div>
+                    <div class="d-flex flex-column align-items-lg-end gap-3 text-nowrap p-3 rounded-4 bg-body bg-opacity-75 border">
+                        <div class="small text-secondary text-uppercase fw-semibold" th:text="#{news.featured.kicker}">AI market reading</div>
+                        <a class="btn btn-sm btn-primary px-3 text-nowrap shadow-sm" th:href="@{'/news/' + ${featuredNews.id}}" th:text="#{news.action.detail}">Detail</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="mb-4" th:if="${marketSignalOverview != null and marketSignalOverview.hasSignals()}">
+        <div class="card border-0 news-surface">
+            <div class="card-body p-4">
+                <div class="mb-3">
+                    <h2 class="h6 fw-bold mb-1" th:text="#{news.overview.title}">Market Signals</h2>
+                    <p class="text-secondary small mb-0" th:text="#{news.overview.subtitle}">
+                        A quick read of direction inferred from recent analyzed macro news.
+                    </p>
+                </div>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3">
+                    <div class="col" th:each="signal : ${marketSignalOverview.items}">
+                        <div class="border rounded-4 p-3 h-100 signal-tile news-surface">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="fw-semibold small text-uppercase text-secondary mb-2"
+                                         th:text="#{${'news.overview.variable.' + #strings.toLowerCase(signal.variable.name())}}">
+                                        Oil
+                                    </div>
+                                    <div class="fw-semibold"
+                                         th:text="#{${'news.overview.direction.' + #strings.toLowerCase(signal.direction.name())}}">
+                                        Neutral
+                                    </div>
+                                </div>
+                                <span class="badge rounded-pill signal-arrow fs-6 py-2"
+                                      th:classappend="${signal.direction.name() == 'UP' ? ' text-bg-success' : (signal.direction.name() == 'DOWN' ? ' text-bg-danger' : ' text-bg-secondary')}"
+                                      th:text="${signal.direction.name() == 'UP' ? '↑' : (signal.direction.name() == 'DOWN' ? '↓' : '→')}">
+                                    →
+                                </span>
+                            </div>
+                            <div class="text-secondary small mt-3"
+                                 th:text="#{news.overview.sampleCount(${signal.sampleCount})}">
+                                0 signals
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="mb-3 d-flex flex-column gap-2">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="text-secondary small" th:text="#{news.filter.label}">Filter</span>
+            <a class="btn btn-sm news-toolbar-chip"
+               th:classappend="${#strings.isEmpty(selectedStatus) ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(sort=${selectedSort})}" th:text="#{news.filter.all}">All</a>
+            <a class="btn btn-sm news-toolbar-chip"
+               th:classappend="${selectedStatus == 'INGESTED' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status='INGESTED', sort=${selectedSort})}" th:text="#{news.filter.ingested}">Ingested</a>
+            <a class="btn btn-sm news-toolbar-chip"
+               th:classappend="${selectedStatus == 'ANALYZED' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status='ANALYZED', sort=${selectedSort})}" th:text="#{news.filter.analyzed}">Analyzed</a>
+            <a class="btn btn-sm news-toolbar-chip"
+               th:classappend="${selectedStatus == 'FAILED' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status='FAILED', sort=${selectedSort})}" th:text="#{news.filter.failed}">Failed</a>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <span class="text-secondary small" th:text="#{news.sort.label}">Sort</span>
+            <a class="btn btn-sm news-toolbar-chip"
+               th:classappend="${selectedSort == 'published_desc' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status=${selectedStatus}, sort='published_desc')}" th:text="#{news.sort.publishedDesc}">Newest</a>
+            <a class="btn btn-sm news-toolbar-chip"
+               th:classappend="${selectedSort == 'published_asc' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status=${selectedStatus}, sort='published_asc')}" th:text="#{news.sort.publishedAsc}">Oldest</a>
+            <a class="btn btn-sm news-toolbar-chip"
+               th:classappend="${selectedSort == 'priority' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status=${selectedStatus}, sort='priority')}" th:text="#{news.sort.priority}">Priority</a>
+            <a class="btn btn-sm news-toolbar-chip"
+               th:classappend="${selectedSort == 'ingested_desc' ? ' btn-primary' : ' btn-outline-secondary'}"
+               th:href="@{/news(status=${selectedStatus}, sort='ingested_desc')}" th:text="#{news.sort.ingestedDesc}">Recently Ingested</a>
+        </div>
+    </section>
+
+    <section>
+        <div class="card border-0 news-table-card news-surface">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th style="width: 42%;" th:text="#{news.table.title}">Title</th>
+                        <th class="text-nowrap" style="width: 12%;" th:text="#{news.table.source}">Source</th>
+                        <th class="text-nowrap" style="width: 14%;" th:text="#{news.table.publishedAt}">Published At</th>
+                        <th class="text-nowrap" style="width: 10%;" th:text="#{news.table.status}">Status</th>
+                        <th style="width: 12%;" th:text="#{news.table.interpretation}">Interpretation</th>
+                        <th class="text-end text-nowrap" style="width: 10%;" th:text="#{news.table.actions}">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:if="${#lists.isEmpty(newsItems)}">
+                        <td colspan="6" class="text-secondary py-4" th:text="#{news.empty}">No news events found.</td>
+                    </tr>
+                    <tr th:each="news : ${newsItems}">
+                        <td class="py-3">
+                            <div class="fw-semibold mb-1 news-title line-clamp-2"
+                                 th:text="${news.title ?: #messages.msg('news.untitled')}">Untitled</div>
+                            <div class="text-secondary small fw-medium" th:if="${news.priorityScore > 0}" th:text="#{news.priority(${news.priorityScore})}">Priority 0</div>
+                        </td>
+                        <td class="small text-nowrap text-truncate py-3 fw-medium text-body-secondary" style="max-width: 10rem;" th:text="${news.source ?: '-'}"></td>
+                        <td class="small text-nowrap py-3 text-body-secondary" th:text="${news.publishedAt ?: '-'}"></td>
+                        <td class="py-3" th:switch="${news.status != null ? news.status.name() : 'UNKNOWN'}">
+                            <span th:case="'ANALYZED'" class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle" th:text="#{status.analyzed}">Analyzed</span>
+                            <span th:case="'FAILED'" class="badge rounded-pill bg-danger-subtle text-danger-emphasis border border-danger-subtle" th:text="#{status.failed}">Failed</span>
+                            <span th:case="'INGESTED'" class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle" th:text="#{status.ingested}">Ingested</span>
+                            <span th:case="*" class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle" th:text="#{status.unknown}">Unknown</span>
+                        </td>
+                        <td class="py-3"
+                            th:with="rowSignal=${news.macroSummary != null and #strings.contains(news.macroSummary, ' DOWN') ? 'bearish' : (news.macroSummary != null and #strings.contains(news.macroSummary, ' UP') ? 'bullish' : 'mixed')}">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge rounded-pill px-2 py-1"
+                                      th:classappend="${rowSignal == 'bullish' ? ' text-bg-success-subtle text-success' : (rowSignal == 'bearish' ? ' text-bg-danger-subtle text-danger' : ' text-bg-secondary-subtle text-secondary')}"
+                                      th:text="${rowSignal == 'bullish' ? #messages.msg('news.signal.bullishShort') : (rowSignal == 'bearish' ? #messages.msg('news.signal.bearishShort') : #messages.msg('news.signal.mixedShort'))}">Up</span>
+                                <div th:if="${news.status != null and news.status.name() == 'ANALYZED'}" class="fw-semibold small text-success" th:text="#{news.interpretation.available}">Available</div>
+                                <div th:if="${news.status != null and news.status.name() == 'INGESTED'}" class="fw-semibold small text-secondary" th:text="#{news.interpretation.pending}">Pending</div>
+                                <div th:if="${news.status != null and news.status.name() == 'FAILED'}" class="fw-semibold small text-danger" th:text="#{news.interpretation.failed}">Failed</div>
+                                <div th:if="${news.status == null}" class="fw-semibold small text-secondary" th:text="#{news.interpretation.unknown}">Unknown</div>
+                            </div>
+                            <div th:if="${news.status != null and news.status.name() == 'ANALYZED' and news.interpretationSummary != null and !#strings.isEmpty(news.interpretationSummary)}"
+                                 class="text-secondary small mt-2 news-summary line-clamp-2"
+                                 th:text="${news.interpretationSummary}"></div>
+                        </td>
+                        <td class="text-end text-nowrap py-3">
+                            <div class="d-inline-flex flex-wrap justify-content-end gap-1 align-items-center news-action-stack">
+                                <a class="btn btn-sm btn-outline-primary text-nowrap rounded-pill px-3" th:href="@{'/news/' + ${news.id}}" th:text="#{news.action.detail}">Detail</a>
+                                <th:block sec:authorize="hasRole('ADMIN')">
+                                    <form th:action="@{'/admin/news/' + ${news.id} + '/reinterpret'}" method="post" class="d-inline">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <input type="hidden" name="returnTo" value="/news"/>
+                                        <input type="hidden" name="status" th:value="${selectedStatus}"/>
+                                        <input type="hidden" name="sort" th:value="${selectedSort}"/>
+                                        <button type="submit" class="btn btn-sm btn-outline-warning text-nowrap rounded-pill px-3" th:text="#{news.action.reinterpret}">Re-interpret</button>
+                                    </form>
+                                    <form th:action="@{'/admin/news/' + ${news.id} + '/delete'}" method="post" class="d-inline"
+                                          th:attr="data-confirm=#{news.action.delete.confirm},onsubmit=|return confirm(this.dataset.confirm);|">
+                                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                                        <input type="hidden" name="returnTo" value="/news"/>
+                                        <input type="hidden" name="status" th:value="${selectedStatus}"/>
+                                        <input type="hidden" name="sort" th:value="${selectedSort}"/>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap rounded-pill px-3" th:text="#{news.action.delete}">Delete</button>
+                                    </form>
+                                </th:block>
+                            </div>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</th:block>
+</html>

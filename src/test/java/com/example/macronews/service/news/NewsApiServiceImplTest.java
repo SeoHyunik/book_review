@@ -3,7 +3,10 @@ package com.example.macronews.service.news;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 
+import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +14,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -55,6 +59,30 @@ class NewsApiServiceImplTest {
         assertThat(results).hasSize(2);
         assertThat(results).extracting(item -> item.url())
                 .containsExactly("https://example.com/newest", "https://example.com/fresh");
+    }
+
+    @Test
+    @DisplayName("fetchTopHeadlines should encode the recent query before calling NewsAPI")
+    void fetchTopHeadlines_encodesRecentQueryParameter() {
+        ReflectionTestUtils.setField(newsApiService, "objectMapper", new ObjectMapper());
+        ReflectionTestUtils.setField(newsApiService, "apiKey", "test-key");
+        ReflectionTestUtils.setField(newsApiService, "defaultLimit", 10);
+        ReflectionTestUtils.setField(newsApiService, "recencyHours", 48L);
+        ReflectionTestUtils.setField(newsApiService, "recentQuery", "market OR stocks OR economy");
+        ReflectionTestUtils.setField(newsApiService, "searchUrl", "https://newsapi.org/v2/everything");
+        ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");
+        ReflectionTestUtils.setField(newsApiService, "country", "us");
+        ReflectionTestUtils.setField(newsApiService, "category", "business");
+
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, "{\"articles\":[]}"));
+
+        newsApiService.fetchTopHeadlines(1);
+
+        ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
+        verify(externalApiUtils, atLeastOnce()).callAPI(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues())
+                .extracting(ExternalApiRequest::url)
+                .anySatisfy(url -> assertThat(url).contains("q=market%20OR%20stocks%20OR%20economy"));
     }
 
     @Test
