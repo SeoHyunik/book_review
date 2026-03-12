@@ -253,13 +253,147 @@
         }
 
         @media (max-width: 991.98px) {
+            .featured-card > .card-body,
+            .news-surface > .card-body {
+                padding: 1.5rem;
+            }
+
+            .featured-layout {
+                gap: 1.15rem;
+            }
+
             .featured-heading {
                 max-width: none;
+                font-size: clamp(1.5rem, 4vw, 2rem);
             }
 
             .featured-card-panel {
                 width: 100%;
                 max-width: none;
+                min-width: 0;
+            }
+
+            .featured-summary {
+                max-width: none;
+            }
+
+            .signal-tile {
+                min-height: 0;
+            }
+
+            .signal-state {
+                font-size: 0.96rem;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .featured-card > .card-body,
+            .news-surface > .card-body {
+                padding: 1.25rem;
+            }
+
+            .featured-layout {
+                gap: 1rem;
+            }
+
+            .featured-header {
+                gap: 0.7rem;
+                margin-bottom: 0.85rem;
+            }
+
+            .featured-badges {
+                gap: 0.45rem;
+            }
+
+            .featured-support {
+                gap: 0.4rem;
+                font-size: 0.78rem;
+            }
+
+            .featured-heading {
+                margin-bottom: 0.75rem;
+                font-size: clamp(1.4rem, 6vw, 1.85rem);
+                line-height: 1.12;
+            }
+
+            .featured-summary {
+                font-size: 0.95rem;
+                -webkit-line-clamp: 2;
+            }
+
+            .featured-card-panel {
+                padding: 0.95rem 1rem;
+                gap: 0.65rem;
+                text-wrap: wrap;
+            }
+
+            .featured-card-panel-label {
+                font-size: 0.72rem;
+            }
+
+            .signal-tile {
+                padding: 1rem;
+            }
+
+            .signal-state {
+                font-size: 0.93rem;
+            }
+
+            .signal-count {
+                font-size: 0.82rem;
+                margin-top: 0.75rem;
+            }
+
+            .signal-arrow {
+                min-width: 1.85rem;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .featured-card::after {
+                inset: auto -18% -36% 26%;
+                height: 58%;
+            }
+
+            .featured-header {
+                margin-bottom: 0.7rem;
+            }
+
+            .featured-support {
+                gap: 0.3rem 0.45rem;
+                line-height: 1.35;
+            }
+
+            .featured-support-dot {
+                display: none;
+            }
+
+            .featured-heading {
+                font-size: clamp(1.3rem, 7vw, 1.6rem);
+            }
+
+            .featured-summary {
+                font-size: 0.92rem;
+            }
+
+            .featured-card-panel {
+                align-items: stretch;
+                padding: 0.9rem;
+            }
+
+            .featured-card-panel .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .signal-tile {
+                padding: 0.95rem;
+            }
+
+            .signal-arrow {
+                min-width: 1.75rem;
+                padding-top: 0.4rem;
+                padding-bottom: 0.4rem;
             }
         }
 
