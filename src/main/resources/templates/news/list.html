@@ -177,8 +177,10 @@
                                         Oil
                                     </div>
                                     <div class="fw-semibold"
-                                         th:text="#{${'news.overview.direction.' + #strings.toLowerCase(signal.direction.name())}}">
-                                        Neutral
+                                         th:with="specificDirectionKey=${'news.overview.direction.' + #strings.toLowerCase(signal.variable.name()) + '.' + #strings.toLowerCase(signal.direction.name())},
+                                                  genericDirectionKey=${'news.overview.direction.generic.' + #strings.toLowerCase(signal.direction.name())}"
+                                         th:text="${#messages.msgOrNull(specificDirectionKey) != null ? #messages.msg(specificDirectionKey) : #messages.msg(genericDirectionKey)}">
+                                        Wait-and-see
                                     </div>
                                 </div>
                                 <span class="badge rounded-pill signal-arrow fs-6 py-2"
