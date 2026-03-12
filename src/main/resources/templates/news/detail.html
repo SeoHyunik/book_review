@@ -93,12 +93,24 @@
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
         }
 
+        .detail-section-card + .detail-section-card,
+        .detail-section-card + .detail-state-card,
+        .detail-state-card + .detail-section-card {
+            margin-top: 1.25rem;
+        }
+
         .detail-section-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
             margin-bottom: 1rem;
+        }
+
+        .detail-section-headline {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
         }
 
         .detail-section-kicker {
@@ -123,10 +135,19 @@
             max-width: 74ch;
         }
 
+        .detail-copy--article {
+            max-width: 72ch;
+        }
+
         .detail-interpretation-card {
             background:
                 radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 36%),
                 linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 247, 255, 0.96));
+        }
+
+        .detail-interpretation-card .detail-section-header {
+            align-items: flex-start;
+            margin-bottom: 1.15rem;
         }
 
         .detail-status-badges {
@@ -144,7 +165,23 @@
 
         .detail-callout {
             border-left: 3px solid color-mix(in srgb, var(--bs-primary) 28%, transparent);
-            padding-left: 1rem;
+            padding: 0.15rem 0 0.15rem 1rem;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.08), transparent 26%);
+            border-radius: 0.75rem;
+        }
+
+        .detail-ai-summary {
+            font-size: 1.03rem;
+            line-height: 1.8;
+            max-width: 68ch;
+            color: color-mix(in srgb, var(--surface-strong) 92%, #213047);
+        }
+
+        .detail-ai-support {
+            color: color-mix(in srgb, var(--surface-muted) 84%, #334155);
+            font-size: 0.9rem;
+            max-width: 62ch;
+            margin-bottom: 0;
         }
 
         .detail-impact-grid {
@@ -158,6 +195,9 @@
             border-radius: 1rem;
             background: rgba(255, 255, 255, 0.72);
             padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
         }
 
         .detail-impact-table {
@@ -183,6 +223,10 @@
             vertical-align: middle;
         }
 
+        .detail-impact-table tbody tr:nth-child(even) td {
+            background: color-mix(in srgb, var(--bs-tertiary-bg) 54%, transparent);
+        }
+
         .detail-impact-table tbody tr:last-child td {
             border-bottom: 0;
         }
@@ -190,6 +234,7 @@
         .detail-impact-name {
             font-weight: 600;
             letter-spacing: -0.01em;
+            color: var(--surface-strong);
         }
 
         .detail-direction-chip {
@@ -202,6 +247,16 @@
             border: 1px solid transparent;
             font-weight: 600;
             font-size: 0.84rem;
+        }
+
+        .detail-direction-cell {
+            width: 1%;
+            white-space: nowrap;
+        }
+
+        .detail-confidence-cell {
+            width: 1%;
+            white-space: nowrap;
         }
 
         .detail-direction-chip--up {
@@ -226,6 +281,12 @@
             font-variant-numeric: tabular-nums;
             color: color-mix(in srgb, var(--surface-muted) 86%, #243246);
             font-weight: 600;
+        }
+
+        .detail-impact-note {
+            color: color-mix(in srgb, var(--surface-muted) 84%, #334155);
+            font-size: 0.84rem;
+            margin: -0.1rem 0 0.55rem;
         }
 
         .detail-empty {
@@ -281,6 +342,15 @@
                 min-width: 5.2rem;
                 font-size: 0.8rem;
             }
+
+            .detail-ai-summary {
+                font-size: 0.98rem;
+                max-width: none;
+            }
+
+            .detail-impact-note {
+                margin-bottom: 0.45rem;
+            }
         }
     </style>
 
@@ -333,12 +403,12 @@
     <section class="card border-0 mb-4 detail-surface detail-section-card">
         <div class="card-body p-4">
             <div class="detail-section-header">
-                <div>
+                <div class="detail-section-headline">
                     <div class="detail-section-kicker" th:text="#{news.detail.summary}">Summary</div>
                     <h2 class="fw-bold detail-section-title" th:text="#{news.detail.originalSummary}">Original News Summary</h2>
                 </div>
             </div>
-            <p class="detail-copy" th:text="${newsDetail.summary ?: '-'}"></p>
+            <p class="detail-copy detail-copy--article" th:text="${newsDetail.summary ?: '-'}"></p>
         </div>
     </section>
 
@@ -351,9 +421,10 @@
                     : (!#strings.isEmpty(newsDetail.analysisResult.summaryKo) ? newsDetail.analysisResult.summaryKo : newsDetail.summary))}">
         <div class="card-body p-4 d-flex flex-column gap-3">
             <div class="detail-section-header">
-                <div>
+                <div class="detail-section-headline">
                     <div class="detail-section-kicker" th:text="#{news.detail.interpretationBadge}">AI Market Take</div>
                     <h2 class="fw-bold detail-section-title" th:text="#{news.detail.interpretationSummary}">Interpretation Summary</h2>
+                    <p class="detail-ai-support">The key market read distilled from the article context and AI interpretation.</p>
                 </div>
                 <div class="detail-status-badges">
                     <span class="badge text-bg-primary" th:text="#{news.detail.interpretationBadge}">AI Market Take</span>
@@ -366,7 +437,7 @@
                 </div>
             </div>
             <div class="detail-callout">
-                <p class="detail-copy" th:text="${localizedSummary ?: '-'}"></p>
+                <p class="detail-copy detail-ai-summary" th:text="${localizedSummary ?: '-'}"></p>
             </div>
         </div>
     </section>
@@ -389,20 +460,21 @@
              th:if="${newsDetail.status != null and newsDetail.status.name() == 'ANALYZED' and newsDetail.analysisResult != null}">
         <div class="card-body p-4">
             <div class="detail-section-header">
-                <div>
+                <div class="detail-section-headline">
                     <div class="detail-section-kicker" th:text="#{news.detail.interpretationBadge}">AI Market Take</div>
-                    <h2 class="fw-bold detail-section-title" th:text="#{news.detail.marketImpacts}">Market Signals</h2>
+                    <h2 class="fw-bold detail-section-title">Impact Breakdown</h2>
                 </div>
             </div>
 
             <div class="detail-impact-grid">
                 <div class="detail-impact-card">
                     <div class="detail-section-header mb-3">
-                        <div>
+                        <div class="detail-section-headline">
                             <div class="detail-section-kicker" th:text="#{news.detail.interpretationBadge}">AI Market Take</div>
                             <h3 class="fw-bold detail-section-title" th:text="#{news.detail.macroImpacts}">Macro Signals</h3>
                         </div>
                     </div>
+                    <p class="detail-impact-note">Compare direction and confidence across macro variables at a glance.</p>
                     <div th:if="${newsDetail.analysisResult.macroImpacts == null or #lists.isEmpty(newsDetail.analysisResult.macroImpacts)}"
                          class="detail-empty"
                          th:text="#{news.detail.noMacroImpacts}">No macro impacts.</div>
@@ -418,13 +490,13 @@
                             <tbody>
                             <tr th:each="impact : ${newsDetail.analysisResult.macroImpacts}">
                                 <td class="detail-impact-name" th:text="${impact.variable ?: '-'}"></td>
-                                <td th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
+                                <td class="detail-direction-cell" th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
                                     <span th:case="'UP'" class="detail-direction-chip detail-direction-chip--up">UP</span>
                                     <span th:case="'DOWN'" class="detail-direction-chip detail-direction-chip--down">DOWN</span>
                                     <span th:case="'NEUTRAL'" class="detail-direction-chip detail-direction-chip--neutral">NEUTRAL</span>
                                     <span th:case="*" class="detail-direction-chip detail-direction-chip--neutral">-</span>
                                 </td>
-                                <td class="text-end detail-confidence" th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>
+                                <td class="text-end detail-confidence detail-confidence-cell" th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>
                             </tr>
                             </tbody>
                         </table>
@@ -433,11 +505,12 @@
 
                 <div class="detail-impact-card">
                     <div class="detail-section-header mb-3">
-                        <div>
+                        <div class="detail-section-headline">
                             <div class="detail-section-kicker" th:text="#{news.detail.interpretationBadge}">AI Market Take</div>
                             <h3 class="fw-bold detail-section-title" th:text="#{news.detail.marketImpacts}">Market Signals</h3>
                         </div>
                     </div>
+                    <p class="detail-impact-note">Scan risk direction and conviction side by side across markets.</p>
                     <div th:if="${newsDetail.analysisResult.marketImpacts == null or #lists.isEmpty(newsDetail.analysisResult.marketImpacts)}"
                          class="detail-empty"
                          th:text="#{news.detail.noMarketImpacts}">No market impacts.</div>
@@ -453,13 +526,13 @@
                             <tbody>
                             <tr th:each="impact : ${newsDetail.analysisResult.marketImpacts}">
                                 <td class="detail-impact-name" th:text="${impact.market ?: '-'}"></td>
-                                <td th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
+                                <td class="detail-direction-cell" th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
                                     <span th:case="'UP'" class="detail-direction-chip detail-direction-chip--up">UP</span>
                                     <span th:case="'DOWN'" class="detail-direction-chip detail-direction-chip--down">DOWN</span>
                                     <span th:case="'NEUTRAL'" class="detail-direction-chip detail-direction-chip--neutral">NEUTRAL</span>
                                     <span th:case="*" class="detail-direction-chip detail-direction-chip--neutral">-</span>
                                 </td>
-                                <td class="text-end detail-confidence" th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>
+                                <td class="text-end detail-confidence detail-confidence-cell" th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>
                             </tr>
                             </tbody>
                         </table>
