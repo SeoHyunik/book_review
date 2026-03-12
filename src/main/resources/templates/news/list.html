@@ -16,9 +16,53 @@
         }
 
         .featured-card {
+            position: relative;
+            isolation: isolate;
             background:
                 radial-gradient(circle at top right, rgba(13, 110, 253, 0.12), transparent 34%),
                 linear-gradient(180deg, color-mix(in srgb, var(--bs-body-bg) 92%, var(--bs-primary) 8%), var(--bs-body-bg));
+        }
+
+        .featured-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 45%);
+            opacity: 0.9;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .featured-card > .card-body {
+            position: relative;
+            z-index: 1;
+        }
+
+        .featured-card--bullish {
+            border-color: rgba(255, 109, 77, 0.22);
+            box-shadow: 0 1.3rem 3rem rgba(255, 116, 76, 0.14);
+            background:
+                radial-gradient(circle at top right, rgba(255, 132, 90, 0.28), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(255, 196, 122, 0.18), transparent 30%),
+                linear-gradient(135deg, rgba(255, 248, 243, 0.98), rgba(255, 238, 230, 0.96));
+        }
+
+        .featured-card--bearish {
+            border-color: rgba(59, 130, 246, 0.2);
+            box-shadow: 0 1.3rem 3rem rgba(37, 99, 235, 0.14);
+            background:
+                radial-gradient(circle at top right, rgba(96, 165, 250, 0.24), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(30, 64, 175, 0.18), transparent 32%),
+                linear-gradient(135deg, rgba(244, 249, 255, 0.98), rgba(233, 243, 255, 0.96));
+        }
+
+        .featured-card--mixed {
+            border-color: rgba(124, 58, 237, 0.14);
+            box-shadow: 0 1.3rem 3rem rgba(107, 114, 128, 0.12);
+            background:
+                radial-gradient(circle at top right, rgba(167, 139, 250, 0.18), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(148, 163, 184, 0.18), transparent 30%),
+                linear-gradient(135deg, rgba(249, 250, 252, 0.98), rgba(239, 242, 247, 0.96));
         }
 
         .featured-summary,
@@ -34,13 +78,175 @@
             font-size: 0.85rem;
         }
 
+        .featured-badge-primary {
+            background: rgba(15, 23, 42, 0.82);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+        }
+
+        .featured-badge-tone {
+            border: 1px solid transparent;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .featured-card--bullish .featured-badge-tone {
+            color: #b9382d;
+            background: rgba(255, 237, 231, 0.92);
+            border-color: rgba(255, 133, 94, 0.28);
+        }
+
+        .featured-card--bearish .featured-badge-tone {
+            color: #2158b5;
+            background: rgba(230, 241, 255, 0.94);
+            border-color: rgba(96, 165, 250, 0.28);
+        }
+
+        .featured-card--mixed .featured-badge-tone {
+            color: #5b6472;
+            background: rgba(241, 245, 249, 0.94);
+            border-color: rgba(148, 163, 184, 0.28);
+        }
+
+        .featured-card-panel {
+            background: rgba(255, 255, 255, 0.68);
+            border: 1px solid rgba(255, 255, 255, 0.52);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(10px);
+        }
+
+        .featured-card--bullish .featured-card-panel {
+            background: rgba(255, 251, 248, 0.72);
+        }
+
+        .featured-card--bearish .featured-card-panel {
+            background: rgba(248, 251, 255, 0.72);
+        }
+
+        .featured-card--mixed .featured-card-panel {
+            background: rgba(250, 251, 253, 0.72);
+        }
+
+        .featured-card .btn-primary {
+            border: none;
+            box-shadow: 0 0.75rem 1.6rem rgba(15, 23, 42, 0.12);
+        }
+
+        .featured-card--bullish .btn-primary {
+            background: linear-gradient(135deg, #ff7b54, #ff5d5f);
+        }
+
+        .featured-card--bearish .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        }
+
+        .featured-card--mixed .btn-primary {
+            background: linear-gradient(135deg, #64748b, #7c3aed);
+        }
+
         .signal-tile {
+            position: relative;
+            overflow: hidden;
             background: color-mix(in srgb, var(--bs-tertiary-bg) 88%, var(--bs-body-bg));
             min-height: 124px;
         }
 
+        .signal-tile::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.55), transparent 55%);
+            pointer-events: none;
+            opacity: 0.9;
+        }
+
+        .signal-tile > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .signal-tile--up {
+            border-color: rgba(255, 141, 94, 0.22);
+            background:
+                radial-gradient(circle at top right, rgba(255, 183, 153, 0.32), transparent 35%),
+                linear-gradient(180deg, rgba(255, 249, 245, 0.98), rgba(255, 255, 255, 0.98));
+        }
+
+        .signal-tile--down {
+            border-color: rgba(96, 165, 250, 0.24);
+            background:
+                radial-gradient(circle at top right, rgba(191, 219, 254, 0.34), transparent 36%),
+                linear-gradient(180deg, rgba(245, 250, 255, 0.98), rgba(255, 255, 255, 0.98));
+        }
+
+        .signal-tile--neutral {
+            border-color: rgba(148, 163, 184, 0.2);
+            background:
+                radial-gradient(circle at top right, rgba(226, 232, 240, 0.36), transparent 36%),
+                linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.98));
+        }
+
+        .signal-tile--volatility {
+            box-shadow: 0 1rem 2.4rem rgba(76, 29, 149, 0.1);
+        }
+
+        .signal-tile--volatility.signal-tile--up {
+            border-color: rgba(139, 92, 246, 0.24);
+            background:
+                radial-gradient(circle at top right, rgba(167, 139, 250, 0.32), transparent 36%),
+                linear-gradient(180deg, rgba(245, 241, 255, 0.98), rgba(255, 255, 255, 0.98));
+        }
+
+        .signal-tile--volatility.signal-tile--down {
+            border-color: rgba(99, 102, 241, 0.24);
+            background:
+                radial-gradient(circle at top right, rgba(165, 180, 252, 0.3), transparent 36%),
+                linear-gradient(180deg, rgba(241, 245, 255, 0.98), rgba(255, 255, 255, 0.98));
+        }
+
+        .signal-tile--volatility.signal-tile--neutral {
+            border-color: rgba(129, 140, 248, 0.2);
+            background:
+                radial-gradient(circle at top right, rgba(199, 210, 254, 0.28), transparent 36%),
+                linear-gradient(180deg, rgba(245, 246, 255, 0.98), rgba(255, 255, 255, 0.98));
+        }
+
         .signal-arrow {
             min-width: 2rem;
+            border: 1px solid transparent;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .signal-tile--up .signal-arrow {
+            color: #c2410c;
+            background: rgba(255, 237, 213, 0.95);
+            border-color: rgba(251, 146, 60, 0.2);
+        }
+
+        .signal-tile--down .signal-arrow {
+            color: #1d4ed8;
+            background: rgba(219, 234, 254, 0.95);
+            border-color: rgba(96, 165, 250, 0.2);
+        }
+
+        .signal-tile--neutral .signal-arrow {
+            color: #64748b;
+            background: rgba(226, 232, 240, 0.92);
+            border-color: rgba(148, 163, 184, 0.2);
+        }
+
+        .signal-tile--volatility .signal-arrow {
+            color: #5b21b6;
+            background: rgba(237, 233, 254, 0.92);
+            border-color: rgba(167, 139, 250, 0.24);
+        }
+
+        .signal-state {
+            font-size: 1rem;
+            letter-spacing: -0.01em;
+        }
+
+        .signal-count {
+            color: color-mix(in srgb, var(--bs-secondary-color) 88%, #475569);
         }
 
         .news-toolbar-chip {
@@ -129,14 +335,14 @@
 
     <section class="mb-4" th:if="${featuredNews != null}"
              th:with="featuredSignal=${featuredNews.macroSummary != null and #strings.contains(featuredNews.macroSummary, ' DOWN') ? 'bearish' : (featuredNews.macroSummary != null and #strings.contains(featuredNews.macroSummary, ' UP') ? 'bullish' : 'mixed')}">
-        <div class="card border-0 overflow-hidden news-surface featured-card">
+        <div class="card border-0 overflow-hidden news-surface featured-card"
+             th:classappend="${featuredSignal == 'bullish' ? ' featured-card--bullish' : (featuredSignal == 'bearish' ? ' featured-card--bearish' : ' featured-card--mixed')}">
             <div class="card-body p-4">
                 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3">
                     <div class="flex-grow-1">
                         <div class="d-flex flex-wrap gap-2 align-items-center mb-3 featured-meta">
-                            <span class="badge rounded-pill text-bg-primary px-3 py-2 shadow-sm" th:text="#{news.featured.label}">Featured</span>
-                            <span class="badge rounded-pill"
-                                  th:classappend="${featuredSignal == 'bullish' ? ' text-bg-success' : (featuredSignal == 'bearish' ? ' text-bg-danger' : ' text-bg-secondary')}"
+                            <span class="badge rounded-pill px-3 py-2 shadow-sm featured-badge-primary" th:text="#{news.featured.label}">Featured</span>
+                            <span class="badge rounded-pill px-3 py-2 featured-badge-tone"
                                   th:text="${featuredSignal == 'bullish' ? #messages.msg('news.signal.bullish') : (featuredSignal == 'bearish' ? #messages.msg('news.signal.bearish') : #messages.msg('news.signal.mixed'))}">Bullish</span>
                             <span class="text-secondary fw-medium" th:text="${featuredNews.source ?: '-'}">Source</span>
                             <span class="text-secondary opacity-50">&middot;</span>
@@ -149,8 +355,8 @@
                            style="max-height: 2.9em;"
                            th:text="${featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? featuredNews.interpretationSummary : #messages.msg('news.featured.fallback')}">AI summary</p>
                     </div>
-                    <div class="d-flex flex-column align-items-lg-end gap-3 text-nowrap p-3 rounded-4 bg-body bg-opacity-75 border">
-                        <div class="small text-secondary text-uppercase fw-semibold" th:text="#{news.featured.kicker}">AI market reading</div>
+                    <div class="d-flex flex-column align-items-lg-end gap-3 text-nowrap p-3 rounded-4 featured-card-panel">
+                        <div class="small text-secondary text-uppercase fw-semibold" th:text="#{news.featured.kicker}">AI Analysis</div>
                         <a class="btn btn-sm btn-primary px-3 text-nowrap shadow-sm" th:href="@{'/news/' + ${featuredNews.id}}" th:text="#{news.action.detail}">Detail</a>
                     </div>
                 </div>
@@ -169,14 +375,15 @@
                 </div>
                 <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3">
                     <div class="col" th:each="signal : ${marketSignalOverview.items}">
-                        <div class="border rounded-4 p-3 h-100 signal-tile news-surface">
+                        <div class="border rounded-4 p-3 h-100 signal-tile news-surface"
+                             th:classappend="${(signal.variable.name() == 'VOLATILITY' ? ' signal-tile--volatility' : '') + (signal.direction.name() == 'UP' ? ' signal-tile--up' : (signal.direction.name() == 'DOWN' ? ' signal-tile--down' : ' signal-tile--neutral'))}">
                             <div class="d-flex justify-content-between align-items-start gap-3">
                                 <div>
                                     <div class="fw-semibold small text-uppercase text-secondary mb-2"
                                          th:text="#{${'news.overview.variable.' + #strings.toLowerCase(signal.variable.name())}}">
                                         Oil
                                     </div>
-                                    <div class="fw-semibold"
+                                    <div class="fw-semibold signal-state"
                                          th:with="specificDirectionKey=${'news.overview.direction.' + #strings.toLowerCase(signal.variable.name()) + '.' + #strings.toLowerCase(signal.direction.name())},
                                                   genericDirectionKey=${'news.overview.direction.generic.' + #strings.toLowerCase(signal.direction.name())}"
                                          th:text="${#messages.msgOrNull(specificDirectionKey) != null ? #messages.msg(specificDirectionKey) : #messages.msg(genericDirectionKey)}">
@@ -184,12 +391,11 @@
                                     </div>
                                 </div>
                                 <span class="badge rounded-pill signal-arrow fs-6 py-2"
-                                      th:classappend="${signal.direction.name() == 'UP' ? ' text-bg-success' : (signal.direction.name() == 'DOWN' ? ' text-bg-danger' : ' text-bg-secondary')}"
                                       th:text="${signal.direction.name() == 'UP' ? '↑' : (signal.direction.name() == 'DOWN' ? '↓' : '→')}">
                                     →
                                 </span>
                             </div>
-                            <div class="text-secondary small mt-3"
+                            <div class="small mt-3 signal-count"
                                  th:text="#{news.overview.sampleCount(${signal.sampleCount})}">
                                 0 signals
                             </div>
