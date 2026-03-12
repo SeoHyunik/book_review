@@ -3,6 +3,20 @@
       th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content" th:with="featuredNews=${#lists.isEmpty(newsItems) ? null : newsItems[0]}">
     <style>
+        :root {
+            --tone-positive-fg: #b9382d;
+            --tone-positive-border: rgba(255, 133, 94, 0.28);
+            --tone-positive-bg: rgba(255, 237, 231, 0.94);
+            --tone-negative-fg: #2158b5;
+            --tone-negative-border: rgba(96, 165, 250, 0.28);
+            --tone-negative-bg: rgba(230, 241, 255, 0.94);
+            --tone-neutral-fg: #8a5a00;
+            --tone-neutral-border: rgba(245, 158, 11, 0.24);
+            --tone-neutral-bg: rgba(255, 247, 214, 0.94);
+            --surface-strong: #162033;
+            --surface-muted: #526077;
+        }
+
         .news-surface {
             border: 1px solid color-mix(in srgb, var(--bs-border-color) 72%, transparent);
             box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.06);
@@ -131,7 +145,7 @@
             flex-wrap: wrap;
             gap: 0.5rem;
             align-items: center;
-            color: color-mix(in srgb, var(--bs-secondary-color) 84%, #475569);
+            color: color-mix(in srgb, var(--surface-muted) 84%, #334155);
             font-size: 0.82rem;
             line-height: 1.2;
         }
@@ -166,21 +180,21 @@
         }
 
         .featured-card--bullish .featured-badge-tone {
-            color: #b9382d;
-            background: rgba(255, 237, 231, 0.92);
-            border-color: rgba(255, 133, 94, 0.28);
+            color: var(--tone-positive-fg);
+            background: var(--tone-positive-bg);
+            border-color: var(--tone-positive-border);
         }
 
         .featured-card--bearish .featured-badge-tone {
-            color: #2158b5;
-            background: rgba(230, 241, 255, 0.94);
-            border-color: rgba(96, 165, 250, 0.28);
+            color: var(--tone-negative-fg);
+            background: var(--tone-negative-bg);
+            border-color: var(--tone-negative-border);
         }
 
         .featured-card--mixed .featured-badge-tone {
-            color: #5b6472;
-            background: rgba(241, 245, 249, 0.94);
-            border-color: rgba(148, 163, 184, 0.28);
+            color: var(--tone-neutral-fg);
+            background: var(--tone-neutral-bg);
+            border-color: var(--tone-neutral-border);
         }
 
         .featured-card-panel {
@@ -213,7 +227,7 @@
 
         .featured-summary {
             max-width: 60ch;
-            color: color-mix(in srgb, var(--bs-secondary-color) 90%, #334155);
+            color: color-mix(in srgb, var(--surface-muted) 90%, #243246);
             -webkit-line-clamp: 3;
         }
 
@@ -479,35 +493,35 @@
         }
 
         .signal-tile--neutral {
-            border-color: rgba(148, 163, 184, 0.2);
+            border-color: var(--tone-neutral-border);
             background:
-                radial-gradient(circle at top right, rgba(226, 232, 240, 0.36), transparent 36%),
-                linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.98));
+                radial-gradient(circle at top right, rgba(253, 230, 138, 0.3), transparent 36%),
+                linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.98));
         }
 
         .signal-tile--volatility {
-            box-shadow: 0 1rem 2.4rem rgba(76, 29, 149, 0.1);
+            box-shadow: 0 1rem 2.4rem rgba(30, 64, 175, 0.1);
         }
 
         .signal-tile--volatility.signal-tile--up {
-            border-color: rgba(139, 92, 246, 0.24);
+            border-color: rgba(96, 165, 250, 0.26);
             background:
-                radial-gradient(circle at top right, rgba(167, 139, 250, 0.32), transparent 36%),
-                linear-gradient(180deg, rgba(245, 241, 255, 0.98), rgba(255, 255, 255, 0.98));
+                radial-gradient(circle at top right, rgba(191, 219, 254, 0.36), transparent 36%),
+                linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 0.98));
         }
 
         .signal-tile--volatility.signal-tile--down {
-            border-color: rgba(99, 102, 241, 0.24);
+            border-color: rgba(96, 165, 250, 0.24);
             background:
-                radial-gradient(circle at top right, rgba(165, 180, 252, 0.3), transparent 36%),
-                linear-gradient(180deg, rgba(241, 245, 255, 0.98), rgba(255, 255, 255, 0.98));
+                radial-gradient(circle at top right, rgba(186, 230, 253, 0.28), transparent 36%),
+                linear-gradient(180deg, rgba(243, 249, 255, 0.98), rgba(255, 255, 255, 0.98));
         }
 
         .signal-tile--volatility.signal-tile--neutral {
-            border-color: rgba(129, 140, 248, 0.2);
+            border-color: var(--tone-neutral-border);
             background:
-                radial-gradient(circle at top right, rgba(199, 210, 254, 0.28), transparent 36%),
-                linear-gradient(180deg, rgba(245, 246, 255, 0.98), rgba(255, 255, 255, 0.98));
+                radial-gradient(circle at top right, rgba(253, 230, 138, 0.26), transparent 36%),
+                linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.98));
         }
 
         .signal-arrow {
@@ -518,36 +532,50 @@
         }
 
         .signal-tile--up .signal-arrow {
-            color: #c2410c;
-            background: rgba(255, 237, 213, 0.95);
-            border-color: rgba(251, 146, 60, 0.2);
+            color: var(--tone-positive-fg);
+            background: var(--tone-positive-bg);
+            border-color: var(--tone-positive-border);
         }
 
         .signal-tile--down .signal-arrow {
-            color: #1d4ed8;
-            background: rgba(219, 234, 254, 0.95);
-            border-color: rgba(96, 165, 250, 0.2);
+            color: var(--tone-negative-fg);
+            background: var(--tone-negative-bg);
+            border-color: var(--tone-negative-border);
         }
 
         .signal-tile--neutral .signal-arrow {
-            color: #64748b;
-            background: rgba(226, 232, 240, 0.92);
-            border-color: rgba(148, 163, 184, 0.2);
+            color: var(--tone-neutral-fg);
+            background: var(--tone-neutral-bg);
+            border-color: var(--tone-neutral-border);
         }
 
         .signal-tile--volatility .signal-arrow {
-            color: #5b21b6;
-            background: rgba(237, 233, 254, 0.92);
-            border-color: rgba(167, 139, 250, 0.24);
+            color: var(--tone-negative-fg);
+            background: var(--tone-negative-bg);
+            border-color: var(--tone-negative-border);
         }
 
         .signal-state {
             font-size: 1rem;
             letter-spacing: -0.01em;
+            color: var(--surface-strong);
+        }
+
+        .signal-tile--up .signal-state {
+            color: var(--tone-positive-fg);
+        }
+
+        .signal-tile--down .signal-state,
+        .signal-tile--volatility .signal-state {
+            color: var(--tone-negative-fg);
+        }
+
+        .signal-tile--neutral .signal-state {
+            color: var(--tone-neutral-fg);
         }
 
         .signal-count {
-            color: color-mix(in srgb, var(--bs-secondary-color) 88%, #475569);
+            color: color-mix(in srgb, var(--surface-muted) 90%, #334155);
         }
 
         .signal-tile:hover {
@@ -621,11 +649,11 @@
         }
 
         .news-priority {
-            color: color-mix(in srgb, var(--bs-secondary-color) 86%, #475569);
+            color: color-mix(in srgb, var(--surface-muted) 88%, #334155);
         }
 
         .news-secondary {
-            color: color-mix(in srgb, var(--bs-secondary-color) 88%, #475569);
+            color: color-mix(in srgb, var(--surface-muted) 88%, #334155);
             font-size: 0.88rem;
         }
 
@@ -708,19 +736,19 @@
         }
 
         .forecast-up {
-            color: #ff4d4f;
+            color: var(--tone-positive-fg);
             font-size: 22px;
             font-weight: bold;
         }
 
         .forecast-down {
-            color: #3b82f6;
+            color: var(--tone-negative-fg);
             font-size: 22px;
             font-weight: bold;
         }
 
         .forecast-flat {
-            color: #9ca3af;
+            color: var(--tone-neutral-fg);
             font-size: 20px;
             font-weight: 600;
         }

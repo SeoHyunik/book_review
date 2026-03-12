@@ -3,6 +3,20 @@
       th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content">
     <style>
+        :root {
+            --tone-positive-fg: #b9382d;
+            --tone-positive-border: rgba(255, 133, 94, 0.28);
+            --tone-positive-bg: rgba(255, 237, 231, 0.94);
+            --tone-negative-fg: #2158b5;
+            --tone-negative-border: rgba(96, 165, 250, 0.28);
+            --tone-negative-bg: rgba(230, 241, 255, 0.94);
+            --tone-neutral-fg: #8a5a00;
+            --tone-neutral-border: rgba(245, 158, 11, 0.24);
+            --tone-neutral-bg: rgba(255, 247, 214, 0.94);
+            --surface-strong: #162033;
+            --surface-muted: #526077;
+        }
+
         .detail-surface {
             border: 1px solid color-mix(in srgb, var(--bs-border-color) 74%, transparent);
             box-shadow: 0 1rem 2.4rem rgba(15, 23, 42, 0.06);
@@ -35,6 +49,7 @@
             line-height: 1.08;
             letter-spacing: -0.03em;
             max-width: 18ch;
+            color: var(--surface-strong);
         }
 
         .detail-subheading {
@@ -55,7 +70,7 @@
             border-radius: 999px;
             background: rgba(255, 255, 255, 0.78);
             border: 1px solid rgba(148, 163, 184, 0.16);
-            color: color-mix(in srgb, var(--bs-secondary-color) 84%, #334155);
+            color: color-mix(in srgb, var(--surface-muted) 86%, #243246);
             font-size: 0.84rem;
             line-height: 1.2;
         }
@@ -90,7 +105,7 @@
             font-size: 0.78rem;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: var(--bs-secondary-color);
+            color: color-mix(in srgb, var(--surface-muted) 88%, #243246);
             font-weight: 700;
         }
 
@@ -98,10 +113,11 @@
             margin-bottom: 0;
             font-size: 1.02rem;
             letter-spacing: -0.01em;
+            color: var(--surface-strong);
         }
 
         .detail-copy {
-            color: color-mix(in srgb, var(--bs-secondary-color) 88%, #334155);
+            color: color-mix(in srgb, var(--surface-muted) 90%, #243246);
             line-height: 1.75;
             margin-bottom: 0;
             max-width: 74ch;
@@ -150,7 +166,7 @@
 
         .detail-impact-table thead th {
             background: transparent;
-            color: var(--bs-secondary-color);
+            color: color-mix(in srgb, var(--surface-muted) 88%, #243246);
             font-size: 0.76rem;
             font-weight: 700;
             letter-spacing: 0.04em;
@@ -189,31 +205,31 @@
         }
 
         .detail-direction-chip--up {
-            color: #c2410c;
-            background: rgba(255, 237, 213, 0.9);
-            border-color: rgba(251, 146, 60, 0.22);
+            color: var(--tone-positive-fg);
+            background: var(--tone-positive-bg);
+            border-color: var(--tone-positive-border);
         }
 
         .detail-direction-chip--down {
-            color: #1d4ed8;
-            background: rgba(219, 234, 254, 0.92);
-            border-color: rgba(96, 165, 250, 0.22);
+            color: var(--tone-negative-fg);
+            background: var(--tone-negative-bg);
+            border-color: var(--tone-negative-border);
         }
 
         .detail-direction-chip--neutral {
-            color: #64748b;
-            background: rgba(226, 232, 240, 0.9);
-            border-color: rgba(148, 163, 184, 0.2);
+            color: var(--tone-neutral-fg);
+            background: var(--tone-neutral-bg);
+            border-color: var(--tone-neutral-border);
         }
 
         .detail-confidence {
             font-variant-numeric: tabular-nums;
-            color: color-mix(in srgb, var(--bs-secondary-color) 86%, #334155);
+            color: color-mix(in srgb, var(--surface-muted) 86%, #243246);
             font-weight: 600;
         }
 
         .detail-empty {
-            color: var(--bs-secondary-color);
+            color: color-mix(in srgb, var(--surface-muted) 86%, #243246);
             padding: 0.2rem 0 0;
         }
 
