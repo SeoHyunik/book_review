@@ -78,15 +78,64 @@
             font-size: 0.85rem;
         }
 
+        .featured-layout {
+            gap: 1.5rem;
+        }
+
+        .featured-main {
+            min-width: 0;
+        }
+
+        .featured-header {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.85rem;
+            margin-bottom: 1rem;
+        }
+
+        .featured-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+            align-items: center;
+        }
+
+        .featured-support {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            color: color-mix(in srgb, var(--bs-secondary-color) 84%, #475569);
+            font-size: 0.82rem;
+            line-height: 1.2;
+        }
+
+        .featured-support-dot {
+            opacity: 0.45;
+        }
+
+        .featured-heading {
+            margin-bottom: 0.95rem;
+            font-size: clamp(1.65rem, 2.2vw, 2.35rem);
+            line-height: 1.08;
+            letter-spacing: -0.03em;
+            max-width: 14ch;
+        }
+
         .featured-badge-primary {
             background: rgba(15, 23, 42, 0.82);
             color: #fff;
             border: 1px solid rgba(255, 255, 255, 0.14);
+            font-size: 0.75rem;
+            letter-spacing: 0.01em;
         }
 
         .featured-badge-tone {
             border: 1px solid transparent;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            font-size: 0.75rem;
+            letter-spacing: 0.01em;
         }
 
         .featured-card--bullish .featured-badge-tone {
@@ -112,6 +161,8 @@
             border: 1px solid rgba(255, 255, 255, 0.52);
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
             backdrop-filter: blur(10px);
+            min-width: 220px;
+            max-width: 260px;
         }
 
         .featured-card--bullish .featured-card-panel {
@@ -129,6 +180,41 @@
         .featured-card .btn-primary {
             border: none;
             box-shadow: 0 0.75rem 1.6rem rgba(15, 23, 42, 0.12);
+        }
+
+        .featured-summary {
+            max-width: 60ch;
+            color: color-mix(in srgb, var(--bs-secondary-color) 90%, #334155);
+            -webkit-line-clamp: 3;
+        }
+
+        .featured-card-panel-label {
+            letter-spacing: 0.08em;
+        }
+
+        .featured-card-panel .btn {
+            align-self: flex-start;
+        }
+
+        @media (min-width: 992px) {
+            .featured-layout {
+                align-items: stretch;
+            }
+
+            .featured-card-panel {
+                align-self: center;
+            }
+        }
+
+        @media (max-width: 991.98px) {
+            .featured-heading {
+                max-width: none;
+            }
+
+            .featured-card-panel {
+                width: 100%;
+                max-width: none;
+            }
         }
 
         .featured-card--bullish .btn-primary {
@@ -338,25 +424,29 @@
         <div class="card border-0 overflow-hidden news-surface featured-card"
              th:classappend="${featuredSignal == 'bullish' ? ' featured-card--bullish' : (featuredSignal == 'bearish' ? ' featured-card--bearish' : ' featured-card--mixed')}">
             <div class="card-body p-4">
-                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3">
-                    <div class="flex-grow-1">
-                        <div class="d-flex flex-wrap gap-2 align-items-center mb-3 featured-meta">
-                            <span class="badge rounded-pill px-3 py-2 shadow-sm featured-badge-primary" th:text="#{news.featured.label}">Featured</span>
-                            <span class="badge rounded-pill px-3 py-2 featured-badge-tone"
-                                  th:text="${featuredSignal == 'bullish' ? #messages.msg('news.signal.bullish') : (featuredSignal == 'bearish' ? #messages.msg('news.signal.bearish') : #messages.msg('news.signal.mixed'))}">Bullish</span>
-                            <span class="text-secondary fw-medium" th:text="${featuredNews.source ?: '-'}">Source</span>
-                            <span class="text-secondary opacity-50">&middot;</span>
-                            <span class="text-secondary" th:text="${featuredNews.publishedAt ?: '-'}">Published At</span>
+                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start featured-layout">
+                    <div class="flex-grow-1 featured-main">
+                        <div class="featured-header featured-meta">
+                            <div class="featured-badges">
+                                <span class="badge rounded-pill px-3 py-2 shadow-sm featured-badge-primary" th:text="#{news.featured.label}">Featured</span>
+                                <span class="badge rounded-pill px-3 py-2 featured-badge-tone"
+                                      th:text="${featuredSignal == 'bullish' ? #messages.msg('news.signal.bullish') : (featuredSignal == 'bearish' ? #messages.msg('news.signal.bearish') : #messages.msg('news.signal.mixed'))}">Bullish</span>
+                            </div>
+                            <div class="featured-support">
+                                <span class="fw-medium" th:text="${featuredNews.source ?: '-'}">Source</span>
+                                <span class="featured-support-dot">&middot;</span>
+                                <span th:text="${featuredNews.publishedAt ?: '-'}">Published At</span>
+                            </div>
                         </div>
-                        <h2 class="h3 fw-bold mb-3 lh-sm line-clamp-2"
-                            style="max-height: 2.9em;"
+                        <h2 class="h3 fw-bold lh-sm line-clamp-2 featured-heading"
+                            style="max-height: 2.35em;"
                             th:text="${featuredNews.title ?: #messages.msg('news.untitled')}">Featured News</h2>
-                        <p class="text-secondary mb-0 lh-sm featured-summary"
-                           style="max-height: 2.9em;"
+                        <p class="mb-0 lh-sm featured-summary"
+                           style="max-height: 4.1em;"
                            th:text="${featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? featuredNews.interpretationSummary : #messages.msg('news.featured.fallback')}">AI summary</p>
                     </div>
-                    <div class="d-flex flex-column align-items-lg-end gap-3 text-nowrap p-3 rounded-4 featured-card-panel">
-                        <div class="small text-secondary text-uppercase fw-semibold" th:text="#{news.featured.kicker}">AI Analysis</div>
+                    <div class="d-flex flex-column justify-content-center align-items-lg-start gap-2 text-nowrap p-3 p-lg-4 rounded-4 featured-card-panel">
+                        <div class="small text-secondary text-uppercase fw-semibold featured-card-panel-label" th:text="#{news.featured.kicker}">AI Analysis</div>
                         <a class="btn btn-sm btn-primary px-3 text-nowrap shadow-sm" th:href="@{'/news/' + ${featuredNews.id}}" th:text="#{news.action.detail}">Detail</a>
                     </div>
                 </div>
