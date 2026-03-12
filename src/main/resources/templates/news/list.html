@@ -120,8 +120,8 @@
                            th:text="${featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? featuredNews.interpretationSummary : #messages.msg('news.featured.fallback')}">AI summary</p>
                     </div>
                     <div class="d-flex flex-column align-items-lg-end gap-3 text-nowrap p-3 rounded-4 bg-body bg-opacity-75 border">
-                        <div class="small text-secondary text-uppercase fw-semibold" th:text="#{news.featured.kicker}">AI market reading</div>
-                        <a class="btn btn-sm btn-primary px-3 text-nowrap shadow-sm" th:href="@{'/news/' + ${featuredNews.id}}" th:text="#{news.action.detail}">Detail</a>
+                        <div class="small text-secondary text-uppercase fw-semibold" th:text="#{news.featured.kicker}">AI Analysis</div>
+                        <a class="btn btn-sm btn-primary px-3 text-nowrap shadow-sm" th:href="@{'/news/' + ${featuredNews.id}}" th:text="#{news.featured.action}">View Details</a>
                     </div>
                 </div>
             </div>
