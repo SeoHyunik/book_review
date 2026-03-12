@@ -8,20 +8,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.macronews.config.SecurityConfig;
 import com.example.macronews.repository.UserRepository;
+import com.example.macronews.security.ContinueAwareAuthenticationSuccessHandler;
 import com.example.macronews.security.CustomUserDetailsService;
 import com.example.macronews.security.LoggingAuthenticationFailureHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(controllers = UserValidationApiController.class, properties = "spring.cache.type=none")
-@Import(SecurityConfig.class)
+@SpringBootTest(properties = "spring.cache.type=none")
+@AutoConfigureMockMvc
 class UserValidationApiControllerTest {
 
     @Autowired
@@ -35,6 +35,9 @@ class UserValidationApiControllerTest {
 
     @MockitoBean
     private LoggingAuthenticationFailureHandler loggingAuthenticationFailureHandler;
+
+    @MockitoBean
+    private ContinueAwareAuthenticationSuccessHandler continueAwareAuthenticationSuccessHandler;
 
     @Test
     @DisplayName("Available username should return available true")
