@@ -6,12 +6,12 @@
         .news-surface {
             border: 1px solid color-mix(in srgb, var(--bs-border-color) 72%, transparent);
             box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.06);
-            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+            transition: transform 0.22s ease, box-shadow 0.24s ease, border-color 0.24s ease, background 0.28s ease;
         }
 
         .news-surface:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 1.2rem 2.75rem rgba(15, 23, 42, 0.09);
+            transform: translateY(-3px);
+            box-shadow: 0 1.35rem 2.9rem rgba(15, 23, 42, 0.1);
             border-color: color-mix(in srgb, var(--bs-primary) 18%, var(--bs-border-color));
         }
 
@@ -31,11 +31,36 @@
             opacity: 0.9;
             pointer-events: none;
             z-index: 0;
+            transition: opacity 0.28s ease, transform 0.36s ease;
+            transform: translate3d(0, 0, 0);
+        }
+
+        .featured-card::after {
+            content: "";
+            position: absolute;
+            inset: auto -10% -30% 38%;
+            height: 62%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.24), transparent 68%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 0;
+            transition: opacity 0.3s ease, transform 0.36s ease;
+            transform: translate3d(0, 12px, 0);
         }
 
         .featured-card > .card-body {
             position: relative;
             z-index: 1;
+        }
+
+        .featured-card:hover::before {
+            opacity: 1;
+            transform: translate3d(6px, -4px, 0);
+        }
+
+        .featured-card:hover::after {
+            opacity: 0.75;
+            transform: translate3d(-4px, 0, 0);
         }
 
         .featured-card--bullish {
@@ -129,6 +154,7 @@
             border: 1px solid rgba(255, 255, 255, 0.14);
             font-size: 0.75rem;
             letter-spacing: 0.01em;
+            transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
         }
 
         .featured-badge-tone {
@@ -136,6 +162,7 @@
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
             font-size: 0.75rem;
             letter-spacing: 0.01em;
+            transition: background-color 0.24s ease, border-color 0.24s ease, color 0.24s ease, transform 0.2s ease;
         }
 
         .featured-card--bullish .featured-badge-tone {
@@ -163,6 +190,7 @@
             backdrop-filter: blur(10px);
             min-width: 220px;
             max-width: 260px;
+            transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease, background-color 0.24s ease;
         }
 
         .featured-card--bullish .featured-card-panel {
@@ -180,6 +208,7 @@
         .featured-card .btn-primary {
             border: none;
             box-shadow: 0 0.75rem 1.6rem rgba(15, 23, 42, 0.12);
+            transition: transform 0.2s ease, box-shadow 0.24s ease, filter 0.24s ease;
         }
 
         .featured-summary {
@@ -194,6 +223,23 @@
 
         .featured-card-panel .btn {
             align-self: flex-start;
+        }
+
+        .featured-card:hover .featured-card-panel {
+            transform: translateY(-1px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0.85rem 1.8rem rgba(15, 23, 42, 0.08);
+            border-color: rgba(255, 255, 255, 0.68);
+        }
+
+        .featured-card:hover .featured-badge-primary,
+        .featured-card:hover .featured-badge-tone {
+            transform: translateY(-1px);
+        }
+
+        .featured-card .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 1rem 1.9rem rgba(15, 23, 42, 0.16);
+            filter: saturate(1.04);
         }
 
         @media (min-width: 992px) {
@@ -234,6 +280,7 @@
             overflow: hidden;
             background: color-mix(in srgb, var(--bs-tertiary-bg) 88%, var(--bs-body-bg));
             min-height: 124px;
+            transition: transform 0.2s ease, box-shadow 0.24s ease, border-color 0.24s ease, background 0.28s ease;
         }
 
         .signal-tile::before {
@@ -243,6 +290,8 @@
             background: linear-gradient(145deg, rgba(255, 255, 255, 0.55), transparent 55%);
             pointer-events: none;
             opacity: 0.9;
+            transition: opacity 0.24s ease, transform 0.3s ease;
+            transform: translate3d(0, 0, 0);
         }
 
         .signal-tile > * {
@@ -300,6 +349,7 @@
             min-width: 2rem;
             border: 1px solid transparent;
             box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            transition: transform 0.2s ease, box-shadow 0.24s ease, background-color 0.24s ease, border-color 0.24s ease;
         }
 
         .signal-tile--up .signal-arrow {
@@ -333,6 +383,21 @@
 
         .signal-count {
             color: color-mix(in srgb, var(--bs-secondary-color) 88%, #475569);
+        }
+
+        .signal-tile:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 1.15rem 2.4rem rgba(15, 23, 42, 0.11);
+        }
+
+        .signal-tile:hover::before {
+            opacity: 1;
+            transform: translate3d(0, -4px, 0);
+        }
+
+        .signal-tile:hover .signal-arrow {
+            transform: translateY(-1px);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 0.5rem 1rem rgba(15, 23, 42, 0.08);
         }
 
         .news-toolbar-chip {
@@ -375,6 +440,33 @@
         .news-action-stack .btn:hover {
             transform: translateY(-1px);
             box-shadow: 0 0.35rem 0.8rem rgba(15, 23, 42, 0.08);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .news-surface,
+            .featured-card::before,
+            .featured-card::after,
+            .featured-card-panel,
+            .featured-badge-primary,
+            .featured-badge-tone,
+            .featured-card .btn-primary,
+            .signal-tile,
+            .signal-tile::before,
+            .signal-arrow,
+            .news-action-stack .btn {
+                transition: none;
+            }
+
+            .news-surface:hover,
+            .signal-tile:hover,
+            .featured-card:hover .featured-card-panel,
+            .featured-card .btn-primary:hover,
+            .news-action-stack .btn:hover,
+            .featured-card:hover .featured-badge-primary,
+            .featured-card:hover .featured-badge-tone,
+            .signal-tile:hover .signal-arrow {
+                transform: none;
+            }
         }
 
         .forecast-column {
