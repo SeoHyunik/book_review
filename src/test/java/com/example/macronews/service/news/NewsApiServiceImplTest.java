@@ -41,6 +41,7 @@ class NewsApiServiceImplTest {
         ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");
         ReflectionTestUtils.setField(newsApiService, "country", "us");
         ReflectionTestUtils.setField(newsApiService, "category", "business");
+        ReflectionTestUtils.setField(newsApiService, "enabled", true);
 
         Instant newest = Instant.now().minusSeconds(60 * 60);
         Instant fresh = Instant.now().minusSeconds(60 * 90);
@@ -73,6 +74,7 @@ class NewsApiServiceImplTest {
         ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");
         ReflectionTestUtils.setField(newsApiService, "country", "us");
         ReflectionTestUtils.setField(newsApiService, "category", "business");
+        ReflectionTestUtils.setField(newsApiService, "enabled", true);
 
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, "{\"articles\":[]}"));
 
@@ -97,6 +99,7 @@ class NewsApiServiceImplTest {
         ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");
         ReflectionTestUtils.setField(newsApiService, "country", "us");
         ReflectionTestUtils.setField(newsApiService, "category", "business");
+        ReflectionTestUtils.setField(newsApiService, "enabled", true);
 
         Instant recent = Instant.now().minusSeconds(60 * 60);
         Instant headline = Instant.now().minusSeconds(60 * 70);

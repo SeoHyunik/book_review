@@ -2,8 +2,8 @@ package com.example.macronews.config;
 
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
-import com.example.macronews.service.news.NewsApiService;
 import com.example.macronews.service.news.NewsIngestionService;
+import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -23,7 +23,7 @@ public class ScheduledNewsIngestionJob {
     private static final int DEFAULT_PAGE_SIZE = 10;
 
     private final NewsIngestionService newsIngestionService;
-    private final NewsApiService newsApiService;
+    private final NewsSourceProviderSelector newsSourceProviderSelector;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicLong runSequence = new AtomicLong(0);
 
@@ -39,8 +39,8 @@ public class ScheduledNewsIngestionJob {
         }
 
         try {
-            if (!newsApiService.isConfigured()) {
-                log.info("[SCHEDULER] runId={} skipped reason=news-api-not-configured", runId);
+            if (!newsSourceProviderSelector.isConfigured()) {
+                log.info("[SCHEDULER] runId={} skipped reason=news-source-not-configured", runId);
                 return;
             }
 

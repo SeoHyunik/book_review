@@ -6,7 +6,7 @@ import static org.mockito.Mockito.mock;
 import com.example.macronews.controller.AdminNewsController;
 import com.example.macronews.controller.LoginController;
 import com.example.macronews.service.macro.MacroAiService;
-import com.example.macronews.service.news.NewsApiService;
+import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
 import jakarta.servlet.http.HttpSession;
@@ -28,7 +28,7 @@ class RedirectHardeningTest {
 
     private final AdminNewsController adminNewsController = new AdminNewsController(
             mock(NewsIngestionService.class),
-            mock(NewsApiService.class),
+            mock(NewsSourceProviderSelector.class),
             mock(MacroAiService.class),
             mock(NewsQueryService.class));
 

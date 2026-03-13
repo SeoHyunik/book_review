@@ -6,12 +6,12 @@ import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.macro.MacroAiService;
+import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +19,6 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
@@ -33,22 +32,12 @@ import org.springframework.util.StringUtils;
 @Slf4j
 public class NewsIngestionServiceImpl implements NewsIngestionService {
 
-    private static final ZoneId SEOUL_ZONE_ID = ZoneId.of("Asia/Seoul");
-    private static final int DEFAULT_DOMESTIC_START_HOUR = 5;
-    private static final int DEFAULT_DOMESTIC_END_HOUR = 22;
-
     private final NewsEventRepository newsEventRepository;
-    private final NewsApiService newsApiService;
+    private final NewsSourceProviderSelector newsSourceProviderSelector;
     private final MacroAiService macroAiService;
 
     @Qualifier("ingestionExecutor")
     private final Executor ingestionExecutor;
-
-    @Value("${app.ingestion.domestic-start-hour:5}")
-    private int domesticStartHour;
-
-    @Value("${app.ingestion.domestic-end-hour:22}")
-    private int domesticEndHour;
 
     @Override
     @Transactional
@@ -195,35 +184,7 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
     }
 
     private List<ExternalNewsItem> loadScheduledHeadlineFeed(int limit) {
-        if (isDomesticWindow()) {
-            log.info("[INGEST] using domestic headline window hour={} start={} end={}",
-                    currentSeoulHour(), resolveHour(domesticStartHour, DEFAULT_DOMESTIC_START_HOUR),
-                    resolveHour(domesticEndHour, DEFAULT_DOMESTIC_END_HOUR));
-            return newsApiService.fetchDomesticTopHeadlines(limit);
-        }
-        log.info("[INGEST] using foreign headline window hour={} start={} end={}",
-                currentSeoulHour(), resolveHour(domesticStartHour, DEFAULT_DOMESTIC_START_HOUR),
-                resolveHour(domesticEndHour, DEFAULT_DOMESTIC_END_HOUR));
-        return newsApiService.fetchForeignTopHeadlines(limit);
-    }
-
-    private boolean isDomesticWindow() {
-        int startHour = resolveHour(domesticStartHour, DEFAULT_DOMESTIC_START_HOUR);
-        int endHour = resolveHour(domesticEndHour, DEFAULT_DOMESTIC_END_HOUR);
-        int currentHour = currentSeoulHour();
-
-        if (startHour <= endHour) {
-            return currentHour >= startHour && currentHour <= endHour;
-        }
-        return currentHour >= startHour || currentHour <= endHour;
-    }
-
-    private int currentSeoulHour() {
-        return LocalTime.now(SEOUL_ZONE_ID).getHour();
-    }
-
-    private int resolveHour(int configuredHour, int fallbackHour) {
-        return configuredHour >= 0 && configuredHour <= 23 ? configuredHour : fallbackHour;
+        return newsSourceProviderSelector.fetchTopHeadlines(limit);
     }
 
     private String resolveExternalId(ExternalNewsItem item) {

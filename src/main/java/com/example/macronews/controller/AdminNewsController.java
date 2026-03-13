@@ -6,10 +6,10 @@ import com.example.macronews.dto.AutoIngestionBatchStatusDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
-import com.example.macronews.service.news.NewsApiService;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +42,7 @@ public class AdminNewsController {
     private static final String NEWS_PAGE = "/news";
 
     private final NewsIngestionService newsIngestionService;
-    private final NewsApiService newsApiService;
+    private final NewsSourceProviderSelector newsSourceProviderSelector;
     private final MacroAiService macroAiService;
     private final NewsQueryService newsQueryService;
 
@@ -73,7 +73,7 @@ public class AdminNewsController {
         populateAutoBatchStatusFromFlash(model);
         model.addAttribute("pageTitleKey", "page.admin.auto.title");
         model.addAttribute("pageDescriptionKey", "page.admin.auto.description");
-        model.addAttribute("newsApiConfigured", newsApiService.isConfigured());
+        model.addAttribute("newsApiConfigured", newsSourceProviderSelector.isConfigured());
         log.debug("Rendering admin automatic news ingestion form with {} recent items", recentNewsItems.size());
         return "admin/news/ingest-api";
     }
@@ -158,10 +158,10 @@ public class AdminNewsController {
     public String ingestFromApi(@RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
             RedirectAttributes redirectAttributes) {
         try {
-            if (!newsApiService.isConfigured()) {
-                log.info("Admin external ingestion skipped because news.api.key is not configured");
+            if (!newsSourceProviderSelector.isConfigured()) {
+                log.info("Admin external ingestion skipped because no news source provider is configured");
                 redirectAttributes.addFlashAttribute("warningMessage",
-                        "Automatic ingestion requires external news API configuration (news.api.key). Manual ingestion is still available.");
+                        "Automatic ingestion requires at least one configured news source provider. Manual ingestion is still available.");
                 return "redirect:" + AUTO_PAGE;
             }
 
