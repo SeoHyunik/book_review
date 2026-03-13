@@ -6,6 +6,7 @@ import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.macro.MacroAiService;
+import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -32,7 +33,7 @@ import org.springframework.util.StringUtils;
 public class NewsIngestionServiceImpl implements NewsIngestionService {
 
     private final NewsEventRepository newsEventRepository;
-    private final NewsApiService newsApiService;
+    private final NewsSourceProviderSelector newsSourceProviderSelector;
     private final MacroAiService macroAiService;
 
     @Qualifier("ingestionExecutor")
@@ -79,7 +80,7 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
     @Transactional
     public List<NewsEvent> ingestTopHeadlines(int limit) {
         log.info("[INGEST] batch start limit={}", limit);
-        List<ExternalNewsItem> externalItems = newsApiService.fetchTopHeadlines(limit);
+        List<ExternalNewsItem> externalItems = loadScheduledHeadlineFeed(limit);
         List<NewsEvent> results = new ArrayList<>();
         List<String> interpretationTargets = new ArrayList<>();
 
@@ -180,6 +181,10 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         }
 
         return Optional.empty();
+    }
+
+    private List<ExternalNewsItem> loadScheduledHeadlineFeed(int limit) {
+        return newsSourceProviderSelector.fetchTopHeadlines(limit);
     }
 
     private String resolveExternalId(ExternalNewsItem item) {

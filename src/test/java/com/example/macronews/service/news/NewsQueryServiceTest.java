@@ -426,7 +426,8 @@ class NewsQueryServiceTest {
                         List.of(
                                 new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.9d),
                                 new MacroImpact(MacroVariable.INTEREST_RATE, ImpactDirection.UP, 0.8d),
-                                new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.7d)
+                                new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.7d),
+                                new MacroImpact(MacroVariable.KOSPI, ImpactDirection.UP, 0.7d)
                         ),
                         List.of()));
         NewsEvent analyzedTwo = newsEvent(
@@ -442,7 +443,8 @@ class NewsQueryServiceTest {
                         List.of(
                                 new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.6d),
                                 new MacroImpact(MacroVariable.INFLATION, ImpactDirection.DOWN, 0.6d),
-                                new MacroImpact(MacroVariable.VOLATILITY, ImpactDirection.NEUTRAL, 0.5d)
+                                new MacroImpact(MacroVariable.VOLATILITY, ImpactDirection.NEUTRAL, 0.5d),
+                                new MacroImpact(MacroVariable.GOLD, ImpactDirection.UP, 0.6d)
                         ),
                         List.of()));
 
@@ -451,22 +453,30 @@ class NewsQueryServiceTest {
 
         var overview = newsQueryService.getMarketSignalOverview(null, NewsListSort.PUBLISHED_DESC);
 
-        assertThat(overview.items()).hasSize(5);
+        assertThat(overview.items()).hasSize(8);
         assertThat(overview.items())
                 .filteredOn(item -> item.variable() == MacroVariable.OIL)
                 .singleElement()
                 .satisfies(item -> {
-                    assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
+                    assertThat(item.direction()).isEqualTo(ImpactDirection.DOWN);
                     assertThat(item.sampleCount()).isEqualTo(2);
                 });
         assertThat(overview.items())
                 .filteredOn(item -> item.variable() == MacroVariable.USD)
                 .singleElement()
-                .satisfies(item -> assertThat(item.direction()).isEqualTo(ImpactDirection.DOWN));
+                .satisfies(item -> assertThat(item.direction()).isEqualTo(ImpactDirection.UP));
         assertThat(overview.items())
                 .filteredOn(item -> item.variable() == MacroVariable.VOLATILITY)
                 .singleElement()
                 .satisfies(item -> assertThat(item.direction()).isEqualTo(ImpactDirection.NEUTRAL));
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.KOSPI)
+                .singleElement()
+                .satisfies(item -> assertThat(item.direction()).isEqualTo(ImpactDirection.UP));
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.GOLD)
+                .singleElement()
+                .satisfies(item -> assertThat(item.direction()).isEqualTo(ImpactDirection.DOWN));
     }
     private NewsEvent newsEvent(String id, String title, String summary, String source, String url,
             String publishedAt, String ingestedAt, NewsStatus status, AnalysisResult analysisResult) {

@@ -15,6 +15,7 @@ import com.example.macronews.repository.NewsEventRepository;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -32,6 +33,15 @@ import org.springframework.util.StringUtils;
 @Service
 @RequiredArgsConstructor
 public class NewsQueryService {
+
+    private static final EnumSet<MacroVariable> REVERSE_DIRECTION_VARIABLES = EnumSet.of(
+            MacroVariable.OIL,
+            MacroVariable.USD,
+            MacroVariable.INTEREST_RATE,
+            MacroVariable.INFLATION,
+            MacroVariable.VOLATILITY,
+            MacroVariable.GOLD
+    );
 
     private final NewsEventRepository newsEventRepository;
 
@@ -102,6 +112,21 @@ public class NewsQueryService {
     @Cacheable(cacheNames = "newsDetail", key = "#id")
     public Optional<NewsDetailDto> getNewsDetail(String id) {
         return newsEventRepository.findById(id).map(this::toDetail);
+    }
+
+    public List<NewsListItemDto> getNewsItemsByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Map<String, NewsEvent> eventsById = StreamSupport
+                .stream(newsEventRepository.findAllById(ids).spliterator(), false)
+                .collect(Collectors.toMap(NewsEvent::id, Function.identity()));
+
+        return ids.stream()
+                .map(eventsById::get)
+                .filter(Objects::nonNull)
+                .map(this::toListItem)
+                .toList();
     }
 
     private List<NewsEvent> loadCandidates(NewsStatus status) {
@@ -212,7 +237,11 @@ public class NewsQueryService {
             }
         }
 
-        return new MarketSignalItemDto(variable, resolveDominantDirection(counts), sampleCount);
+        ImpactDirection dominantDirection = resolveDominantDirection(counts);
+        if (REVERSE_DIRECTION_VARIABLES.contains(variable)) {
+            dominantDirection = invertDirection(dominantDirection);
+        }
+        return new MarketSignalItemDto(variable, dominantDirection, sampleCount);
     }
 
     private ImpactDirection resolveDominantDirection(Map<ImpactDirection, Integer> counts) {
@@ -225,6 +254,16 @@ public class NewsQueryService {
         }
         if (down > up && down > neutral) {
             return ImpactDirection.DOWN;
+        }
+        return ImpactDirection.NEUTRAL;
+    }
+
+    private ImpactDirection invertDirection(ImpactDirection direction) {
+        if (direction == ImpactDirection.UP) {
+            return ImpactDirection.DOWN;
+        }
+        if (direction == ImpactDirection.DOWN) {
+            return ImpactDirection.UP;
         }
         return ImpactDirection.NEUTRAL;
     }

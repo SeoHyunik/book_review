@@ -32,7 +32,7 @@ public class ExternalApiUtils {
         HttpHeaders headers = request.headers() != null ? request.headers() : new HttpHeaders();
         HttpHeaders sanitizedHeaders = sanitizeHeaders(headers);
         log.info("[HTTP] Calling external API: method={}, url={}, headers={}", request.method(),
-                request.url(), sanitizedHeaders);
+                sanitizeUrl(request.url()), sanitizedHeaders);
 
         try {
             return webClientBuilder
@@ -94,7 +94,9 @@ public class ExternalApiUtils {
     private HttpHeaders sanitizeHeaders(HttpHeaders headers) {
         HttpHeaders sanitized = new HttpHeaders();
         headers.forEach((key, values) -> {
-            if ("authorization".equalsIgnoreCase(key)) {
+            if ("authorization".equalsIgnoreCase(key)
+                    || "x-naver-client-id".equalsIgnoreCase(key)
+                    || "x-naver-client-secret".equalsIgnoreCase(key)) {
                 values.forEach(value -> sanitized.add(key, maskAuthorization(value)));
             } else {
                 sanitized.addAll(key, values);
@@ -103,9 +105,21 @@ public class ExternalApiUtils {
         return sanitized;
     }
 
+    private String sanitizeUrl(String value) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+        String sanitized = value.replaceAll("(?i)([?&](?:apiKey|api_key|access_key)=)[^&]+", "$1****(masked)");
+        sanitized = sanitized.replaceAll("(?i)(/v6/)[^/]+(/latest/[^?]+)", "$1****(masked)$2");
+        return sanitized;
+    }
+
     private String maskAuthorization(String value) {
         if (value == null || value.isBlank()) {
             return "****(masked)";
+        }
+        if (value.startsWith("Token ")) {
+            return "Token ****(masked)";
         }
         if (!value.startsWith("Bearer ")) {
             return "****(masked)";

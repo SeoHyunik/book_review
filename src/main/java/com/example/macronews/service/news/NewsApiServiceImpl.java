@@ -2,6 +2,8 @@ package com.example.macronews.service.news;
 
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.service.news.source.NewsFeedPriority;
+import com.example.macronews.service.news.source.NewsSourceProvider;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -26,10 +28,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class NewsApiServiceImpl implements NewsApiService {
+public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
+
+    @Value("${app.news.global.enabled:true}")
+    private boolean enabled;
 
     @Value("${news.api.base-url:https://newsapi.org/v2/top-headlines}")
     private String baseUrl;
@@ -57,6 +62,21 @@ public class NewsApiServiceImpl implements NewsApiService {
 
     @Override
     public List<ExternalNewsItem> fetchTopHeadlines(int limit) {
+        return fetchForeignTopHeadlines(limit);
+    }
+
+    @Override
+    public String sourceCode() {
+        return "newsapi-global";
+    }
+
+    @Override
+    public boolean supports(NewsFeedPriority priority) {
+        return priority == NewsFeedPriority.FOREIGN;
+    }
+
+    @Override
+    public List<ExternalNewsItem> fetchDomesticTopHeadlines(int limit) {
         if (!isConfigured()) {
             log.warn("news.api.key is missing; returning empty top-headlines list");
             return List.of();
@@ -74,6 +94,24 @@ public class NewsApiServiceImpl implements NewsApiService {
     }
 
     @Override
+    public List<ExternalNewsItem> fetchForeignTopHeadlines(int limit) {
+        if (!isConfigured()) {
+            log.warn("news.api.key is missing; returning empty top-headlines list");
+            return List.of();
+        }
+
+        int resolvedLimit = limit > 0 ? limit : defaultLimit;
+        List<ExternalNewsItem> headlines = fetchFromUrl(buildTopHeadlinesUrl(resolvedLimit), resolvedLimit,
+                "top-headlines");
+        if (headlines.size() >= resolvedLimit) {
+            return headlines;
+        }
+
+        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit);
+        return mergeAndLimit(headlines, freshest, resolvedLimit);
+    }
+
+    @Override
     public Optional<ExternalNewsItem> fetchByUrl(String url) {
         if (!StringUtils.hasText(url)) {
             return Optional.empty();
@@ -86,7 +124,7 @@ public class NewsApiServiceImpl implements NewsApiService {
 
     @Override
     public boolean isConfigured() {
-        return StringUtils.hasText(apiKey);
+        return enabled && StringUtils.hasText(apiKey);
     }
 
     private List<ExternalNewsItem> fetchRecentEverything(int limit) {

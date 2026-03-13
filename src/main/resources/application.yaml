@@ -13,6 +13,30 @@
 # - APP_INGESTION_SCHEDULER_ENABLED
 # - APP_INGESTION_SCHEDULER_CRON
 # - APP_INGESTION_SCHEDULER_PAGE_SIZE
+# - APP_INGESTION_DOMESTIC_START_HOUR
+# - APP_INGESTION_DOMESTIC_END_HOUR
+# - APP_NEWS_GLOBAL_ENABLED
+# - APP_NEWS_NAVER_ENABLED
+# - NAVER_CLIENT_ID
+# - NAVER_CLIENT_SECRET
+# - APP_NEWS_NAVER_QUERIES
+# - APP_NEWS_NAVER_DISPLAY
+# - APP_NEWS_NAVER_START
+# - APP_MARKET_FX_ENABLED
+# - EXCHANGE_RATE_API_KEY
+# - APP_MARKET_GOLD_ENABLED
+# - METALPRICE_API_KEY
+# - APP_MARKET_OIL_ENABLED
+# - OILPRICE_API_KEY
+# - APP_MARKET_INDEX_PROVIDER
+# - APP_MARKET_INDEX_ENABLED
+# - TWELVEDATA_API_KEY
+# - APP_MARKET_INDEX_SYMBOL_KOSPI
+# - APP_MARKET_INDEX_SYMBOL_KOSDAQ
+# - MARKET_FORECAST_ENABLED
+# - MARKET_FORECAST_WINDOW_HOURS
+# - MARKET_FORECAST_MAX_NEWS_ITEMS
+# - MARKET_FORECAST_CACHE_MINUTES
 server:
   port: ${PORT:8080}
 
@@ -69,6 +93,7 @@ openai:
   max-tokens: ${OPENAI_MAX_TOKENS:800}
   temperature: ${OPENAI_TEMPERATURE:0.2}
   macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
+  forecast-prompt-file: classpath:ai/prompts/market_forecast_aggregation_prompt.json
 
 jasypt:
   encryptor:
@@ -96,10 +121,48 @@ app:
     bootstrap-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:kqU58JuYwHS!}
     bootstrap-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:hos0917@naver.com}
   ingestion:
+    domestic-start-hour: ${APP_INGESTION_DOMESTIC_START_HOUR:5}
+    domestic-end-hour: ${APP_INGESTION_DOMESTIC_END_HOUR:22}
     scheduler:
       enabled: ${APP_INGESTION_SCHEDULER_ENABLED:false}
       cron: ${APP_INGESTION_SCHEDULER_CRON:0 0 * * * *}
       page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:3}
+  news:
+    global:
+      enabled: ${APP_NEWS_GLOBAL_ENABLED:true}
+    naver:
+      enabled: ${APP_NEWS_NAVER_ENABLED:false}
+      base-url: ${APP_NEWS_NAVER_BASE_URL:https://openapi.naver.com}
+      client-id: ${NAVER_CLIENT_ID:}
+      client-secret: ${NAVER_CLIENT_SECRET:}
+      queries: ${APP_NEWS_NAVER_QUERIES:코스피,코스닥,환율,금리,유가,반도체,미국 금리,연준}
+      display: ${APP_NEWS_NAVER_DISPLAY:10}
+      start: ${APP_NEWS_NAVER_START:1}
+  market:
+    fx:
+      enabled: ${APP_MARKET_FX_ENABLED:false}
+      base-url: ${APP_MARKET_FX_BASE_URL:https://v6.exchangerate-api.com}
+      api-key: ${EXCHANGE_RATE_API_KEY:}
+    gold:
+      enabled: ${APP_MARKET_GOLD_ENABLED:false}
+      base-url: ${APP_MARKET_GOLD_BASE_URL:https://api.metalpriceapi.com/v1/latest}
+      api-key: ${METALPRICE_API_KEY:}
+    oil:
+      enabled: ${APP_MARKET_OIL_ENABLED:false}
+      url: ${APP_MARKET_OIL_URL:https://api.oilpriceapi.com/v1/prices/latest}
+      api-key: ${OILPRICE_API_KEY:}
+    index:
+      provider: ${APP_MARKET_INDEX_PROVIDER:twelvedata}
+      enabled: ${APP_MARKET_INDEX_ENABLED:false}
+      api-key: ${TWELVEDATA_API_KEY:}
+      symbol:
+        kospi: ${APP_MARKET_INDEX_SYMBOL_KOSPI:}
+        kosdaq: ${APP_MARKET_INDEX_SYMBOL_KOSDAQ:}
+  forecast:
+    enabled: ${MARKET_FORECAST_ENABLED:true}
+    window-hours: ${MARKET_FORECAST_WINDOW_HOURS:3}
+    max-news-items: ${MARKET_FORECAST_MAX_NEWS_ITEMS:20}
+    cache-minutes: ${MARKET_FORECAST_CACHE_MINUTES:15}
   gating:
     free-detail-views: 3
   auth:

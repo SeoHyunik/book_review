@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <style>
+        .forecast-surface {
+            border: 1px solid color-mix(in srgb, var(--bs-border-color) 74%, transparent);
+            box-shadow: 0 1rem 2.4rem rgba(15, 23, 42, 0.06);
+        }
+
+        .forecast-hero {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .forecast-hero--sun {
+            background:
+                radial-gradient(circle at top right, rgba(255, 191, 73, 0.32), transparent 34%),
+                linear-gradient(135deg, rgba(255, 250, 237, 0.98), rgba(255, 242, 216, 0.96));
+        }
+
+        .forecast-hero--cloud {
+            background:
+                radial-gradient(circle at top right, rgba(148, 163, 184, 0.24), transparent 34%),
+                linear-gradient(135deg, rgba(247, 249, 252, 0.98), rgba(236, 241, 247, 0.96));
+        }
+
+        .forecast-hero--rain {
+            background:
+                radial-gradient(circle at top right, rgba(96, 165, 250, 0.28), transparent 34%),
+                linear-gradient(135deg, rgba(239, 246, 255, 0.98), rgba(224, 236, 255, 0.96));
+        }
+
+        .forecast-weather {
+            width: 3rem;
+            height: 3rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.74);
+            border: 1px solid rgba(255, 255, 255, 0.58);
+        }
+
+        .forecast-weather i {
+            font-size: 1.25rem;
+        }
+
+        .forecast-driver-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+        }
+
+        .forecast-driver-chip {
+            border-radius: 999px;
+            padding: 0.45rem 0.75rem;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.54);
+        }
+
+        .forecast-stat-card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
+        }
+    </style>
+
+    <section th:if="${forecastDetail != null}"
+             th:with="snapshot=${forecastDetail.snapshot},
+                      moodClass=${snapshot.mood.name() == 'SUN' ? 'forecast-hero--sun' : (snapshot.mood.name() == 'RAIN' ? 'forecast-hero--rain' : 'forecast-hero--cloud')}">
+        <div class="card border-0 forecast-surface forecast-hero mb-4" th:classappend="' ' + ${moodClass}">
+            <div class="card-body p-4 p-lg-5">
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="badge rounded-pill bg-dark-subtle text-dark-emphasis" th:text="#{news.featured.forecast.label}">Market Forecast</span>
+                        <span class="badge rounded-pill bg-light text-dark border"
+                              th:text="${snapshot.mood.name() == 'SUN' ? #messages.msg('forecast.mood.sun') : (snapshot.mood.name() == 'RAIN' ? #messages.msg('forecast.mood.rain') : #messages.msg('forecast.mood.cloud'))}">CLOUD</span>
+                        <span class="forecast-weather">
+                            <i class="bi"
+                               th:classappend="${snapshot.mood.name() == 'SUN' ? ' bi-sun-fill' : (snapshot.mood.name() == 'RAIN' ? ' bi-cloud-rain-fill' : ' bi-cloud-fill')}"></i>
+                        </span>
+                    </div>
+                    <div>
+                        <h1 class="h2 fw-bold mb-2"
+                            th:text="${#locale.language == 'ko' and snapshot.headlineKo != null and !#strings.isEmpty(snapshot.headlineKo) ? snapshot.headlineKo : snapshot.headlineEn}">Forecast headline</h1>
+                        <p class="text-secondary mb-0"
+                           th:text="${#locale.language == 'ko' and snapshot.summaryKo != null and !#strings.isEmpty(snapshot.summaryKo) ? snapshot.summaryKo : snapshot.summaryEn}">Forecast summary</p>
+                    </div>
+                    <div class="small text-secondary" th:text="${#messages.msg('forecast.generatedAt') + ' / ' + snapshot.generatedAt}">Generated</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-12 col-lg-8">
+                <div class="card border-0 forecast-surface forecast-stat-card h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h6 fw-bold mb-3" th:text="#{forecast.keyDrivers}">Key Drivers</h2>
+                        <div class="forecast-driver-list" th:if="${snapshot.keyDrivers != null and !#lists.isEmpty(snapshot.keyDrivers)}">
+                            <span class="forecast-driver-chip" th:each="driver : ${snapshot.keyDrivers}" th:text="${driver}">Driver</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="card border-0 forecast-surface forecast-stat-card h-100">
+                    <div class="card-body p-4">
+                        <h2 class="h6 fw-bold mb-3" th:text="#{forecast.marketData}">Market Data Snapshot</h2>
+                        <div class="small text-secondary d-flex flex-column gap-2">
+                            <div th:if="${forecastDetail.fxSnapshot != null}" th:text="${#messages.msg('forecast.fx') + ': USD/KRW ' + #numbers.formatDecimal(forecastDetail.fxSnapshot.rate, 1, 2)}">FX</div>
+                            <div th:if="${forecastDetail.goldSnapshot != null}" th:text="${#messages.msg('forecast.gold') + ': $' + #numbers.formatDecimal(forecastDetail.goldSnapshot.usdPerOunce, 1, 2)}">Gold</div>
+                            <div th:if="${forecastDetail.oilSnapshot != null}"
+                                 th:text="${#messages.msg('forecast.oil') + ': WTI ' + #numbers.formatDecimal(forecastDetail.oilSnapshot.wtiUsd != null ? forecastDetail.oilSnapshot.wtiUsd : 0, 1, 2) + ' / Brent ' + #numbers.formatDecimal(forecastDetail.oilSnapshot.brentUsd != null ? forecastDetail.oilSnapshot.brentUsd : 0, 1, 2)}">Oil</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 forecast-surface">
+            <div class="card-body p-4">
+                <h2 class="h6 fw-bold mb-3" th:text="#{forecast.relatedNews}">Related News</h2>
+                <div class="list-group list-group-flush" th:if="${forecastDetail.relatedNewsItems != null and !#lists.isEmpty(forecastDetail.relatedNewsItems)}">
+                    <a class="list-group-item list-group-item-action px-0"
+                       th:each="news : ${forecastDetail.relatedNewsItems}"
+                       th:href="@{'/news/' + ${news.id}}">
+                        <div class="fw-semibold mb-1" th:text="${news.title}">News title</div>
+                        <div class="small text-secondary" th:text="${news.source} + ' / ' + ${news.publishedAt}">Meta</div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section th:if="${forecastDetail == null}">
+        <div class="card border-0 forecast-surface">
+            <div class="card-body p-4 text-center text-secondary" th:text="#{forecast.empty}">Not enough recent analyzed news to build a market forecast.</div>
+        </div>
+    </section>
+</th:block>
+</html>

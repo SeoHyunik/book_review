@@ -3,11 +3,11 @@ package com.example.macronews.config;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.macronews.dto.MarketSignalOverviewDto;
 import com.example.macronews.repository.UserRepository;
+import com.example.macronews.service.forecast.MarketForecastQueryService;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
 import java.util.List;
@@ -33,12 +33,16 @@ class PublicNewsAccessIntegrationTest {
     @MockitoBean
     private NewsQueryService newsQueryService;
 
+    @MockitoBean
+    private MarketForecastQueryService marketForecastQueryService;
+
     @BeforeEach
     void setUp() {
         given(newsQueryService.getRecentNews(null, NewsListSort.PUBLISHED_DESC)).willReturn(List.of());
         given(newsQueryService.getMarketSignalOverview(null, NewsListSort.PUBLISHED_DESC))
                 .willReturn(new MarketSignalOverviewDto(List.of()));
         given(newsQueryService.getNewsDetail("non-existent-id")).willReturn(Optional.empty());
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
     }
 
     @Test
