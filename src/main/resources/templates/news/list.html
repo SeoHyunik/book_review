@@ -821,8 +821,9 @@
                             </div>
                         </div>
                         <h2 class="h3 fw-bold lh-sm line-clamp-2 featured-heading"
+                            th:with="localizedTitle=${#locale.language == 'ko' and featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? (featuredNews.interpretationSummary.contains('.') ? featuredNews.interpretationSummary.substring(0, featuredNews.interpretationSummary.indexOf('.') + 1) : featuredNews.interpretationSummary) : (featuredNews.title ?: #messages.msg('news.untitled'))}"
                             style="max-height: 2.35em;"
-                            th:text="${featuredNews.title ?: #messages.msg('news.untitled')}">Featured News</h2>
+                            th:text="${localizedTitle}">Featured News</h2>
                         <p class="mb-0 lh-sm featured-summary"
                            style="max-height: 4.1em;"
                            th:text="${featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? featuredNews.interpretationSummary : #messages.msg('news.featured.fallback')}">AI summary</p>
@@ -932,7 +933,8 @@
                     <tr th:each="news : ${newsItems}">
                         <td class="py-3 news-row-title news-col-title">
                             <div class="fw-semibold mb-1 news-title line-clamp-2"
-                                 th:text="${news.title ?: #messages.msg('news.untitled')}">Untitled</div>
+                                 th:with="localizedTitle=${#locale.language == 'ko' and news.interpretationSummary != null and !#strings.isEmpty(news.interpretationSummary) ? (news.interpretationSummary.contains('.') ? news.interpretationSummary.substring(0, news.interpretationSummary.indexOf('.') + 1) : news.interpretationSummary) : (news.title ?: #messages.msg('news.untitled'))}"
+                                 th:text="${localizedTitle}">Untitled</div>
                             <div class="small fw-medium news-priority" th:if="${news.priorityScore > 0}" th:text="#{news.priority(${news.priorityScore})}">Priority 0</div>
                         </td>
                         <td class="news-col-meta text-nowrap text-truncate py-3 fw-medium news-secondary" style="max-width: 10rem;" th:text="${news.source ?: '-'}"></td>
