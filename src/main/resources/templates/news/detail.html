@@ -56,10 +56,23 @@
             max-width: 58ch;
         }
 
+        .detail-page-header {
+            margin-bottom: 1.35rem;
+        }
+
+        .detail-hero-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+        }
+
         .detail-meta-list {
             display: flex;
             flex-wrap: wrap;
             gap: 0.65rem;
+            align-items: center;
+            padding-top: 0.95rem;
+            border-top: 1px solid color-mix(in srgb, var(--bs-border-color) 64%, transparent);
         }
 
         .detail-meta-chip {
@@ -105,6 +118,11 @@
             justify-content: space-between;
             gap: 1rem;
             margin-bottom: 1rem;
+        }
+
+        .detail-section-divider {
+            padding-bottom: 0.9rem;
+            border-bottom: 1px solid color-mix(in srgb, var(--bs-border-color) 66%, transparent);
         }
 
         .detail-section-headline {
@@ -188,6 +206,7 @@
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 1rem;
+            margin-top: 0.35rem;
         }
 
         .detail-impact-card {
@@ -354,7 +373,7 @@
         }
     </style>
 
-    <section class="mb-4 d-flex justify-content-between align-items-start gap-3">
+    <section class="detail-page-header d-flex justify-content-between align-items-start gap-3">
         <div>
             <h1 class="h3 fw-bold mb-1" th:text="${newsDetail.title ?: #messages.msg('news.untitled')}">News Title</h1>
             <p class="text-secondary mb-0" th:text="#{news.detail.subheading}">AI market interpretation built from the latest news context.</p>
@@ -364,7 +383,7 @@
 
     <section class="card border-0 mb-4 detail-surface detail-hero">
         <div class="card-body p-4 d-flex flex-column gap-3">
-            <div class="d-flex flex-column gap-2">
+            <div class="detail-hero-copy">
                 <div class="detail-section-kicker" th:text="#{news.detail.summary}">Summary</div>
                 <h2 class="fw-bold mb-0 detail-heading" th:text="${newsDetail.title ?: #messages.msg('news.untitled')}">News Title</h2>
                 <p class="text-secondary mb-0 detail-subheading" th:text="#{news.detail.subheading}">AI market interpretation built from the latest news context.</p>
@@ -402,7 +421,7 @@
 
     <section class="card border-0 mb-4 detail-surface detail-section-card">
         <div class="card-body p-4">
-            <div class="detail-section-header">
+            <div class="detail-section-header detail-section-divider">
                 <div class="detail-section-headline">
                     <div class="detail-section-kicker" th:text="#{news.detail.summary}">Summary</div>
                     <h2 class="fw-bold detail-section-title" th:text="#{news.detail.originalSummary}">Original News Summary</h2>
@@ -420,7 +439,7 @@
                 : (!#strings.isEmpty(newsDetail.analysisResult.summaryEn) ? newsDetail.analysisResult.summaryEn
                     : (!#strings.isEmpty(newsDetail.analysisResult.summaryKo) ? newsDetail.analysisResult.summaryKo : newsDetail.summary))}">
         <div class="card-body p-4 d-flex flex-column gap-3">
-            <div class="detail-section-header">
+            <div class="detail-section-header detail-section-divider">
                 <div class="detail-section-headline">
                     <div class="detail-section-kicker" th:text="#{news.detail.interpretationBadge}">AI Market Take</div>
                     <h2 class="fw-bold detail-section-title" th:text="#{news.detail.interpretationSummary}">Interpretation Summary</h2>
@@ -459,7 +478,7 @@
     <section class="card border-0 mb-4 detail-surface detail-section-card"
              th:if="${newsDetail.status != null and newsDetail.status.name() == 'ANALYZED' and newsDetail.analysisResult != null}">
         <div class="card-body p-4">
-            <div class="detail-section-header">
+            <div class="detail-section-header detail-section-divider">
                 <div class="detail-section-headline">
                     <div class="detail-section-kicker" th:text="#{news.detail.interpretationBadge}">AI Market Take</div>
                     <h2 class="fw-bold detail-section-title">Impact Breakdown</h2>
