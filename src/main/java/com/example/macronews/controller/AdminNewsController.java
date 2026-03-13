@@ -10,10 +10,10 @@ import com.example.macronews.service.news.NewsApiService;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import com.example.macronews.util.RedirectPathUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Controller
 @RequestMapping("/admin/news")
@@ -250,23 +251,24 @@ public class AdminNewsController {
     private String resolveAdminRedirect(String returnTo, String status, String sort) {
         String normalizedStatus = normalizeStatus(status);
         String normalizedSort = normalizeSort(sort);
-        String basePath;
-        if (NEWS_PAGE.equals(returnTo)) {
+        String safeReturnTo = RedirectPathUtils.normalizeSafeRelativePath(returnTo);
+        String basePath = NEWS_PAGE;
+        if (NEWS_PAGE.equals(safeReturnTo)) {
             basePath = NEWS_PAGE;
-        } else if (AUTO_PAGE.equals(returnTo)) {
+        } else if (AUTO_PAGE.equals(safeReturnTo)) {
             basePath = AUTO_PAGE;
-        } else {
+        } else if (MANUAL_PAGE.equals(safeReturnTo)) {
             basePath = MANUAL_PAGE;
         }
 
-        List<String> queryParts = new ArrayList<>();
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath(basePath);
         if (StringUtils.hasText(normalizedStatus)) {
-            queryParts.add("status=" + normalizedStatus);
+            builder.queryParam("status", normalizedStatus);
         }
         if (NEWS_PAGE.equals(basePath) && StringUtils.hasText(normalizedSort)) {
-            queryParts.add("sort=" + normalizedSort);
+            builder.queryParam("sort", normalizedSort);
         }
-        return queryParts.isEmpty() ? basePath : basePath + "?" + String.join("&", queryParts);
+        return builder.build(true).toUriString();
     }
 
     private String normalizeStatus(String status) {

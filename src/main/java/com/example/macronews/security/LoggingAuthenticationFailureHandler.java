@@ -1,5 +1,6 @@
 package com.example.macronews.security;
 
+import com.example.macronews.util.RedirectPathUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,8 +27,8 @@ public class LoggingAuthenticationFailureHandler extends SimpleUrlAuthentication
         log.warn("Authentication failed for identifier='{}' with reason={} - {}", identifier,
                 exception.getClass().getSimpleName(), exception.getMessage());
 
-        String continueUrl = request.getParameter("continue");
-        if (StringUtils.hasText(continueUrl) && continueUrl.startsWith("/")) {
+        String continueUrl = RedirectPathUtils.normalizeSafeRelativePath(request.getParameter("continue"));
+        if (StringUtils.hasText(continueUrl)) {
             setDefaultFailureUrl(UriComponentsBuilder.fromPath("/login")
                     .queryParam("error")
                     .queryParam("continue", continueUrl)

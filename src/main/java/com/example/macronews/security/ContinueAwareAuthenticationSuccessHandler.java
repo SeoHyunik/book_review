@@ -1,5 +1,6 @@
 package com.example.macronews.security;
 
+import com.example.macronews.util.RedirectPathUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,7 +24,7 @@ public class ContinueAwareAuthenticationSuccessHandler implements Authentication
         String continueUrl = resolveContinueUrl(request);
         clearContinueUrl(request.getSession(false));
 
-        if (StringUtils.hasText(continueUrl) && continueUrl.startsWith("/")) {
+        if (StringUtils.hasText(continueUrl)) {
             log.debug("Authentication success, redirecting to continueUrl={}", continueUrl);
             response.sendRedirect(continueUrl);
             return;
@@ -33,8 +34,8 @@ public class ContinueAwareAuthenticationSuccessHandler implements Authentication
     }
 
     private String resolveContinueUrl(HttpServletRequest request) {
-        String requestParam = request.getParameter("continue");
-        if (StringUtils.hasText(requestParam) && requestParam.startsWith("/")) {
+        String requestParam = RedirectPathUtils.normalizeSafeRelativePath(request.getParameter("continue"));
+        if (StringUtils.hasText(requestParam)) {
             return requestParam;
         }
 
@@ -44,9 +45,11 @@ public class ContinueAwareAuthenticationSuccessHandler implements Authentication
         }
 
         Object sessionValue = session.getAttribute(CONTINUE_URL_SESSION_KEY);
-        if (sessionValue instanceof String continueUrl && StringUtils.hasText(continueUrl)
-                && continueUrl.startsWith("/")) {
-            return continueUrl;
+        if (sessionValue instanceof String continueUrl) {
+            String normalizedSessionContinueUrl = RedirectPathUtils.normalizeSafeRelativePath(continueUrl);
+            if (StringUtils.hasText(normalizedSessionContinueUrl)) {
+                return normalizedSessionContinueUrl;
+            }
         }
         return null;
     }
