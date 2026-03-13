@@ -79,7 +79,7 @@ news:
   api:
     base-url: https://newsapi.org/v2/top-headlines
     search-url: https://newsapi.org/v2/everything
-    key: ${NEWS_API_KEY:af544c09e17a4b3b9a8e2245f75c0d8a}
+    key: ${NEWS_API_KEY:}
     country: us
     category: business
     default-limit: 10
