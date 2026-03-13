@@ -1,6 +1,7 @@
 package com.example.macronews.controller;
 
 import com.example.macronews.security.ContinueAwareAuthenticationSuccessHandler;
+import com.example.macronews.util.RedirectPathUtils;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
@@ -26,10 +27,11 @@ public class LoginController {
         log.debug("Rendering login page");
         model.addAttribute("pageTitle", "Login");
 
-        if (StringUtils.hasText(continueUrl) && continueUrl.startsWith("/")) {
-            model.addAttribute("continueUrl", continueUrl);
+        String safeContinueUrl = RedirectPathUtils.normalizeSafeRelativePath(continueUrl);
+        if (StringUtils.hasText(safeContinueUrl)) {
+            model.addAttribute("continueUrl", safeContinueUrl);
             session.setAttribute(ContinueAwareAuthenticationSuccessHandler.CONTINUE_URL_SESSION_KEY,
-                    continueUrl);
+                    safeContinueUrl);
         } else {
             model.addAttribute("continueUrl", "");
             session.removeAttribute(ContinueAwareAuthenticationSuccessHandler.CONTINUE_URL_SESSION_KEY);

@@ -8,6 +8,8 @@ public record AutoIngestionBatchStatusDto(
         int ingestedCount,
         int analyzedCount,
         int failedCount,
+        int pendingCount,
+        boolean completed,
         List<NewsListItemDto> items
 ) {
 }

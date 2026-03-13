@@ -68,7 +68,7 @@ public class NewsQueryService {
 
     public AutoIngestionBatchStatusDto getAutoIngestionBatchStatus(int requestedCount, int returnedCount, List<String> itemIds) {
         if (itemIds == null || itemIds.isEmpty()) {
-            return new AutoIngestionBatchStatusDto(requestedCount, returnedCount, 0, 0, 0, List.of());
+            return new AutoIngestionBatchStatusDto(requestedCount, returnedCount, 0, 0, 0, 0, true, List.of());
         }
 
         Map<String, NewsEvent> eventsById = StreamSupport
@@ -84,6 +84,8 @@ public class NewsQueryService {
         int ingestedCount = countByStatus(items, NewsStatus.INGESTED);
         int analyzedCount = countByStatus(items, NewsStatus.ANALYZED);
         int failedCount = countByStatus(items, NewsStatus.FAILED);
+        int pendingCount = ingestedCount;
+        boolean completed = pendingCount == 0;
 
         return new AutoIngestionBatchStatusDto(
                 requestedCount,
@@ -91,6 +93,8 @@ public class NewsQueryService {
                 ingestedCount,
                 analyzedCount,
                 failedCount,
+                pendingCount,
+                completed,
                 items
         );
     }

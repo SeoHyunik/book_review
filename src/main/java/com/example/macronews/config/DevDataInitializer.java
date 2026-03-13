@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@Profile({"dev", "default", "test"})
+@Profile({"dev", "test"})
 @RequiredArgsConstructor
 public class DevDataInitializer implements CommandLineRunner {
 

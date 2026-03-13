@@ -405,6 +405,8 @@ class NewsQueryServiceTest {
         assertThat(snapshot.ingestedCount()).isEqualTo(1);
         assertThat(snapshot.analyzedCount()).isEqualTo(1);
         assertThat(snapshot.failedCount()).isEqualTo(1);
+        assertThat(snapshot.pendingCount()).isEqualTo(1);
+        assertThat(snapshot.completed()).isFalse();
         assertThat(snapshot.items()).extracting(item -> item.id())
                 .containsExactly("batch-1", "batch-2", "batch-3");
     }

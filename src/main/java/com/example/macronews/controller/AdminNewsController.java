@@ -10,10 +10,10 @@ import com.example.macronews.service.news.NewsApiService;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import com.example.macronews.util.RedirectPathUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Controller
 @RequestMapping("/admin/news")
@@ -164,12 +165,24 @@ public class AdminNewsController {
                 return "redirect:" + AUTO_PAGE;
             }
 
-            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(pageSize);
-            redirectAttributes.addFlashAttribute("successMessage",
-                    "External ingestion completed. total=" + ingested.size());
-            redirectAttributes.addFlashAttribute("autoBatchRequestedCount", pageSize);
+            int resolvedPageSize = resolveAutoPageSize(pageSize);
+            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(resolvedPageSize);
+            AutoIngestionBatchStatusDto autoBatchStatus =
+                    newsQueryService.getAutoIngestionBatchStatus(resolvedPageSize, ingested.size(),
+                            ingested.stream().map(NewsEvent::id).toList());
+            redirectAttributes.addFlashAttribute("successMessage", buildAutoIngestionFlashMessage(autoBatchStatus));
+            if (pageSize <= 0) {
+                redirectAttributes.addFlashAttribute("warningMessage",
+                        "Requested page size was invalid, so automatic ingestion used the default size of "
+                                + DEFAULT_LIMIT + ".");
+            }
+            redirectAttributes.addFlashAttribute("autoBatchStatus", autoBatchStatus);
+            redirectAttributes.addFlashAttribute("autoBatchRequestedCount", resolvedPageSize);
             redirectAttributes.addFlashAttribute("autoBatchReturnedCount", ingested.size());
             redirectAttributes.addFlashAttribute("autoBatchItemIds", ingested.stream().map(NewsEvent::id).toList());
+            log.info("[ADMIN-AUTO] automatic ingestion completed requested={} returned={} analyzed={} pending={} failed={}",
+                    resolvedPageSize, autoBatchStatus.returnedCount(), autoBatchStatus.analyzedCount(),
+                    autoBatchStatus.pendingCount(), autoBatchStatus.failedCount());
         } catch (RuntimeException ex) {
             log.error("Admin external ingestion failed", ex);
             redirectAttributes.addFlashAttribute("errorMessage",
@@ -191,6 +204,17 @@ public class AdminNewsController {
 
     private void populateAutoBatchStatusFromFlash(Model model) {
         Map<String, Object> attributes = model.asMap();
+        if (attributes.get("autoBatchStatus") instanceof AutoIngestionBatchStatusDto autoBatchStatus) {
+            model.addAttribute("autoBatchStatus", autoBatchStatus);
+            model.addAttribute("autoBatchStatusUrl", "/admin/news/auto/batch-status");
+            if (attributes.get("autoBatchItemIds") instanceof List<?> itemIds) {
+                model.addAttribute("autoBatchItemIdsCsv", itemIds.stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .collect(java.util.stream.Collectors.joining(",")));
+            }
+            return;
+        }
         Integer requestedCount = asInteger(attributes.get("autoBatchRequestedCount"));
         Integer returnedCount = asInteger(attributes.get("autoBatchReturnedCount"));
         List<String> itemIds = asStringList(attributes.get("autoBatchItemIds"));
@@ -250,23 +274,24 @@ public class AdminNewsController {
     private String resolveAdminRedirect(String returnTo, String status, String sort) {
         String normalizedStatus = normalizeStatus(status);
         String normalizedSort = normalizeSort(sort);
-        String basePath;
-        if (NEWS_PAGE.equals(returnTo)) {
+        String safeReturnTo = RedirectPathUtils.normalizeSafeRelativePath(returnTo);
+        String basePath = NEWS_PAGE;
+        if (NEWS_PAGE.equals(safeReturnTo)) {
             basePath = NEWS_PAGE;
-        } else if (AUTO_PAGE.equals(returnTo)) {
+        } else if (AUTO_PAGE.equals(safeReturnTo)) {
             basePath = AUTO_PAGE;
-        } else {
+        } else if (MANUAL_PAGE.equals(safeReturnTo)) {
             basePath = MANUAL_PAGE;
         }
 
-        List<String> queryParts = new ArrayList<>();
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath(basePath);
         if (StringUtils.hasText(normalizedStatus)) {
-            queryParts.add("status=" + normalizedStatus);
+            builder.queryParam("status", normalizedStatus);
         }
         if (NEWS_PAGE.equals(basePath) && StringUtils.hasText(normalizedSort)) {
-            queryParts.add("sort=" + normalizedSort);
+            builder.queryParam("sort", normalizedSort);
         }
-        return queryParts.isEmpty() ? basePath : basePath + "?" + String.join("&", queryParts);
+        return builder.build(true).toUriString();
     }
 
     private String normalizeStatus(String status) {
@@ -284,5 +309,28 @@ public class AdminNewsController {
             log.debug("Ignoring unsupported admin sort={}", sort);
             return "";
         }
+    }
+
+    private int resolveAutoPageSize(int pageSize) {
+        return pageSize > 0 ? pageSize : DEFAULT_LIMIT;
+    }
+
+    private String buildAutoIngestionFlashMessage(AutoIngestionBatchStatusDto autoBatchStatus) {
+        if (autoBatchStatus.returnedCount() == 0) {
+            return "Automatic ingestion completed, but the external feed returned no items.";
+        }
+        if (autoBatchStatus.failedCount() > 0) {
+            return "Automatic ingestion completed. returned=" + autoBatchStatus.returnedCount()
+                    + ", analyzed=" + autoBatchStatus.analyzedCount()
+                    + ", pending=" + autoBatchStatus.pendingCount()
+                    + ", failed=" + autoBatchStatus.failedCount();
+        }
+        if (!autoBatchStatus.completed()) {
+            return "Automatic ingestion completed. returned=" + autoBatchStatus.returnedCount()
+                    + ", analyzed=" + autoBatchStatus.analyzedCount()
+                    + ", pending analysis=" + autoBatchStatus.pendingCount();
+        }
+        return "Automatic ingestion completed. returned=" + autoBatchStatus.returnedCount()
+                + ", analyzed=" + autoBatchStatus.analyzedCount();
     }
 }
