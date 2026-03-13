@@ -59,7 +59,7 @@ public class AdminBootstrapInitializer implements CommandLineRunner {
 
         String bootstrapEmail = StringUtils.hasText(bootstrapEmailProperty) ? bootstrapEmailProperty.trim() : null;
 
-        userRepository.findByUsername(bootstrapUsernameProperty.trim()).ifPresentOrElse(existing -> {
+        userRepository.findByUsername(bootstrapUsername).ifPresentOrElse(existing -> {
             Set<String> updatedRoles = new LinkedHashSet<>(existing.roles());
             if (updatedRoles.add("ADMIN")) {
                 userRepository.save(User.builder()
@@ -78,7 +78,7 @@ public class AdminBootstrapInitializer implements CommandLineRunner {
             }
         }, () -> {
             User user = User.builder()
-                    .username(bootstrapUsernameProperty.trim())
+                    .username(bootstrapUsername)
                     .passwordHash(passwordEncoder.encode(bootstrapPassword))
                     .email(bootstrapEmail)
                     .roles(Set.of("ADMIN", "USER"))
