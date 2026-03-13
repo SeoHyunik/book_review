@@ -207,6 +207,12 @@
             backdrop-filter: blur(10px);
             min-width: 220px;
             max-width: 260px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 0.75rem;
+            text-align: center;
             transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease, background-color 0.24s ease;
         }
 
@@ -236,10 +242,12 @@
 
         .featured-card-panel-label {
             letter-spacing: 0.08em;
+            font-weight: 600;
+            opacity: 0.9;
         }
 
         .featured-card-panel .btn {
-            align-self: flex-start;
+            align-self: center;
         }
 
         .featured-card:hover .featured-card-panel {
@@ -801,8 +809,8 @@
                            style="max-height: 4.1em;"
                            th:text="${featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? featuredNews.interpretationSummary : #messages.msg('news.featured.fallback')}">AI summary</p>
                     </div>
-                    <div class="d-flex flex-column align-items-lg-end gap-3 text-nowrap p-3 rounded-4 bg-body bg-opacity-75 border">
-                        <div class="small text-secondary text-uppercase fw-semibold" th:text="#{news.featured.kicker}">AI Analysis</div>
+                    <div class="featured-card-panel p-3 rounded-4">
+                        <div class="small text-secondary text-uppercase featured-card-panel-label" th:text="#{news.featured.kicker}">AI Analysis</div>
                         <a class="btn btn-sm btn-primary px-3 text-nowrap shadow-sm" th:href="@{'/news/' + ${featuredNews.id}}" th:text="#{news.featured.action}">View Details</a>
                     </div>
                 </div>
