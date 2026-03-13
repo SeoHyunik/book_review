@@ -30,6 +30,8 @@
 ## Runtime configuration
 
 - Runtime secrets and provider settings now come from environment variables: `OPENAI_API_KEY`, `OPENAI_API_URL`, `OPENAI_MODEL`, `OPENAI_MAX_TOKENS`, `OPENAI_TEMPERATURE`, `NEWS_API_KEY`, `JASYPT_PASSWORD`
+- Explicit non-dev/test admin bootstrap uses: `APP_ADMIN_ALLOWED_USERNAMES`, `APP_BOOTSTRAP_ADMIN_USERNAME`, `APP_BOOTSTRAP_ADMIN_PASSWORD`, `APP_BOOTSTRAP_ADMIN_EMAIL`
 - Local and production environments should provide these explicitly instead of relying on repository-stored values
 - Default admin seeding is intended only for `dev` and `test` profiles
+- Production-like admin creation is explicit only and requires allowlist membership
 - Production must use explicitly provisioned users and configuration
