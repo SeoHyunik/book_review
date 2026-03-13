@@ -18,7 +18,12 @@
                     <span class="badge text-bg-light border" th:text="#{admin.auto.snapshot.failed(${autoBatchStatus.failedCount})}">FAILED 0</span>
                 </div>
             </div>
-            <div class="text-secondary small" th:if="${autoBatchStatus.ingestedCount > 0}" th:text="#{admin.auto.snapshot.updating}">Updating automatically while analysis is still pending.</div>
+            <div class="text-secondary small d-flex flex-column gap-1">
+                <span th:if="${autoBatchStatus.returnedCount == 0}" th:text="#{admin.auto.snapshot.noResults}">The most recent automatic ingestion run returned no items.</span>
+                <span th:if="${autoBatchStatus.pendingCount > 0}" th:text="#{admin.auto.snapshot.updating(${autoBatchStatus.pendingCount})}">Updating automatically while analysis is still pending.</span>
+                <span th:if="${autoBatchStatus.completed and autoBatchStatus.failedCount == 0 and autoBatchStatus.returnedCount > 0}" th:text="#{admin.auto.snapshot.completed}">The most recent automatic ingestion run has completed.</span>
+                <span th:if="${autoBatchStatus.completed and autoBatchStatus.failedCount > 0}" th:text="#{admin.auto.snapshot.completedWithFailures(${autoBatchStatus.failedCount})}">The most recent automatic ingestion run completed with failures.</span>
+            </div>
             <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                     <thead>

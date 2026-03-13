@@ -165,12 +165,24 @@ public class AdminNewsController {
                 return "redirect:" + AUTO_PAGE;
             }
 
-            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(pageSize);
-            redirectAttributes.addFlashAttribute("successMessage",
-                    "External ingestion completed. total=" + ingested.size());
-            redirectAttributes.addFlashAttribute("autoBatchRequestedCount", pageSize);
+            int resolvedPageSize = resolveAutoPageSize(pageSize);
+            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(resolvedPageSize);
+            AutoIngestionBatchStatusDto autoBatchStatus =
+                    newsQueryService.getAutoIngestionBatchStatus(resolvedPageSize, ingested.size(),
+                            ingested.stream().map(NewsEvent::id).toList());
+            redirectAttributes.addFlashAttribute("successMessage", buildAutoIngestionFlashMessage(autoBatchStatus));
+            if (pageSize <= 0) {
+                redirectAttributes.addFlashAttribute("warningMessage",
+                        "Requested page size was invalid, so automatic ingestion used the default size of "
+                                + DEFAULT_LIMIT + ".");
+            }
+            redirectAttributes.addFlashAttribute("autoBatchStatus", autoBatchStatus);
+            redirectAttributes.addFlashAttribute("autoBatchRequestedCount", resolvedPageSize);
             redirectAttributes.addFlashAttribute("autoBatchReturnedCount", ingested.size());
             redirectAttributes.addFlashAttribute("autoBatchItemIds", ingested.stream().map(NewsEvent::id).toList());
+            log.info("[ADMIN-AUTO] automatic ingestion completed requested={} returned={} analyzed={} pending={} failed={}",
+                    resolvedPageSize, autoBatchStatus.returnedCount(), autoBatchStatus.analyzedCount(),
+                    autoBatchStatus.pendingCount(), autoBatchStatus.failedCount());
         } catch (RuntimeException ex) {
             log.error("Admin external ingestion failed", ex);
             redirectAttributes.addFlashAttribute("errorMessage",
@@ -192,6 +204,17 @@ public class AdminNewsController {
 
     private void populateAutoBatchStatusFromFlash(Model model) {
         Map<String, Object> attributes = model.asMap();
+        if (attributes.get("autoBatchStatus") instanceof AutoIngestionBatchStatusDto autoBatchStatus) {
+            model.addAttribute("autoBatchStatus", autoBatchStatus);
+            model.addAttribute("autoBatchStatusUrl", "/admin/news/auto/batch-status");
+            if (attributes.get("autoBatchItemIds") instanceof List<?> itemIds) {
+                model.addAttribute("autoBatchItemIdsCsv", itemIds.stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .collect(java.util.stream.Collectors.joining(",")));
+            }
+            return;
+        }
         Integer requestedCount = asInteger(attributes.get("autoBatchRequestedCount"));
         Integer returnedCount = asInteger(attributes.get("autoBatchReturnedCount"));
         List<String> itemIds = asStringList(attributes.get("autoBatchItemIds"));
@@ -286,5 +309,28 @@ public class AdminNewsController {
             log.debug("Ignoring unsupported admin sort={}", sort);
             return "";
         }
+    }
+
+    private int resolveAutoPageSize(int pageSize) {
+        return pageSize > 0 ? pageSize : DEFAULT_LIMIT;
+    }
+
+    private String buildAutoIngestionFlashMessage(AutoIngestionBatchStatusDto autoBatchStatus) {
+        if (autoBatchStatus.returnedCount() == 0) {
+            return "Automatic ingestion completed, but the external feed returned no items.";
+        }
+        if (autoBatchStatus.failedCount() > 0) {
+            return "Automatic ingestion completed. returned=" + autoBatchStatus.returnedCount()
+                    + ", analyzed=" + autoBatchStatus.analyzedCount()
+                    + ", pending=" + autoBatchStatus.pendingCount()
+                    + ", failed=" + autoBatchStatus.failedCount();
+        }
+        if (!autoBatchStatus.completed()) {
+            return "Automatic ingestion completed. returned=" + autoBatchStatus.returnedCount()
+                    + ", analyzed=" + autoBatchStatus.analyzedCount()
+                    + ", pending analysis=" + autoBatchStatus.pendingCount();
+        }
+        return "Automatic ingestion completed. returned=" + autoBatchStatus.returnedCount()
+                + ", analyzed=" + autoBatchStatus.analyzedCount();
     }
 }

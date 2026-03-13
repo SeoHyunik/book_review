@@ -1,10 +1,12 @@
 package com.example.macronews.config;
 
 import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.service.news.NewsApiService;
 import com.example.macronews.service.news.NewsIngestionService;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,31 +25,49 @@ public class ScheduledNewsIngestionJob {
     private final NewsIngestionService newsIngestionService;
     private final NewsApiService newsApiService;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final AtomicLong runSequence = new AtomicLong(0);
 
     @Value("${app.ingestion.scheduler.page-size:10}")
     private int pageSize;
 
     @Scheduled(cron = "${app.ingestion.scheduler.cron:0 0 * * * *}")
     public void ingestTopHeadlines() {
+        long runId = runSequence.incrementAndGet();
         if (!running.compareAndSet(false, true)) {
-            log.warn("[SCHEDULER] skipping ingestion because a local run is already in progress");
+            log.warn("[SCHEDULER] runId={} skipped reason=already-running", runId);
             return;
         }
 
         try {
             if (!newsApiService.isConfigured()) {
-                log.info("[SCHEDULER] skipping ingestion because news.api.key is not configured");
+                log.info("[SCHEDULER] runId={} skipped reason=news-api-not-configured", runId);
                 return;
             }
 
             int resolvedPageSize = pageSize > 0 ? pageSize : DEFAULT_PAGE_SIZE;
-            log.info("[SCHEDULER] starting automatic top-headline ingestion pageSize={}", resolvedPageSize);
+            if (pageSize <= 0) {
+                log.warn("[SCHEDULER] runId={} invalid-page-size configured={} fallback={}", runId, pageSize,
+                        resolvedPageSize);
+            }
+            log.info("[SCHEDULER] runId={} started pageSize={}", runId, resolvedPageSize);
             List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(resolvedPageSize);
-            log.info("[SCHEDULER] completed automatic ingestion processed={}", ingested.size());
+            log.info("[SCHEDULER] runId={} completed returned={} analyzed={} pending={} failed={} duplicates={}",
+                    runId,
+                    ingested.size(),
+                    countByStatus(ingested, NewsStatus.ANALYZED),
+                    countByStatus(ingested, NewsStatus.INGESTED),
+                    countByStatus(ingested, NewsStatus.FAILED),
+                    countByStatus(ingested, NewsStatus.DUPLICATE));
         } catch (RuntimeException ex) {
-            log.error("[SCHEDULER] automatic ingestion failed", ex);
+            log.error("[SCHEDULER] runId={} failed", runId, ex);
         } finally {
             running.set(false);
         }
+    }
+
+    private long countByStatus(List<NewsEvent> ingested, NewsStatus status) {
+        return ingested.stream()
+                .filter(event -> event != null && event.status() == status)
+                .count();
     }
 }

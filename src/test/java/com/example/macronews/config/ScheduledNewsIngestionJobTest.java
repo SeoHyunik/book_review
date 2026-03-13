@@ -57,6 +57,21 @@ class ScheduledNewsIngestionJobTest {
     }
 
     @Test
+    @DisplayName("Scheduled ingestion should keep running flag clear after failures")
+    void ingestTopHeadlines_clearsRunningFlagAfterFailure() {
+        ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 12);
+        given(newsApiService.isConfigured()).willReturn(true);
+        given(newsIngestionService.ingestTopHeadlines(12)).willThrow(new IllegalStateException("boom"));
+
+        scheduledNewsIngestionJob.ingestTopHeadlines();
+
+        AtomicBoolean running = (AtomicBoolean) ReflectionTestUtils.getField(scheduledNewsIngestionJob, "running");
+        verify(newsIngestionService).ingestTopHeadlines(12);
+        org.assertj.core.api.Assertions.assertThat(running).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(running.get()).isFalse();
+    }
+
+    @Test
     @DisplayName("Scheduled ingestion should fall back to default page size when configured value is invalid")
     void ingestTopHeadlines_fallsBackToDefaultPageSizeWhenInvalid() {
         ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 0);
