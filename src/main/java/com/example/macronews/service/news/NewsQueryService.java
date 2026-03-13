@@ -114,6 +114,21 @@ public class NewsQueryService {
         return newsEventRepository.findById(id).map(this::toDetail);
     }
 
+    public List<NewsListItemDto> getNewsItemsByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Map<String, NewsEvent> eventsById = StreamSupport
+                .stream(newsEventRepository.findAllById(ids).spliterator(), false)
+                .collect(Collectors.toMap(NewsEvent::id, Function.identity()));
+
+        return ids.stream()
+                .map(eventsById::get)
+                .filter(Objects::nonNull)
+                .map(this::toListItem)
+                .toList();
+    }
+
     private List<NewsEvent> loadCandidates(NewsStatus status) {
         return status == null
                 ? newsEventRepository.findTop20ByOrderByPublishedAtDesc()

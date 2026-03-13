@@ -33,6 +33,10 @@
 # - TWELVEDATA_API_KEY
 # - APP_MARKET_INDEX_SYMBOL_KOSPI
 # - APP_MARKET_INDEX_SYMBOL_KOSDAQ
+# - MARKET_FORECAST_ENABLED
+# - MARKET_FORECAST_WINDOW_HOURS
+# - MARKET_FORECAST_MAX_NEWS_ITEMS
+# - MARKET_FORECAST_CACHE_MINUTES
 server:
   port: ${PORT:8080}
 
@@ -89,6 +93,7 @@ openai:
   max-tokens: ${OPENAI_MAX_TOKENS:800}
   temperature: ${OPENAI_TEMPERATURE:0.2}
   macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
+  forecast-prompt-file: classpath:ai/prompts/market_forecast_aggregation_prompt.json
 
 jasypt:
   encryptor:
@@ -153,6 +158,11 @@ app:
       symbol:
         kospi: ${APP_MARKET_INDEX_SYMBOL_KOSPI:}
         kosdaq: ${APP_MARKET_INDEX_SYMBOL_KOSDAQ:}
+  forecast:
+    enabled: ${MARKET_FORECAST_ENABLED:true}
+    window-hours: ${MARKET_FORECAST_WINDOW_HOURS:3}
+    max-news-items: ${MARKET_FORECAST_MAX_NEWS_ITEMS:20}
+    cache-minutes: ${MARKET_FORECAST_CACHE_MINUTES:15}
   gating:
     free-detail-views: 3
   auth:

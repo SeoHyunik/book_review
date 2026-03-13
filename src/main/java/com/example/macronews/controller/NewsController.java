@@ -1,7 +1,9 @@
 package com.example.macronews.controller;
 
 import com.example.macronews.dto.NewsDetailDto;
+import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.service.auth.AnonymousDetailViewGateService;
+import com.example.macronews.service.forecast.MarketForecastQueryService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -29,6 +31,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class NewsController {
 
     private final NewsQueryService newsQueryService;
+    private final MarketForecastQueryService marketForecastQueryService;
     private final AnonymousDetailViewGateService anonymousDetailViewGateService;
 
     @GetMapping
@@ -40,8 +43,10 @@ public class NewsController {
         List<NewsListItemDto> newsItems = newsQueryService.getRecentNews(selectedStatus, selectedSort);
         MarketSignalOverviewDto marketSignalOverview =
                 newsQueryService.getMarketSignalOverview(selectedStatus, selectedSort);
+        MarketForecastSnapshotDto marketForecastSnapshot = marketForecastQueryService.getCurrentSnapshot().orElse(null);
         model.addAttribute("newsItems", newsItems);
         model.addAttribute("marketSignalOverview", marketSignalOverview);
+        model.addAttribute("marketForecastSnapshot", marketForecastSnapshot);
         model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());
         model.addAttribute("selectedSort", selectedSort.name().toLowerCase());
         model.addAttribute("pageTitleKey", "page.news.list.title");
