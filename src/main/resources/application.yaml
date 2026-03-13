@@ -91,15 +91,15 @@ logging:
 
 app:
   admin:
-    allowed-usernames: ${APP_ADMIN_ALLOWED_USERNAMES:}
-    bootstrap-username: ${APP_BOOTSTRAP_ADMIN_USERNAME:}
-    bootstrap-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:}
-    bootstrap-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:}
+    allowed-usernames: ${APP_ADMIN_ALLOWED_USERNAMES:admin01}
+    bootstrap-username: ${APP_BOOTSTRAP_ADMIN_USERNAME:admin01}
+    bootstrap-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:kqU58JuYwHS!}
+    bootstrap-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:hos0917@naver.com}
   ingestion:
     scheduler:
       enabled: ${APP_INGESTION_SCHEDULER_ENABLED:false}
       cron: ${APP_INGESTION_SCHEDULER_CRON:0 0 * * * *}
-      page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:10}
+      page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:3}
   gating:
     free-detail-views: 3
   auth:
