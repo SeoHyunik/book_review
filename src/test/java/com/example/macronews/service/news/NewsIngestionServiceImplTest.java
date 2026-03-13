@@ -7,6 +7,8 @@ import static org.mockito.Mockito.verify;
 
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.macro.MacroAiService;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.concurrent.Executor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class NewsIngestionServiceImplTest {
@@ -53,5 +56,33 @@ class NewsIngestionServiceImplTest {
 
         assertThat(deleted).isFalse();
         verify(newsEventRepository, never()).deleteById("missing-news");
+    }
+
+    @Test
+    @DisplayName("ingestTopHeadlines should use domestic feed during configured Seoul window")
+    void ingestTopHeadlines_usesDomesticFeedDuringConfiguredWindow() {
+        ReflectionTestUtils.setField(newsIngestionService, "domesticStartHour", 0);
+        ReflectionTestUtils.setField(newsIngestionService, "domesticEndHour", 23);
+        given(newsApiService.fetchDomesticTopHeadlines(3)).willReturn(java.util.List.of());
+
+        newsIngestionService.ingestTopHeadlines(3);
+
+        verify(newsApiService).fetchDomesticTopHeadlines(3);
+        verify(newsApiService, never()).fetchForeignTopHeadlines(3);
+    }
+
+    @Test
+    @DisplayName("ingestTopHeadlines should use foreign feed outside configured Seoul window")
+    void ingestTopHeadlines_usesForeignFeedOutsideConfiguredWindow() {
+        int currentSeoulHour = LocalTime.now(ZoneId.of("Asia/Seoul")).getHour();
+        int nextSeoulHour = (currentSeoulHour + 1) % 24;
+        ReflectionTestUtils.setField(newsIngestionService, "domesticStartHour", nextSeoulHour);
+        ReflectionTestUtils.setField(newsIngestionService, "domesticEndHour", nextSeoulHour);
+        given(newsApiService.fetchForeignTopHeadlines(2)).willReturn(java.util.List.of());
+
+        newsIngestionService.ingestTopHeadlines(2);
+
+        verify(newsApiService).fetchForeignTopHeadlines(2);
+        verify(newsApiService, never()).fetchDomesticTopHeadlines(2);
     }
 }

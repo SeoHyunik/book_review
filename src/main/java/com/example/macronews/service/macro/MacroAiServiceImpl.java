@@ -53,7 +53,7 @@ public class MacroAiServiceImpl implements MacroAiService {
     @Value("${openai.api-url:}")
     private String openAiUrl;
 
-    @Value("${openai.model:}")
+    @Value("${openai.model:gpt-4o}")
     private String openAiModel;
 
     @Value("${openai.max-tokens:800}")

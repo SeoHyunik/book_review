@@ -13,6 +13,8 @@
 # - APP_INGESTION_SCHEDULER_ENABLED
 # - APP_INGESTION_SCHEDULER_CRON
 # - APP_INGESTION_SCHEDULER_PAGE_SIZE
+# - APP_INGESTION_DOMESTIC_START_HOUR
+# - APP_INGESTION_DOMESTIC_END_HOUR
 server:
   port: ${PORT:8080}
 
@@ -96,6 +98,8 @@ app:
     bootstrap-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:kqU58JuYwHS!}
     bootstrap-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:hos0917@naver.com}
   ingestion:
+    domestic-start-hour: ${APP_INGESTION_DOMESTIC_START_HOUR:5}
+    domestic-end-hour: ${APP_INGESTION_DOMESTIC_END_HOUR:22}
     scheduler:
       enabled: ${APP_INGESTION_SCHEDULER_ENABLED:false}
       cron: ${APP_INGESTION_SCHEDULER_CRON:0 0 * * * *}

@@ -57,6 +57,11 @@ public class NewsApiServiceImpl implements NewsApiService {
 
     @Override
     public List<ExternalNewsItem> fetchTopHeadlines(int limit) {
+        return fetchForeignTopHeadlines(limit);
+    }
+
+    @Override
+    public List<ExternalNewsItem> fetchDomesticTopHeadlines(int limit) {
         if (!isConfigured()) {
             log.warn("news.api.key is missing; returning empty top-headlines list");
             return List.of();
@@ -71,6 +76,24 @@ public class NewsApiServiceImpl implements NewsApiService {
         List<ExternalNewsItem> headlines = fetchFromUrl(buildTopHeadlinesUrl(resolvedLimit), resolvedLimit,
                 "top-headlines");
         return mergeAndLimit(freshest, headlines, resolvedLimit);
+    }
+
+    @Override
+    public List<ExternalNewsItem> fetchForeignTopHeadlines(int limit) {
+        if (!isConfigured()) {
+            log.warn("news.api.key is missing; returning empty top-headlines list");
+            return List.of();
+        }
+
+        int resolvedLimit = limit > 0 ? limit : defaultLimit;
+        List<ExternalNewsItem> headlines = fetchFromUrl(buildTopHeadlinesUrl(resolvedLimit), resolvedLimit,
+                "top-headlines");
+        if (headlines.size() >= resolvedLimit) {
+            return headlines;
+        }
+
+        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit);
+        return mergeAndLimit(headlines, freshest, resolvedLimit);
     }
 
     @Override
