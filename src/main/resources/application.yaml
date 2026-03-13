@@ -10,6 +10,9 @@
 # - APP_BOOTSTRAP_ADMIN_USERNAME
 # - APP_BOOTSTRAP_ADMIN_PASSWORD
 # - APP_BOOTSTRAP_ADMIN_EMAIL
+# - APP_INGESTION_SCHEDULER_ENABLED
+# - APP_INGESTION_SCHEDULER_CRON
+# - APP_INGESTION_SCHEDULER_PAGE_SIZE
 server:
   port: ${PORT:8080}
 
@@ -92,6 +95,11 @@ app:
     bootstrap-username: ${APP_BOOTSTRAP_ADMIN_USERNAME:}
     bootstrap-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:}
     bootstrap-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:}
+  ingestion:
+    scheduler:
+      enabled: ${APP_INGESTION_SCHEDULER_ENABLED:false}
+      cron: ${APP_INGESTION_SCHEDULER_CRON:0 0 * * * *}
+      page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:10}
   gating:
     free-detail-views: 3
   auth:
