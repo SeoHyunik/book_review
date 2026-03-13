@@ -26,3 +26,10 @@
 ```
 
 기본 포트: `8082`
+
+## Runtime configuration
+
+- Runtime secrets and provider settings now come from environment variables: `OPENAI_API_KEY`, `OPENAI_API_URL`, `OPENAI_MODEL`, `OPENAI_MAX_TOKENS`, `OPENAI_TEMPERATURE`, `NEWS_API_KEY`, `JASYPT_PASSWORD`
+- Local and production environments should provide these explicitly instead of relying on repository-stored values
+- Default admin seeding is intended only for `dev` and `test` profiles
+- Production must use explicitly provisioned users and configuration
