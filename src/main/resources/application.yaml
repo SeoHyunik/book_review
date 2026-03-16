@@ -4,6 +4,12 @@
 # - OPENAI_MODEL
 # - OPENAI_MAX_TOKENS
 # - OPENAI_TEMPERATURE
+# - OPENAI_PRICING_PRIMARY_MODEL
+# - OPENAI_PRICING_PRIMARY_MODEL_PROMPT_PER_1K_USD
+# - OPENAI_PRICING_PRIMARY_MODEL_COMPLETION_PER_1K_USD
+# - OPENAI_PRICING_DEFAULT_PROMPT_PER_1K_USD
+# - OPENAI_PRICING_DEFAULT_COMPLETION_PER_1K_USD
+# - OPENAI_COST_KRW_FALLBACK_RATE
 # - NEWS_API_KEY
 # - JASYPT_PASSWORD
 # - APP_ADMIN_ALLOWED_USERNAMES
@@ -97,6 +103,18 @@ openai:
   temperature: ${OPENAI_TEMPERATURE:0.2}
   macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
   forecast-prompt-file: classpath:ai/prompts/market_forecast_aggregation_prompt.json
+  pricing:
+    primary-model-name: ${OPENAI_PRICING_PRIMARY_MODEL:${OPENAI_MODEL:gpt-4o}}
+    primary-model:
+      prompt-per-1k-usd: ${OPENAI_PRICING_PRIMARY_MODEL_PROMPT_PER_1K_USD:0.005}
+      completion-per-1k-usd: ${OPENAI_PRICING_PRIMARY_MODEL_COMPLETION_PER_1K_USD:0.015}
+    default:
+      prompt-per-1k-usd: ${OPENAI_PRICING_DEFAULT_PROMPT_PER_1K_USD:0.005}
+      completion-per-1k-usd: ${OPENAI_PRICING_DEFAULT_COMPLETION_PER_1K_USD:0.015}
+  cost:
+    krw-fallback-rate: ${OPENAI_COST_KRW_FALLBACK_RATE:1350.0}
+    daily-days: ${OPENAI_COST_DAILY_DAYS:7}
+    monthly-months: ${OPENAI_COST_MONTHLY_MONTHS:6}
 
 jasypt:
   encryptor:
@@ -141,7 +159,7 @@ app:
       base-url: ${APP_NEWS_NAVER_BASE_URL:https://openapi.naver.com}
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}
-      queries: ${APP_NEWS_NAVER_QUERIES:코스피,코스닥,환율,금리,유가,반도체,미국 금리,연준}
+      queries: ${APP_NEWS_NAVER_QUERIES:코스??코스???�율,금리,?��?,반도�?미국 금리,?��?}
       display: ${APP_NEWS_NAVER_DISPLAY:10}
       start: ${APP_NEWS_NAVER_START:1}
   market:
@@ -173,3 +191,5 @@ app:
     free-detail-views: 3
   auth:
     google-login-enabled: false
+
+

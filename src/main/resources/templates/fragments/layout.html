@@ -54,6 +54,9 @@
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
                     <a class="btn btn-light text-primary fw-semibold ms-lg-1" th:href="@{/admin/news/auto}" th:text="#{nav.admin.auto}">Admin Auto</a>
                 </li>
+                <li class="nav-item" sec:authorize="hasRole('ADMIN')">
+                    <a class="nav-link" th:href="@{/admin/openai-usage}" th:text="#{nav.admin.usage}">Admin Usage</a>
+                </li>
                 <li class="nav-item">
                     <form th:action="${currentPath}" method="get" class="d-flex align-items-center gap-1 ms-lg-2">
                         <input th:if="${currentStatus != null and !#strings.isEmpty(currentStatus)}" type="hidden" name="status" th:value="${currentStatus}"/>

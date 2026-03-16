@@ -8,10 +8,12 @@ import com.example.macronews.domain.MarketImpact;
 import com.example.macronews.domain.MarketMood;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
+import com.example.macronews.domain.OpenAiUsageFeatureType;
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.repository.NewsEventRepository;
+import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -53,6 +55,7 @@ public class NewsAggregationService {
     private final NewsEventRepository newsEventRepository;
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
+    private final OpenAiUsageLoggingService openAiUsageLoggingService;
 
     private final AtomicReference<CachedSnapshot> cachedSnapshot = new AtomicReference<>();
 
@@ -128,6 +131,10 @@ public class NewsAggregationService {
                 log.warn("[FORECAST] aggregation failed status={}", apiResult == null ? -1 : apiResult.statusCode());
                 return Optional.empty();
             }
+            openAiUsageLoggingService.recordUsage(
+                    OpenAiUsageFeatureType.MARKET_FORECAST,
+                    openAiModel,
+                    apiResult.body());
             return Optional.of(parseSnapshot(apiResult.body(), candidates));
         } catch (Exception ex) {
             log.warn("[FORECAST] aggregation failed", ex);

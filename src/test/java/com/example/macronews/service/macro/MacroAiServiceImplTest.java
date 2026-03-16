@@ -3,10 +3,12 @@ package com.example.macronews.service.macro;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.repository.NewsEventRepository;
+import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,11 +32,14 @@ class MacroAiServiceImplTest {
     @Mock
     private NewsEventRepository newsEventRepository;
 
+    @Mock
+    private OpenAiUsageLoggingService openAiUsageLoggingService;
+
     private MacroAiServiceImpl macroAiService;
 
     @BeforeEach
     void setUp() {
-        macroAiService = new MacroAiServiceImpl(externalApiUtils, new ObjectMapper(), newsEventRepository);
+        macroAiService = new MacroAiServiceImpl(externalApiUtils, new ObjectMapper(), newsEventRepository, openAiUsageLoggingService);
         ReflectionTestUtils.setField(macroAiService, "openAiApiKey", "test-key");
         ReflectionTestUtils.setField(macroAiService, "openAiUrl", "https://example.com/openai");
         ReflectionTestUtils.setField(macroAiService, "openAiModel", "gpt-test");
@@ -46,8 +51,8 @@ class MacroAiServiceImplTest {
     @Test
     @DisplayName("interpret should parse localized headlines and summaries when both are present")
     void interpret_parsesLocalizedSummaries() {
-        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200,
-                "{\"choices\":[{\"message\":{\"content\":\"{\\\"headlineKo\\\":\\\"Korean headline\\\",\\\"headlineEn\\\":\\\"English headline\\\",\\\"summaryKo\\\":\\\"Korean summary\\\",\\\"summaryEn\\\":\\\"English summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}"));
+        String response = "{\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":80,\"total_tokens\":200},\"choices\":[{\"message\":{\"content\":\"{\\\"headlineKo\\\":\\\"Korean headline\\\",\\\"headlineEn\\\":\\\"English headline\\\",\\\"summaryKo\\\":\\\"Korean summary\\\",\\\"summaryEn\\\":\\\"English summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}";
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, response));
 
         var result = macroAiService.interpret(sampleEvent());
 
@@ -57,6 +62,7 @@ class MacroAiServiceImplTest {
         assertThat(result.summaryEn()).isEqualTo("English summary");
         assertThat(result.macroImpacts()).isEmpty();
         assertThat(result.marketImpacts()).isEmpty();
+        verify(openAiUsageLoggingService).recordUsage(any(), any(), any());
     }
 
     @Test
