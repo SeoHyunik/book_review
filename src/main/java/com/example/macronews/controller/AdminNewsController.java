@@ -220,16 +220,13 @@ public class AdminNewsController {
         Integer requestedCount = asInteger(attributes.get("autoBatchRequestedCount"));
         Integer returnedCount = asInteger(attributes.get("autoBatchReturnedCount"));
         List<String> itemIds = asStringList(attributes.get("autoBatchItemIds"));
-        if (requestedCount == null || returnedCount == null || itemIds.isEmpty()) {
+        if (requestedCount == null || returnedCount == null) {
             return;
         }
         populateAutoBatchStatus(model, requestedCount, returnedCount, itemIds);
     }
 
     private void populateAutoBatchStatus(Model model, int requestedCount, int returnedCount, List<String> itemIds) {
-        if (itemIds.isEmpty()) {
-            return;
-        }
         AutoIngestionBatchStatusDto autoBatchStatus =
                 newsQueryService.getAutoIngestionBatchStatus(requestedCount, returnedCount, itemIds);
         model.addAttribute("autoBatchStatus", autoBatchStatus);
