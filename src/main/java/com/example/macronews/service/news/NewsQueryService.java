@@ -156,9 +156,12 @@ public class NewsQueryService {
     private NewsListItemDto toListItem(NewsEvent event) {
         boolean hasAnalysis = event.analysisResult() != null;
         String macroSummary = buildMacroSummary(event);
+        String preferredSummary = resolvePreferredInterpretationSummary(event.analysisResult());
+        String displayTitle = buildDisplayTitle(event, preferredSummary);
         return new NewsListItemDto(
                 event.id(),
                 event.title(),
+                displayTitle,
                 event.source(),
                 event.publishedAt(),
                 event.ingestedAt(),
@@ -166,7 +169,7 @@ public class NewsQueryService {
                 hasAnalysis,
                 StringUtils.hasText(event.url()),
                 macroSummary,
-                buildInterpretationSummary(event, macroSummary),
+                buildInterpretationSummary(event, macroSummary, preferredSummary, displayTitle),
                 calculatePriorityScore(event)
         );
     }
@@ -184,24 +187,48 @@ public class NewsQueryService {
         );
     }
 
-    private String buildInterpretationSummary(NewsEvent event, String macroSummary) {
-        AnalysisResult analysisResult = event.analysisResult();
-        if (analysisResult == null) {
+    private String buildInterpretationSummary(NewsEvent event, String macroSummary, String preferredSummary, String displayTitle) {
+        if (!StringUtils.hasText(preferredSummary)) {
             return macroSummary;
         }
 
+        String remainder = removeLeadingSentence(preferredSummary, displayTitle);
+        if (StringUtils.hasText(remainder)) {
+            return remainder;
+        }
+        if (!preferredSummary.equals(displayTitle)) {
+            return preferredSummary;
+        }
+        return macroSummary;
+    }
+
+    private String resolvePreferredInterpretationSummary(AnalysisResult analysisResult) {
+        if (analysisResult == null) {
+            return "";
+        }
         Locale locale = LocaleContextHolder.getLocale();
         boolean korean = locale != null && "ko".equalsIgnoreCase(locale.getLanguage());
         String preferred = korean ? analysisResult.summaryKo() : analysisResult.summaryEn();
         String fallback = korean ? analysisResult.summaryEn() : analysisResult.summaryKo();
-
         if (StringUtils.hasText(preferred)) {
-            return preferred;
+            return preferred.trim();
         }
         if (StringUtils.hasText(fallback)) {
-            return fallback;
+            return fallback.trim();
         }
-        return macroSummary;
+        return "";
+    }
+
+    private String buildDisplayTitle(NewsEvent event, String preferredSummary) {
+        Locale locale = LocaleContextHolder.getLocale();
+        boolean korean = locale != null && "ko".equalsIgnoreCase(locale.getLanguage());
+        if (korean) {
+            String derivedTitle = extractLeadingSentence(preferredSummary);
+            if (StringUtils.hasText(derivedTitle)) {
+                return derivedTitle;
+            }
+        }
+        return StringUtils.hasText(event.title()) ? event.title() : "";
     }
 
     private String buildMacroSummary(NewsEvent event) {
@@ -238,10 +265,46 @@ public class NewsQueryService {
         }
 
         ImpactDirection dominantDirection = resolveDominantDirection(counts);
-        if (REVERSE_DIRECTION_VARIABLES.contains(variable)) {
-            dominantDirection = invertDirection(dominantDirection);
+        ImpactDirection sentiment = REVERSE_DIRECTION_VARIABLES.contains(variable)
+                ? invertDirection(dominantDirection)
+                : dominantDirection;
+        return new MarketSignalItemDto(variable, dominantDirection, sentiment, sampleCount);
+    }
+
+    private String extractLeadingSentence(String text) {
+        if (!StringUtils.hasText(text)) {
+            return "";
         }
-        return new MarketSignalItemDto(variable, dominantDirection, sampleCount);
+        String trimmed = text.trim();
+        int sentenceBoundary = findSentenceBoundary(trimmed);
+        if (sentenceBoundary < 0) {
+            return trimmed;
+        }
+        return trimmed.substring(0, sentenceBoundary + 1).trim();
+    }
+
+    private String removeLeadingSentence(String text, String headline) {
+        if (!StringUtils.hasText(text)) {
+            return "";
+        }
+        String trimmed = text.trim();
+        String lead = StringUtils.hasText(headline) ? headline.trim() : extractLeadingSentence(trimmed);
+        if (!StringUtils.hasText(lead) || !trimmed.startsWith(lead)) {
+            return trimmed;
+        }
+        String remainder = trimmed.substring(lead.length()).trim();
+        return remainder.replaceFirst("^[\\-:;,.\\s]+", "").trim();
+    }
+
+    private int findSentenceBoundary(String text) {
+        int boundary = -1;
+        for (char marker : new char[] {'.', '!', '?'}) {
+            int index = text.indexOf(marker);
+            if (index >= 0 && (boundary < 0 || index < boundary)) {
+                boundary = index;
+            }
+        }
+        return boundary;
     }
 
     private ImpactDirection resolveDominantDirection(Map<ImpactDirection, Integer> counts) {

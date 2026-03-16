@@ -6,6 +6,7 @@ import java.time.Instant;
 public record NewsListItemDto(
         String id,
         String title,
+        String displayTitle,
         String source,
         Instant publishedAt,
         Instant ingestedAt,

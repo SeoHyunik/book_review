@@ -123,6 +123,7 @@ public class AdminNewsController {
             @RequestParam(name = "returnTo", required = false) String returnTo,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "sort", required = false) String sort,
+            @RequestParam(name = "page", required = false) Integer page,
             RedirectAttributes redirectAttributes) {
         log.info("[ADMIN] reinterpret requested id={}", id);
         try {
@@ -135,7 +136,7 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("errorMessage",
                     "Re-interpretation failed. id=" + id);
         }
-        return "redirect:" + resolveAdminRedirect(returnTo, status, sort);
+        return "redirect:" + resolveAdminRedirect(returnTo, status, sort, page);
     }
 
     @PostMapping("/{id}/delete")
@@ -143,6 +144,7 @@ public class AdminNewsController {
             @RequestParam(name = "returnTo", required = false) String returnTo,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "sort", required = false) String sort,
+            @RequestParam(name = "page", required = false) Integer page,
             RedirectAttributes redirectAttributes) {
         log.info("[ADMIN] delete requested id={}", id);
         boolean deleted = newsIngestionService.deleteById(id);
@@ -151,7 +153,7 @@ public class AdminNewsController {
         } else {
             redirectAttributes.addFlashAttribute("warningMessage", "News item not found. id=" + id);
         }
-        return "redirect:" + resolveAdminRedirect(returnTo, status, sort);
+        return "redirect:" + resolveAdminRedirect(returnTo, status, sort, page);
     }
 
     @PostMapping("/ingest-api")
@@ -271,7 +273,7 @@ public class AdminNewsController {
         }
     }
 
-    private String resolveAdminRedirect(String returnTo, String status, String sort) {
+    private String resolveAdminRedirect(String returnTo, String status, String sort, Integer page) {
         String normalizedStatus = normalizeStatus(status);
         String normalizedSort = normalizeSort(sort);
         String safeReturnTo = RedirectPathUtils.normalizeSafeRelativePath(returnTo);
@@ -290,6 +292,9 @@ public class AdminNewsController {
         }
         if (NEWS_PAGE.equals(basePath) && StringUtils.hasText(normalizedSort)) {
             builder.queryParam("sort", normalizedSort);
+        }
+        if (NEWS_PAGE.equals(basePath) && page != null && page > 1) {
+            builder.queryParam("page", page);
         }
         return builder.build(true).toUriString();
     }

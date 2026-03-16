@@ -1,7 +1,7 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security"
       th:replace="~{fragments/layout :: layout(~{::content})}">
-<th:block th:fragment="content" th:with="featuredNews=${#lists.isEmpty(newsItems) ? null : newsItems[0]}, featuredForecast=${marketForecastSnapshot}">
+<th:block th:fragment="content" th:with="featuredForecast=${marketForecastSnapshot}">
     <style>
         :root {
             --tone-positive-fg: #b9382d;
@@ -155,14 +155,19 @@
         }
 
         .featured-heading {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
             margin-bottom: 0.95rem;
-            color: #1f2937;
-            font-size: clamp(1.4rem, 1.8vw, 2rem);
-            font-weight: 600;
-            line-height: 1.35;
-            letter-spacing: -0.01em;
-            max-width: 14ch;
+            color: #0f172a;
+            font-size: clamp(1.28rem, 1.6vw, 1.82rem);
+            font-weight: 650;
+            line-height: 1.22;
+            letter-spacing: -0.018em;
+            max-width: 24ch;
+            -webkit-line-clamp: 3;
             opacity: 1;
+            text-wrap: balance;
         }
 
         .featured-badge-primary {
@@ -533,83 +538,51 @@
             z-index: 1;
         }
 
-        .signal-tile--up {
-            border-color: rgba(255, 141, 94, 0.22);
+        .signal-tile--positive {
+            border-color: rgba(220, 38, 38, 0.24);
             background:
-                radial-gradient(circle at top right, rgba(255, 183, 153, 0.32), transparent 35%),
-                linear-gradient(180deg, rgba(255, 249, 245, 0.98), rgba(255, 255, 255, 0.98));
+                radial-gradient(circle at top right, rgba(251, 113, 133, 0.32), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(254, 202, 202, 0.28), transparent 30%),
+                linear-gradient(180deg, rgba(255, 242, 242, 0.98), rgba(255, 250, 250, 0.98));
         }
 
-        .signal-tile--down {
-            border-color: rgba(96, 165, 250, 0.24);
+        .signal-tile--negative {
+            border-color: rgba(37, 99, 235, 0.26);
             background:
-                radial-gradient(circle at top right, rgba(191, 219, 254, 0.34), transparent 36%),
-                linear-gradient(180deg, rgba(245, 250, 255, 0.98), rgba(255, 255, 255, 0.98));
+                radial-gradient(circle at top right, rgba(96, 165, 250, 0.36), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(191, 219, 254, 0.28), transparent 30%),
+                linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(248, 251, 255, 0.98));
         }
 
         .signal-tile--neutral {
-            border-color: var(--tone-neutral-border);
+            border-color: rgba(148, 163, 184, 0.28);
             background:
-                radial-gradient(circle at top right, rgba(253, 230, 138, 0.3), transparent 36%),
-                linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.98));
-        }
-
-        .signal-tile--volatility {
-            box-shadow: 0 1rem 2.4rem rgba(30, 64, 175, 0.1);
-        }
-
-        .signal-tile--volatility.signal-tile--up {
-            border-color: rgba(96, 165, 250, 0.26);
-            background:
-                radial-gradient(circle at top right, rgba(191, 219, 254, 0.36), transparent 36%),
-                linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 0.98));
-        }
-
-        .signal-tile--volatility.signal-tile--down {
-            border-color: rgba(96, 165, 250, 0.24);
-            background:
-                radial-gradient(circle at top right, rgba(186, 230, 253, 0.28), transparent 36%),
-                linear-gradient(180deg, rgba(243, 249, 255, 0.98), rgba(255, 255, 255, 0.98));
-        }
-
-        .signal-tile--volatility.signal-tile--neutral {
-            border-color: var(--tone-neutral-border);
-            background:
-                radial-gradient(circle at top right, rgba(253, 230, 138, 0.26), transparent 36%),
-                linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.98));
+                radial-gradient(circle at top right, rgba(203, 213, 225, 0.34), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(226, 232, 240, 0.26), transparent 30%),
+                linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.98));
         }
 
         .signal-arrow {
-            min-width: 2rem;
-            color: #1E1E1E;
-            background: #F4C430;
-            border: 1px solid rgba(244, 196, 48, 0.78);
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+            min-width: 2.35rem;
+            color: #fff;
+            border: 1px solid transparent;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
             transition: transform 0.2s ease, box-shadow 0.24s ease, background-color 0.24s ease, border-color 0.24s ease;
         }
 
-        .signal-tile--up .signal-arrow {
-            color: #1E1E1E;
-            background: #F4C430;
-            border-color: rgba(244, 196, 48, 0.78);
+        .signal-arrow--up {
+            background: linear-gradient(180deg, #ef4444, #b91c1c);
+            border-color: rgba(153, 27, 27, 0.4);
         }
 
-        .signal-tile--down .signal-arrow {
-            color: #1E1E1E;
-            background: #F4C430;
-            border-color: rgba(244, 196, 48, 0.78);
+        .signal-arrow--down {
+            background: linear-gradient(180deg, #3b82f6, #1d4ed8);
+            border-color: rgba(29, 78, 216, 0.38);
         }
 
-        .signal-tile--neutral .signal-arrow {
-            color: #1E1E1E;
-            background: #F4C430;
-            border-color: rgba(244, 196, 48, 0.78);
-        }
-
-        .signal-tile--volatility .signal-arrow {
-            color: #1E1E1E;
-            background: #F4C430;
-            border-color: rgba(244, 196, 48, 0.78);
+        .signal-arrow--neutral {
+            background: linear-gradient(180deg, #94a3b8, #64748b);
+            border-color: rgba(71, 85, 105, 0.36);
         }
 
         .signal-state {
@@ -618,17 +591,23 @@
             color: var(--surface-strong);
         }
 
-        .signal-tile--up .signal-state {
+        .signal-tile--positive .signal-state {
             color: var(--tone-positive-fg);
         }
 
-        .signal-tile--down .signal-state,
-        .signal-tile--volatility .signal-state {
+        .signal-tile--negative .signal-state {
             color: var(--tone-negative-fg);
         }
 
         .signal-tile--neutral .signal-state {
-            color: var(--tone-neutral-fg);
+            color: #475569;
+        }
+
+        .signal-direction-copy {
+            margin-top: 0.35rem;
+            color: color-mix(in srgb, var(--surface-muted) 88%, #334155);
+            font-size: 0.83rem;
+            line-height: 1.35;
         }
 
         .signal-count {
@@ -870,12 +849,10 @@
                                 <span th:text="${featuredForecast != null ? featuredForecast.generatedAt : (featuredNews.publishedAt ?: '-')}">Published At</span>
                             </div>
                         </div>
-                        <h2 class="h3 fw-bold lh-sm line-clamp-2 featured-heading"
-                            th:with="localizedTitle=${featuredForecast != null ? (#locale.language == 'ko' and featuredForecast.headlineKo != null and !#strings.isEmpty(featuredForecast.headlineKo) ? featuredForecast.headlineKo : (featuredForecast.headlineEn != null and !#strings.isEmpty(featuredForecast.headlineEn) ? featuredForecast.headlineEn : #messages.msg('news.featured.forecast.empty'))) : (#locale.language == 'ko' and featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? (featuredNews.interpretationSummary.contains('.') ? featuredNews.interpretationSummary.substring(0, featuredNews.interpretationSummary.indexOf('.') + 1) : featuredNews.interpretationSummary) : (featuredNews.title ?: #messages.msg('news.untitled')))}"
-                            style="max-height: 2.35em;"
+                        <h2 class="h3 fw-bold lh-sm featured-heading"
+                            th:with="localizedTitle=${featuredForecast != null ? (#locale.language == 'ko' and featuredForecast.headlineKo != null and !#strings.isEmpty(featuredForecast.headlineKo) ? featuredForecast.headlineKo : (featuredForecast.headlineEn != null and !#strings.isEmpty(featuredForecast.headlineEn) ? featuredForecast.headlineEn : #messages.msg('news.featured.forecast.empty'))) : (featuredNews.displayTitle != null and !#strings.isEmpty(featuredNews.displayTitle) ? featuredNews.displayTitle : (featuredNews.title ?: #messages.msg('news.untitled')))}"
                             th:text="${localizedTitle}">Featured News</h2>
                         <p class="mb-0 lh-sm featured-summary"
-                           style="max-height: 4.1em;"
                            th:text="${featuredForecast != null ? (#locale.language == 'ko' and featuredForecast.summaryKo != null and !#strings.isEmpty(featuredForecast.summaryKo) ? featuredForecast.summaryKo : (featuredForecast.summaryEn != null and !#strings.isEmpty(featuredForecast.summaryEn) ? featuredForecast.summaryEn : #messages.msg('news.featured.forecast.empty'))) : (featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? featuredNews.interpretationSummary : #messages.msg('news.featured.fallback'))}">AI summary</p>
                         <div class="featured-drivers" th:if="${featuredForecast != null and featuredForecast.keyDrivers != null and !#lists.isEmpty(featuredForecast.keyDrivers)}">
                             <span class="featured-driver-chip" th:each="driver : ${featuredForecast.keyDrivers}" th:text="${driver}">Driver</span>
@@ -904,7 +881,9 @@
                 <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3">
                     <div class="col" th:each="signal : ${marketSignalOverview.items}">
                         <div class="border rounded-4 p-3 h-100 signal-tile news-surface"
-                             th:classappend="${(signal.variable.name() == 'VOLATILITY' ? ' signal-tile--volatility' : '') + (signal.direction.name() == 'UP' ? ' signal-tile--up' : (signal.direction.name() == 'DOWN' ? ' signal-tile--down' : ' signal-tile--neutral'))}">
+                             th:classappend="${signal.sentiment.name() == 'UP' ? ' signal-tile--positive' : (signal.sentiment.name() == 'DOWN' ? ' signal-tile--negative' : ' signal-tile--neutral')}"
+                             th:with="specificDirectionKey=${'news.overview.direction.' + #strings.toLowerCase(signal.variable.name()) + '.' + #strings.toLowerCase(signal.direction.name())},
+                                      genericDirectionKey=${'news.overview.direction.generic.' + #strings.toLowerCase(signal.direction.name())}">
                             <div class="d-flex justify-content-between align-items-start gap-3">
                                 <div>
                                     <div class="fw-semibold small text-uppercase text-secondary mb-2"
@@ -912,15 +891,18 @@
                                         Oil
                                     </div>
                                     <div class="fw-semibold signal-state"
-                                         th:with="specificDirectionKey=${'news.overview.direction.' + #strings.toLowerCase(signal.variable.name()) + '.' + #strings.toLowerCase(signal.direction.name())},
-                                                  genericDirectionKey=${'news.overview.direction.generic.' + #strings.toLowerCase(signal.direction.name())}"
+                                         th:text="${signal.sentiment.name() == 'UP' ? #messages.msg('news.overview.sentiment.positive') : (signal.sentiment.name() == 'DOWN' ? #messages.msg('news.overview.sentiment.negative') : #messages.msg('news.overview.sentiment.neutral'))}">
+                                        Positive
+                                    </div>
+                                    <div class="signal-direction-copy"
                                          th:text="${#messages.msgOrNull(specificDirectionKey) != null ? #messages.msg(specificDirectionKey) : #messages.msg(genericDirectionKey)}">
-                                        Wait-and-see
+                                        Direction detail
                                     </div>
                                 </div>
                                 <span class="badge rounded-pill signal-arrow fs-6 py-2"
-                                      th:text="${signal.direction.name() == 'UP' ? '↑' : (signal.direction.name() == 'DOWN' ? '↓' : '→')}">
-                                    →
+                                      th:classappend="${signal.direction.name() == 'UP' ? ' signal-arrow--up' : (signal.direction.name() == 'DOWN' ? ' signal-arrow--down' : ' signal-arrow--neutral')}"
+                                      th:text="${signal.direction.name() == 'UP' ? '↑' : (signal.direction.name() == 'DOWN' ? '↓' : '•')}">
+                                    ↑
                                 </span>
                             </div>
                             <div class="small mt-3 signal-count"
@@ -977,7 +959,7 @@
                         <th class="news-col-meta text-nowrap" style="width: 12%;" th:text="#{news.table.source}">Source</th>
                         <th class="news-col-meta text-nowrap" style="width: 14%;" th:text="#{news.table.publishedAt}">Published At</th>
                         <th class="news-col-status text-nowrap" style="width: 10%;" th:text="#{news.table.status}">Status</th>
-                        <th class="news-col-forecast forecast-column" style="width: 12%;">FORECAST</th>
+                        <th class="news-col-forecast forecast-column" style="width: 12%;" th:text="#{news.table.forecast}">Forecast</th>
                         <th class="news-col-actions text-nowrap" style="width: 10%;" th:text="#{news.table.actions}">Actions</th>
                     </tr>
                     </thead>
@@ -988,8 +970,7 @@
                     <tr th:each="news : ${newsItems}">
                         <td class="py-3 news-row-title news-col-title">
                             <div class="fw-semibold mb-1 news-title line-clamp-2"
-                                 th:with="localizedTitle=${#locale.language == 'ko' and news.interpretationSummary != null and !#strings.isEmpty(news.interpretationSummary) ? (news.interpretationSummary.contains('.') ? news.interpretationSummary.substring(0, news.interpretationSummary.indexOf('.') + 1) : news.interpretationSummary) : (news.title ?: #messages.msg('news.untitled'))}"
-                                 th:text="${localizedTitle}">Untitled</div>
+                                 th:text="${news.displayTitle != null and !#strings.isEmpty(news.displayTitle) ? news.displayTitle : (news.title ?: #messages.msg('news.untitled'))}">Untitled</div>
                             <div class="small fw-medium news-priority" th:if="${news.priorityScore > 0}" th:text="#{news.priority(${news.priorityScore})}">Priority 0</div>
                         </td>
                         <td class="news-col-meta text-nowrap text-truncate py-3 fw-medium news-secondary" style="max-width: 10rem;" th:text="${news.source ?: '-'}"></td>
@@ -1004,7 +985,7 @@
                             th:with="direction=${news.macroSummary != null and #strings.contains(news.macroSummary, T(com.example.macronews.domain.ImpactDirection).DOWN.name()) ? T(com.example.macronews.domain.ImpactDirection).DOWN.name() : (news.macroSummary != null and #strings.contains(news.macroSummary, T(com.example.macronews.domain.ImpactDirection).UP.name()) ? T(com.example.macronews.domain.ImpactDirection).UP.name() : T(com.example.macronews.domain.ImpactDirection).NEUTRAL.name())}">
                             <span class="forecast-indicator"
                                   th:classappend="${direction == T(com.example.macronews.domain.ImpactDirection).UP.name() ? ' forecast-up' : (direction == T(com.example.macronews.domain.ImpactDirection).DOWN.name() ? ' forecast-down' : ' forecast-flat')}"
-                                  th:text="${direction == T(com.example.macronews.domain.ImpactDirection).UP.name() ? '↑' : (direction == T(com.example.macronews.domain.ImpactDirection).DOWN.name() ? '↓' : '→')}">→</span>
+                                  th:text="${direction == T(com.example.macronews.domain.ImpactDirection).UP.name() ? '↑' : (direction == T(com.example.macronews.domain.ImpactDirection).DOWN.name() ? '↓' : '•')}">↑</span>
                         </td>
                         <td class="news-col-actions text-nowrap py-3 news-actions-cell">
                             <div class="d-inline-flex flex-wrap justify-content-center gap-1 align-items-center news-action-stack">
@@ -1015,6 +996,7 @@
                                         <input type="hidden" name="returnTo" value="/news"/>
                                         <input type="hidden" name="status" th:value="${selectedStatus}"/>
                                         <input type="hidden" name="sort" th:value="${selectedSort}"/>
+                                        <input type="hidden" name="page" th:value="${currentPageNumber}"/>
                                         <button type="submit" class="btn btn-sm btn-outline-warning text-nowrap rounded-pill px-3" th:text="#{news.action.reinterpret}">Re-interpret</button>
                                     </form>
                                     <form th:action="@{'/admin/news/' + ${news.id} + '/delete'}" method="post" class="d-inline"
@@ -1023,6 +1005,7 @@
                                         <input type="hidden" name="returnTo" value="/news"/>
                                         <input type="hidden" name="status" th:value="${selectedStatus}"/>
                                         <input type="hidden" name="sort" th:value="${selectedSort}"/>
+                                        <input type="hidden" name="page" th:value="${currentPageNumber}"/>
                                         <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap rounded-pill px-3" th:text="#{news.action.delete}">Delete</button>
                                     </form>
                                 </th:block>
@@ -1034,5 +1017,25 @@
             </div>
         </div>
     </section>
+
+    <nav class="mt-4" th:if="${totalPages > 1}" th:attr="aria-label=#{pagination.nav}">
+        <ul class="pagination justify-content-center flex-wrap gap-2 mb-0">
+            <li class="page-item" th:classappend="${!hasPreviousPage ? ' disabled' : ''}">
+                <a class="page-link rounded-pill border-0 shadow-sm px-3"
+                   th:href="${hasPreviousPage} ? @{/news(status=${selectedStatus}, sort=${selectedSort}, page=${currentPageNumber - 1})} : '#'"
+                   th:text="#{pagination.previous}">Previous</a>
+            </li>
+            <li class="page-item" th:each="pageNumber : ${pageNumbers}" th:classappend="${pageNumber == currentPageNumber ? ' active' : ''}">
+                <a class="page-link rounded-pill border-0 shadow-sm px-3"
+                   th:href="@{/news(status=${selectedStatus}, sort=${selectedSort}, page=${pageNumber})}"
+                   th:text="${pageNumber}">1</a>
+            </li>
+            <li class="page-item" th:classappend="${!hasNextPage ? ' disabled' : ''}">
+                <a class="page-link rounded-pill border-0 shadow-sm px-3"
+                   th:href="${hasNextPage} ? @{/news(status=${selectedStatus}, sort=${selectedSort}, page=${currentPageNumber + 1})} : '#'"
+                   th:text="#{pagination.next}">Next</a>
+            </li>
+        </ul>
+    </nav>
 </th:block>
 </html>

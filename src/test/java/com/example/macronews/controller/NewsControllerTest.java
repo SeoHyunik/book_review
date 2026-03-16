@@ -62,7 +62,7 @@ class NewsControllerTest {
         given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.of(snapshot));
 
         ConcurrentModel model = new ConcurrentModel();
-        String viewName = newsController.list(null, null, model);
+        String viewName = newsController.list(null, null, null, model);
 
         assertThat(viewName).isEqualTo("news/list");
         assertThat(model.getAttribute("marketForecastSnapshot")).isEqualTo(snapshot);

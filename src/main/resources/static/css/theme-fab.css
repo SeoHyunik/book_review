@@ -1,8 +1,14 @@
-#theme-fab {
+.fab-stack {
     position: fixed;
     right: calc(16px + env(safe-area-inset-right, 0px));
     bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     z-index: 2000;
+    display: flex;
+    gap: 0.75rem;
+}
+
+#theme-fab,
+#scroll-top-fab {
     width: 52px;
     height: 52px;
     border-radius: 50%;
@@ -16,32 +22,42 @@
     transition: transform 120ms ease, box-shadow 120ms ease, background-color 200ms ease, color 200ms ease;
 }
 
-#theme-fab:hover {
+#theme-fab:hover,
+#scroll-top-fab:hover {
     transform: translateY(-1px);
     box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.2);
 }
 
-#theme-fab:active {
+#theme-fab:active,
+#scroll-top-fab:active {
     transform: translateY(0);
     box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.2);
 }
 
-#theme-fab:focus {
+#theme-fab:focus,
+#scroll-top-fab:focus {
     outline: 3px solid rgba(13, 110, 253, 0.35);
     outline-offset: 2px;
 }
 
-#theme-fab i {
+#theme-fab i,
+#scroll-top-fab i {
     font-size: 1.35rem;
 }
 
 @media (max-width: 575.98px) {
-    #theme-fab {
+    .fab-stack {
+        gap: 0.5rem;
+    }
+
+    #theme-fab,
+    #scroll-top-fab {
         width: 44px;
         height: 44px;
     }
 
-    #theme-fab i {
+    #theme-fab i,
+    #scroll-top-fab i {
         font-size: 1.15rem;
     }
 }
