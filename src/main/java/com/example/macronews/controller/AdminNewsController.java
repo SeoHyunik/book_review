@@ -7,11 +7,13 @@ import com.example.macronews.dto.AutoIngestionControlStatusDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
+import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
 import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.ops.RenderKeepAliveService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import com.example.macronews.util.RedirectPathUtils;
 import java.util.Arrays;
@@ -51,6 +53,8 @@ public class AdminNewsController {
     private final MacroAiService macroAiService;
     private final NewsQueryService newsQueryService;
     private final AutoIngestionControlService autoIngestionControlService;
+    private final RenderKeepAliveService renderKeepAliveService;
+    private final AutoIngestionEmailNotificationService autoIngestionEmailNotificationService;
     private final MessageSource messageSource;
 
     @GetMapping
@@ -247,6 +251,8 @@ public class AdminNewsController {
     private void populateAutoIngestionControlModel(Model model) {
         AutoIngestionControlStatusDto controlStatus = autoIngestionControlService.getStatus();
         model.addAttribute("autoIngestionControlStatus", controlStatus);
+        model.addAttribute("keepAliveEnabled", renderKeepAliveService.isEnabled());
+        model.addAttribute("emailNotificationEnabled", autoIngestionEmailNotificationService.isEnabled());
     }
 
     private void populateAutoBatchStatusFromFlash(Model model) {

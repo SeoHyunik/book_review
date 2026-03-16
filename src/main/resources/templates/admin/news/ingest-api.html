@@ -39,6 +39,14 @@
                               th:text="${autoIngestionControlStatus.runInProgress} ? #{admin.news.auto.status.running} : #{admin.news.auto.status.idle}">
                             Idle
                         </span>
+                        <span class="badge text-bg-light border"
+                              th:text="${keepAliveEnabled} ? #{admin.news.auto.keepAlive.enabled} : #{admin.news.auto.keepAlive.disabled}">
+                            Keep-alive Off
+                        </span>
+                        <span class="badge text-bg-light border"
+                              th:text="${emailNotificationEnabled} ? #{admin.news.auto.email.enabled} : #{admin.news.auto.email.disabled}">
+                            Email Off
+                        </span>
                     </div>
                 </div>
                 <div class="text-secondary small d-flex flex-column gap-1">

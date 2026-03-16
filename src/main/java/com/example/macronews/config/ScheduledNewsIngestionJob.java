@@ -7,6 +7,7 @@ import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -28,6 +29,7 @@ public class ScheduledNewsIngestionJob {
     private final NewsSourceProviderSelector newsSourceProviderSelector;
     private final NewsQueryService newsQueryService;
     private final AutoIngestionControlService autoIngestionControlService;
+    private final AutoIngestionEmailNotificationService autoIngestionEmailNotificationService;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicLong runSequence = new AtomicLong(0);
 
@@ -75,6 +77,7 @@ public class ScheduledNewsIngestionJob {
                     ingested.size(),
                     ingested.stream().map(NewsEvent::id).toList());
             autoIngestionControlService.completeRun(batchStatus);
+            autoIngestionEmailNotificationService.sendRunResult(autoIngestionControlService.getStatus(), batchStatus);
             log.info("[SCHEDULER] runId={} completed returned={} analyzed={} pending={} failed={} duplicates={}",
                     runId,
                     ingested.size(),
@@ -84,6 +87,7 @@ public class ScheduledNewsIngestionJob {
                     countByStatus(ingested, NewsStatus.DUPLICATE));
         } catch (RuntimeException ex) {
             autoIngestionControlService.failRun(resolvedPageSize);
+            autoIngestionEmailNotificationService.sendRunResult(autoIngestionControlService.getStatus(), null);
             log.error("[SCHEDULER] runId={} failed", runId, ex);
         } finally {
             running.set(false);

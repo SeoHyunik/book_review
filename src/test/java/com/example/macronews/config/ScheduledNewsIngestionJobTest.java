@@ -7,10 +7,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.dto.AutoIngestionBatchStatusDto;
+import com.example.macronews.dto.AutoIngestionControlStatusDto;
+import com.example.macronews.dto.AutoIngestionRunOutcome;
 import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +41,9 @@ class ScheduledNewsIngestionJobTest {
     @Mock
     private AutoIngestionControlService autoIngestionControlService;
 
+    @Mock
+    private AutoIngestionEmailNotificationService autoIngestionEmailNotificationService;
+
     @InjectMocks
     private ScheduledNewsIngestionJob scheduledNewsIngestionJob;
 
@@ -51,6 +57,7 @@ class ScheduledNewsIngestionJobTest {
 
         verify(autoIngestionControlService).isSchedulerEnabled();
         verifyNoInteractions(newsSourceProviderSelector, newsIngestionService, newsQueryService);
+        verifyNoInteractions(autoIngestionEmailNotificationService);
     }
 
     @Test
@@ -65,6 +72,7 @@ class ScheduledNewsIngestionJobTest {
         verify(autoIngestionControlService).isSchedulerEnabled();
         verify(newsSourceProviderSelector).isConfigured();
         verifyNoInteractions(newsIngestionService);
+        verifyNoInteractions(autoIngestionEmailNotificationService);
     }
 
     @Test
@@ -76,8 +84,13 @@ class ScheduledNewsIngestionJobTest {
         given(autoIngestionControlService.beginScheduledRun(12)).willReturn(AutoIngestionRunCommandResult.STARTED);
         List<NewsEvent> ingested = List.of(sampleNewsEvent("event-1"));
         given(newsIngestionService.ingestTopHeadlines(12)).willReturn(ingested);
+        AutoIngestionBatchStatusDto batchStatus = new AutoIngestionBatchStatusDto(12, 1, 1, 0, 0, 1, false, List.of());
         given(newsQueryService.getAutoIngestionBatchStatus(12, 1, List.of("event-1")))
-                .willReturn(new AutoIngestionBatchStatusDto(12, 1, 1, 0, 0, 1, false, List.of()));
+                .willReturn(batchStatus);
+        given(autoIngestionControlService.getStatus()).willReturn(new AutoIngestionControlStatusDto(
+                true, false, AutoIngestionRunOutcome.COMPLETED,
+                Instant.parse("2026-03-16T00:00:00Z"), Instant.parse("2026-03-16T00:01:00Z"),
+                12, 1, 0, 1, 0));
 
         scheduledNewsIngestionJob.ingestTopHeadlines();
 
@@ -85,6 +98,9 @@ class ScheduledNewsIngestionJobTest {
         verify(newsSourceProviderSelector).isConfigured();
         verify(newsIngestionService).ingestTopHeadlines(12);
         verify(autoIngestionControlService).completeRun(org.mockito.ArgumentMatchers.any(AutoIngestionBatchStatusDto.class));
+        verify(autoIngestionEmailNotificationService)
+                .sendRunResult(org.mockito.ArgumentMatchers.any(AutoIngestionControlStatusDto.class),
+                        org.mockito.ArgumentMatchers.eq(batchStatus));
     }
 
     @Test
@@ -95,12 +111,19 @@ class ScheduledNewsIngestionJobTest {
         given(newsSourceProviderSelector.isConfigured()).willReturn(true);
         given(autoIngestionControlService.beginScheduledRun(12)).willReturn(AutoIngestionRunCommandResult.STARTED);
         given(newsIngestionService.ingestTopHeadlines(12)).willThrow(new IllegalStateException("boom"));
+        given(autoIngestionControlService.getStatus()).willReturn(new AutoIngestionControlStatusDto(
+                true, false, AutoIngestionRunOutcome.FAILED,
+                Instant.parse("2026-03-16T00:00:00Z"), Instant.parse("2026-03-16T00:01:00Z"),
+                12, 0, 0, 0, 0));
 
         scheduledNewsIngestionJob.ingestTopHeadlines();
 
         AtomicBoolean running = (AtomicBoolean) ReflectionTestUtils.getField(scheduledNewsIngestionJob, "running");
         verify(newsIngestionService).ingestTopHeadlines(12);
         verify(autoIngestionControlService).failRun(12);
+        verify(autoIngestionEmailNotificationService)
+                .sendRunResult(org.mockito.ArgumentMatchers.any(AutoIngestionControlStatusDto.class),
+                        org.mockito.ArgumentMatchers.isNull());
         org.assertj.core.api.Assertions.assertThat(running).isNotNull();
         org.assertj.core.api.Assertions.assertThat(running.get()).isFalse();
     }
@@ -132,6 +155,7 @@ class ScheduledNewsIngestionJobTest {
 
         verify(newsSourceProviderSelector, never()).isConfigured();
         verifyNoInteractions(newsIngestionService);
+        verifyNoInteractions(autoIngestionEmailNotificationService);
     }
 
     @Test
@@ -145,6 +169,7 @@ class ScheduledNewsIngestionJobTest {
         scheduledNewsIngestionJob.ingestTopHeadlines();
 
         verify(newsIngestionService, never()).ingestTopHeadlines(12);
+        verifyNoInteractions(autoIngestionEmailNotificationService);
     }
 
     private NewsEvent sampleNewsEvent(String id) {

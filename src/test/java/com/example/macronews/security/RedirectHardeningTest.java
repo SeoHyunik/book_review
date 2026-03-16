@@ -6,9 +6,11 @@ import static org.mockito.Mockito.mock;
 import com.example.macronews.controller.AdminNewsController;
 import com.example.macronews.controller.LoginController;
 import com.example.macronews.service.macro.MacroAiService;
+import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
 import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.ops.RenderKeepAliveService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +36,8 @@ class RedirectHardeningTest {
             mock(MacroAiService.class),
             mock(NewsQueryService.class),
             mock(AutoIngestionControlService.class),
+            mock(RenderKeepAliveService.class),
+            mock(AutoIngestionEmailNotificationService.class),
             mock(MessageSource.class));
 
     @Test
