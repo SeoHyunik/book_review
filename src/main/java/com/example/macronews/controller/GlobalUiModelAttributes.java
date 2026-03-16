@@ -15,6 +15,7 @@ public class GlobalUiModelAttributes {
         model.addAttribute("currentPath", request.getRequestURI());
         model.addAttribute("currentStatus", request.getParameter("status"));
         model.addAttribute("currentSort", request.getParameter("sort"));
+        model.addAttribute("currentPage", request.getParameter("page"));
         model.addAttribute("currentLang", locale.getLanguage());
     }
 }

@@ -4,6 +4,18 @@
 # - OPENAI_MODEL
 # - OPENAI_MAX_TOKENS
 # - OPENAI_TEMPERATURE
+# - OPENAI_PRICING_PRIMARY_MODEL
+# - OPENAI_PRICING_PRIMARY_MODEL_PROMPT_PER_1K_USD
+# - OPENAI_PRICING_PRIMARY_MODEL_COMPLETION_PER_1K_USD
+# - OPENAI_PRICING_DEFAULT_PROMPT_PER_1K_USD
+# - OPENAI_PRICING_DEFAULT_COMPLETION_PER_1K_USD
+# - OPENAI_COST_KRW_FALLBACK_RATE
+# - SPRING_MAIL_HOST
+# - SPRING_MAIL_PORT
+# - SPRING_MAIL_USERNAME
+# - SPRING_MAIL_PASSWORD
+# - SPRING_MAIL_SMTP_AUTH
+# - SPRING_MAIL_SMTP_STARTTLS_ENABLE
 # - NEWS_API_KEY
 # - JASYPT_PASSWORD
 # - APP_ADMIN_ALLOWED_USERNAMES
@@ -13,8 +25,17 @@
 # - APP_INGESTION_SCHEDULER_ENABLED
 # - APP_INGESTION_SCHEDULER_CRON
 # - APP_INGESTION_SCHEDULER_PAGE_SIZE
+# - APP_KEEP_ALIVE_ENABLED
+# - APP_KEEP_ALIVE_CRON
+# - APP_KEEP_ALIVE_TARGET_URL
+# - APP_NOTIFICATION_EMAIL_ENABLED
+# - APP_NOTIFICATION_EMAIL_RECIPIENT
+# - APP_NOTIFICATION_EMAIL_FROM
+# - APP_INGESTION_BUSINESS_TIMEZONE
 # - APP_INGESTION_DOMESTIC_START_HOUR
 # - APP_INGESTION_DOMESTIC_END_HOUR
+# - APP_INGESTION_BREAKING_BONUS_MINUTES
+# - APP_INGESTION_PREFERRED_SOURCE_BONUS_MINUTES
 # - APP_NEWS_GLOBAL_ENABLED
 # - APP_NEWS_NAVER_ENABLED
 # - NAVER_CLIENT_ID
@@ -50,7 +71,7 @@ spring:
   mongodb:
     uri: ${MONGODB_URI:mongodb://localhost:27017/macro_news}
     transactions:
-      enabled: true Replica set required in production for this to take effecteplica set required in production for this to take effect
+      enabled: true # Replica set required in production for this to take effect
 
   cache:
     type: simple
@@ -85,6 +106,17 @@ spring:
     problemdetails:
       enabled: true
 
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:true}
 openai:
   api-key: ${OPENAI_API_KEY:}
   api-url: ${OPENAI_API_URL:https://api.openai.com/v1/chat/completions}
@@ -94,6 +126,18 @@ openai:
   temperature: ${OPENAI_TEMPERATURE:0.2}
   macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
   forecast-prompt-file: classpath:ai/prompts/market_forecast_aggregation_prompt.json
+  pricing:
+    primary-model-name: ${OPENAI_PRICING_PRIMARY_MODEL:${OPENAI_MODEL:gpt-4o}}
+    primary-model:
+      prompt-per-1k-usd: ${OPENAI_PRICING_PRIMARY_MODEL_PROMPT_PER_1K_USD:0.005}
+      completion-per-1k-usd: ${OPENAI_PRICING_PRIMARY_MODEL_COMPLETION_PER_1K_USD:0.015}
+    default:
+      prompt-per-1k-usd: ${OPENAI_PRICING_DEFAULT_PROMPT_PER_1K_USD:0.005}
+      completion-per-1k-usd: ${OPENAI_PRICING_DEFAULT_COMPLETION_PER_1K_USD:0.015}
+  cost:
+    krw-fallback-rate: ${OPENAI_COST_KRW_FALLBACK_RATE:1350.0}
+    daily-days: ${OPENAI_COST_DAILY_DAYS:7}
+    monthly-months: ${OPENAI_COST_MONTHLY_MONTHS:6}
 
 jasypt:
   encryptor:
@@ -121,12 +165,24 @@ app:
     bootstrap-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:kqU58JuYwHS!}
     bootstrap-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:hos0917@naver.com}
   ingestion:
+    business-timezone: ${APP_INGESTION_BUSINESS_TIMEZONE:Asia/Seoul}
     domestic-start-hour: ${APP_INGESTION_DOMESTIC_START_HOUR:5}
     domestic-end-hour: ${APP_INGESTION_DOMESTIC_END_HOUR:22}
+    breaking-bonus-minutes: ${APP_INGESTION_BREAKING_BONUS_MINUTES:45}
+    preferred-source-bonus-minutes: ${APP_INGESTION_PREFERRED_SOURCE_BONUS_MINUTES:15}
     scheduler:
       enabled: ${APP_INGESTION_SCHEDULER_ENABLED:false}
       cron: ${APP_INGESTION_SCHEDULER_CRON:0 0 * * * *}
       page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:3}
+  keep-alive:
+    enabled: ${APP_KEEP_ALIVE_ENABLED:false}
+    cron: ${APP_KEEP_ALIVE_CRON:0 */10 * * * *}
+    target-url: ${APP_KEEP_ALIVE_TARGET_URL:}
+  notification:
+    email:
+      enabled: ${APP_NOTIFICATION_EMAIL_ENABLED:false}
+      recipient: ${APP_NOTIFICATION_EMAIL_RECIPIENT:}
+      from: ${APP_NOTIFICATION_EMAIL_FROM:}
   news:
     global:
       enabled: ${APP_NEWS_GLOBAL_ENABLED:true}
@@ -135,7 +191,7 @@ app:
       base-url: ${APP_NEWS_NAVER_BASE_URL:https://openapi.naver.com}
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}
-      queries: ${APP_NEWS_NAVER_QUERIES:코스피,코스닥,환율,금리,유가,반도체,미국 금리,연준}
+      queries: ${APP_NEWS_NAVER_QUERIES:??ш끽維驪?????ш끽維驪???????볥궙筌????궰???????,?熬곣뫖利??レ뱽??븐쪎??????붺몭??????궰???????}
       display: ${APP_NEWS_NAVER_DISPLAY:10}
       start: ${APP_NEWS_NAVER_START:1}
   market:
@@ -167,3 +223,7 @@ app:
     free-detail-views: 3
   auth:
     google-login-enabled: false
+
+
+
+

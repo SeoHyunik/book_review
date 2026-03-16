@@ -8,8 +8,10 @@ import com.example.macronews.domain.MarketImpact;
 import com.example.macronews.domain.MarketType;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
+import com.example.macronews.domain.OpenAiUsageFeatureType;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.repository.NewsEventRepository;
+import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -46,6 +48,7 @@ public class MacroAiServiceImpl implements MacroAiService {
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
     private final NewsEventRepository newsEventRepository;
+    private final OpenAiUsageLoggingService openAiUsageLoggingService;
 
     @Value("${openai.api-key:}")
     private String openAiApiKey;
@@ -93,6 +96,10 @@ public class MacroAiServiceImpl implements MacroAiService {
             throw new IllegalStateException(
                     "OpenAI interpretation failed with status=" + apiResult.statusCode());
         }
+        openAiUsageLoggingService.recordUsage(
+                OpenAiUsageFeatureType.MACRO_INTERPRETATION,
+                openAiModel,
+                apiResult.body());
 
         AnalysisResult result = parseAnalysisResult(apiResult.body());
         log.info("[INTERPRET] success id={} macroImpacts={} marketImpacts={}", event.id(),
@@ -233,6 +240,8 @@ public class MacroAiServiceImpl implements MacroAiService {
             return new AnalysisResult(
                     openAiModel,
                     Instant.now(),
+                    readOptionalText(node, "headlineKo"),
+                    readOptionalText(node, "headlineEn"),
                     readOptionalText(node, "summaryKo"),
                     readOptionalText(node, "summaryEn"),
                     macroImpacts,

@@ -11,6 +11,7 @@ import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.repository.NewsEventRepository;
+import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -34,11 +35,14 @@ class NewsAggregationServiceTest {
     @Mock
     private ExternalApiUtils externalApiUtils;
 
+    @Mock
+    private OpenAiUsageLoggingService openAiUsageLoggingService;
+
     private NewsAggregationService newsAggregationService;
 
     @BeforeEach
     void setUp() {
-        newsAggregationService = new NewsAggregationService(newsEventRepository, externalApiUtils, new ObjectMapper());
+        newsAggregationService = new NewsAggregationService(newsEventRepository, externalApiUtils, new ObjectMapper(), openAiUsageLoggingService);
         ReflectionTestUtils.setField(newsAggregationService, "forecastEnabled", true);
         ReflectionTestUtils.setField(newsAggregationService, "windowHours", 3);
         ReflectionTestUtils.setField(newsAggregationService, "maxNewsItems", 20);
@@ -116,6 +120,8 @@ class NewsAggregationServiceTest {
                 new AnalysisResult(
                         "test-model",
                         Instant.now(),
+                        "Headline KO",
+                        "Headline EN",
                         "Summary KO",
                         "Summary EN",
                         List.of(new MacroImpact(MacroVariable.KOSPI, ImpactDirection.UP, 0.8d)),
@@ -124,4 +130,3 @@ class NewsAggregationServiceTest {
         );
     }
 }
-

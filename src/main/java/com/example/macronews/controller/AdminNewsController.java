@@ -3,19 +3,26 @@ package com.example.macronews.controller;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.AutoIngestionBatchStatusDto;
+import com.example.macronews.dto.AutoIngestionControlStatusDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
+import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
+import com.example.macronews.service.news.AutoIngestionControlService;
+import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.ops.RenderKeepAliveService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
+import com.example.macronews.util.RedirectPathUtils;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import com.example.macronews.util.RedirectPathUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -45,6 +52,10 @@ public class AdminNewsController {
     private final NewsSourceProviderSelector newsSourceProviderSelector;
     private final MacroAiService macroAiService;
     private final NewsQueryService newsQueryService;
+    private final AutoIngestionControlService autoIngestionControlService;
+    private final RenderKeepAliveService renderKeepAliveService;
+    private final AutoIngestionEmailNotificationService autoIngestionEmailNotificationService;
+    private final MessageSource messageSource;
 
     @GetMapping
     public String ingestForm(Model model) {
@@ -70,6 +81,7 @@ public class AdminNewsController {
         NewsStatus selectedStatus = resolveStatus(status);
         List<NewsListItemDto> recentNewsItems = newsQueryService.getRecentNews(selectedStatus);
         populateAdminListModel(model, recentNewsItems, selectedStatus);
+        populateAutoIngestionControlModel(model);
         populateAutoBatchStatusFromFlash(model);
         model.addAttribute("pageTitleKey", "page.admin.auto.title");
         model.addAttribute("pageDescriptionKey", "page.admin.auto.description");
@@ -87,6 +99,31 @@ public class AdminNewsController {
         populateAutoBatchStatus(model, requestedCount, returnedCount, parseItemIds(itemIds));
         model.addAttribute("autoBatchStatusUrl", "/admin/news/auto/batch-status");
         return "admin/news/fragments/auto-batch-status :: autoBatchStatusPanel";
+    }
+
+    @PostMapping("/auto/start")
+    public String startAutoIngestion(RedirectAttributes redirectAttributes) {
+        boolean changed = autoIngestionControlService.enableScheduler();
+        if (changed) {
+            redirectAttributes.addFlashAttribute("successMessage", msg("admin.news.auto.scheduler.enabled"));
+        } else {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.scheduler.alreadyEnabled"));
+        }
+        return "redirect:" + AUTO_PAGE;
+    }
+
+    @PostMapping("/auto/stop")
+    public String stopAutoIngestion(RedirectAttributes redirectAttributes) {
+        boolean running = autoIngestionControlService.getStatus().runInProgress();
+        boolean changed = autoIngestionControlService.disableScheduler();
+        if (changed && running) {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.scheduler.disabledWhileRunning"));
+        } else if (changed) {
+            redirectAttributes.addFlashAttribute("successMessage", msg("admin.news.auto.scheduler.disabled"));
+        } else {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.scheduler.alreadyDisabled"));
+        }
+        return "redirect:" + AUTO_PAGE;
     }
 
     @PostMapping("/ingest")
@@ -123,6 +160,7 @@ public class AdminNewsController {
             @RequestParam(name = "returnTo", required = false) String returnTo,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "sort", required = false) String sort,
+            @RequestParam(name = "page", required = false) Integer page,
             RedirectAttributes redirectAttributes) {
         log.info("[ADMIN] reinterpret requested id={}", id);
         try {
@@ -135,7 +173,7 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("errorMessage",
                     "Re-interpretation failed. id=" + id);
         }
-        return "redirect:" + resolveAdminRedirect(returnTo, status, sort);
+        return "redirect:" + resolveAdminRedirect(returnTo, status, sort, page);
     }
 
     @PostMapping("/{id}/delete")
@@ -143,6 +181,7 @@ public class AdminNewsController {
             @RequestParam(name = "returnTo", required = false) String returnTo,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "sort", required = false) String sort,
+            @RequestParam(name = "page", required = false) Integer page,
             RedirectAttributes redirectAttributes) {
         log.info("[ADMIN] delete requested id={}", id);
         boolean deleted = newsIngestionService.deleteById(id);
@@ -151,30 +190,36 @@ public class AdminNewsController {
         } else {
             redirectAttributes.addFlashAttribute("warningMessage", "News item not found. id=" + id);
         }
-        return "redirect:" + resolveAdminRedirect(returnTo, status, sort);
+        return "redirect:" + resolveAdminRedirect(returnTo, status, sort, page);
     }
 
     @PostMapping("/ingest-api")
     public String ingestFromApi(@RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
             RedirectAttributes redirectAttributes) {
+        int resolvedPageSize = resolveAutoPageSize(pageSize);
         try {
             if (!newsSourceProviderSelector.isConfigured()) {
                 log.info("Admin external ingestion skipped because no news source provider is configured");
                 redirectAttributes.addFlashAttribute("warningMessage",
-                        "Automatic ingestion requires at least one configured news source provider. Manual ingestion is still available.");
+                        msg("admin.news.auto.warning.unconfigured"));
                 return "redirect:" + AUTO_PAGE;
             }
 
-            int resolvedPageSize = resolveAutoPageSize(pageSize);
+            AutoIngestionRunCommandResult startResult = autoIngestionControlService.beginManualRun(resolvedPageSize);
+            if (startResult == AutoIngestionRunCommandResult.ALREADY_RUNNING) {
+                redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.run.alreadyRunning"));
+                return "redirect:" + AUTO_PAGE;
+            }
+
             List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(resolvedPageSize);
             AutoIngestionBatchStatusDto autoBatchStatus =
                     newsQueryService.getAutoIngestionBatchStatus(resolvedPageSize, ingested.size(),
                             ingested.stream().map(NewsEvent::id).toList());
+            autoIngestionControlService.completeRun(autoBatchStatus);
             redirectAttributes.addFlashAttribute("successMessage", buildAutoIngestionFlashMessage(autoBatchStatus));
             if (pageSize <= 0) {
                 redirectAttributes.addFlashAttribute("warningMessage",
-                        "Requested page size was invalid, so automatic ingestion used the default size of "
-                                + DEFAULT_LIMIT + ".");
+                        msg("admin.news.auto.pageSize.invalid", DEFAULT_LIMIT));
             }
             redirectAttributes.addFlashAttribute("autoBatchStatus", autoBatchStatus);
             redirectAttributes.addFlashAttribute("autoBatchRequestedCount", resolvedPageSize);
@@ -184,9 +229,10 @@ public class AdminNewsController {
                     resolvedPageSize, autoBatchStatus.returnedCount(), autoBatchStatus.analyzedCount(),
                     autoBatchStatus.pendingCount(), autoBatchStatus.failedCount());
         } catch (RuntimeException ex) {
+            autoIngestionControlService.failRun(resolvedPageSize);
             log.error("Admin external ingestion failed", ex);
             redirectAttributes.addFlashAttribute("errorMessage",
-                    "External ingestion failed. Please check logs/config.");
+                    msg("admin.news.auto.run.failed"));
         }
         return "redirect:" + AUTO_PAGE;
     }
@@ -200,6 +246,13 @@ public class AdminNewsController {
         model.addAttribute("recentNewsItems", recentNewsItems);
         model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());
         model.addAttribute("statusOptions", Arrays.stream(NewsStatus.values()).map(Enum::name).toList());
+    }
+
+    private void populateAutoIngestionControlModel(Model model) {
+        AutoIngestionControlStatusDto controlStatus = autoIngestionControlService.getStatus();
+        model.addAttribute("autoIngestionControlStatus", controlStatus);
+        model.addAttribute("keepAliveEnabled", renderKeepAliveService.isEnabled());
+        model.addAttribute("emailNotificationEnabled", autoIngestionEmailNotificationService.isEnabled());
     }
 
     private void populateAutoBatchStatusFromFlash(Model model) {
@@ -218,16 +271,20 @@ public class AdminNewsController {
         Integer requestedCount = asInteger(attributes.get("autoBatchRequestedCount"));
         Integer returnedCount = asInteger(attributes.get("autoBatchReturnedCount"));
         List<String> itemIds = asStringList(attributes.get("autoBatchItemIds"));
-        if (requestedCount == null || returnedCount == null || itemIds.isEmpty()) {
+        if (requestedCount != null && returnedCount != null) {
+            populateAutoBatchStatus(model, requestedCount, returnedCount, itemIds);
             return;
         }
-        populateAutoBatchStatus(model, requestedCount, returnedCount, itemIds);
+        autoIngestionControlService.getLatestBatchStatus().ifPresent(autoBatchStatus -> {
+            model.addAttribute("autoBatchStatus", autoBatchStatus);
+            model.addAttribute("autoBatchItemIdsCsv", autoBatchStatus.items().stream()
+                    .map(NewsListItemDto::id)
+                    .collect(java.util.stream.Collectors.joining(",")));
+            model.addAttribute("autoBatchStatusUrl", "/admin/news/auto/batch-status");
+        });
     }
 
     private void populateAutoBatchStatus(Model model, int requestedCount, int returnedCount, List<String> itemIds) {
-        if (itemIds.isEmpty()) {
-            return;
-        }
         AutoIngestionBatchStatusDto autoBatchStatus =
                 newsQueryService.getAutoIngestionBatchStatus(requestedCount, returnedCount, itemIds);
         model.addAttribute("autoBatchStatus", autoBatchStatus);
@@ -271,7 +328,7 @@ public class AdminNewsController {
         }
     }
 
-    private String resolveAdminRedirect(String returnTo, String status, String sort) {
+    private String resolveAdminRedirect(String returnTo, String status, String sort, Integer page) {
         String normalizedStatus = normalizeStatus(status);
         String normalizedSort = normalizeSort(sort);
         String safeReturnTo = RedirectPathUtils.normalizeSafeRelativePath(returnTo);
@@ -290,6 +347,9 @@ public class AdminNewsController {
         }
         if (NEWS_PAGE.equals(basePath) && StringUtils.hasText(normalizedSort)) {
             builder.queryParam("sort", normalizedSort);
+        }
+        if (NEWS_PAGE.equals(basePath) && page != null && page > 1) {
+            builder.queryParam("page", page);
         }
         return builder.build(true).toUriString();
     }
@@ -317,20 +377,27 @@ public class AdminNewsController {
 
     private String buildAutoIngestionFlashMessage(AutoIngestionBatchStatusDto autoBatchStatus) {
         if (autoBatchStatus.returnedCount() == 0) {
-            return "Automatic ingestion completed, but the external feed returned no items.";
+            return msg("admin.news.auto.run.completed.noResults");
         }
         if (autoBatchStatus.failedCount() > 0) {
-            return "Automatic ingestion completed. returned=" + autoBatchStatus.returnedCount()
-                    + ", analyzed=" + autoBatchStatus.analyzedCount()
-                    + ", pending=" + autoBatchStatus.pendingCount()
-                    + ", failed=" + autoBatchStatus.failedCount();
+            return msg("admin.news.auto.run.completed.withFailures",
+                    autoBatchStatus.returnedCount(),
+                    autoBatchStatus.analyzedCount(),
+                    autoBatchStatus.pendingCount(),
+                    autoBatchStatus.failedCount());
         }
         if (!autoBatchStatus.completed()) {
-            return "Automatic ingestion completed. returned=" + autoBatchStatus.returnedCount()
-                    + ", analyzed=" + autoBatchStatus.analyzedCount()
-                    + ", pending analysis=" + autoBatchStatus.pendingCount();
+            return msg("admin.news.auto.run.completed.pending",
+                    autoBatchStatus.returnedCount(),
+                    autoBatchStatus.analyzedCount(),
+                    autoBatchStatus.pendingCount());
         }
-        return "Automatic ingestion completed. returned=" + autoBatchStatus.returnedCount()
-                + ", analyzed=" + autoBatchStatus.analyzedCount();
+        return msg("admin.news.auto.run.completed.success",
+                autoBatchStatus.returnedCount(),
+                autoBatchStatus.analyzedCount());
+    }
+
+    private String msg(String key, Object... args) {
+        return messageSource.getMessage(key, args, LocaleContextHolder.getLocale());
     }
 }

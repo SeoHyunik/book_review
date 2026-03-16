@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <section class="mb-4 d-flex flex-column flex-md-row justify-content-between align-items-start gap-3">
+        <div>
+            <h1 class="h3 fw-bold mb-1" th:text="#{admin.openai.heading}">OpenAI Usage</h1>
+            <p class="text-secondary mb-0" th:text="#{admin.openai.subheading}">Estimated token usage and cost visibility for admin operations.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-primary" th:href="@{/admin/news/manual}" th:text="#{admin.news.manual.tab}">Manual Ingestion</a>
+            <a class="btn btn-outline-primary" th:href="@{/admin/news/auto}" th:text="#{admin.news.auto.tab}">Automatic Ingestion</a>
+            <a class="btn btn-primary" th:href="@{/admin/openai-usage}" th:text="#{nav.admin.usage}">OpenAI Usage</a>
+        </div>
+    </section>
+
+    <section class="mb-4">
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small mb-1" th:text="#{admin.openai.estimatedUsd}">Estimated USD Cost</div>
+                        <div class="fs-3 fw-bold" th:text="${'$' + #numbers.formatDecimal(usageDashboard.recentUsdTotal, 1, 4)}">$0.0000</div>
+                        <div class="text-secondary small" th:text="#{admin.openai.recentWindowNote}">Based on recent usage records shown below.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-secondary small mb-1" th:text="#{admin.openai.estimatedKrw}">Estimated KRW Cost</div>
+                        <div class="fs-3 fw-bold" th:text="${#numbers.formatDecimal(usageDashboard.recentKrwTotal, 1, 0) + ' KRW'}">0 KRW</div>
+                        <div class="text-secondary small"
+                             th:text="${#messages.msg(usageDashboard.exchangeRateStatusMessageKey, #numbers.formatDecimal(usageDashboard.exchangeRate, 1, 2))}">
+                            USD/KRW rate applied: 1350.00
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="mb-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="h5 fw-bold mb-0" th:text="#{admin.openai.recent.heading}">Recent Usage Records</h2>
+                    <span class="badge text-bg-light border" th:text="#{admin.openai.recent.count(${#lists.size(usageDashboard.recentRecords)})}">Records 0</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th th:text="#{admin.openai.timestamp}">Timestamp</th>
+                            <th th:text="#{admin.openai.feature}">Feature</th>
+                            <th th:text="#{admin.openai.model}">Model</th>
+                            <th class="text-end" th:text="#{admin.openai.promptTokens}">Prompt Tokens</th>
+                            <th class="text-end" th:text="#{admin.openai.completionTokens}">Completion Tokens</th>
+                            <th class="text-end" th:text="#{admin.openai.totalTokens}">Total Tokens</th>
+                            <th class="text-end" th:text="#{admin.openai.estimatedUsd}">Estimated USD</th>
+                            <th class="text-end" th:text="#{admin.openai.estimatedKrw}">Estimated KRW</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:if="${#lists.isEmpty(usageDashboard.recentRecords)}">
+                            <td colspan="8" class="text-secondary" th:text="#{admin.openai.empty}">No usage records yet.</td>
+                        </tr>
+                        <tr th:each="record : ${usageDashboard.recentRecords}">
+                            <td class="text-nowrap" th:text="${#temporals.format(record.timestamp, 'yyyy-MM-dd HH:mm')}">2026-03-16 09:00</td>
+                            <td th:text="${#messages.msg(record.featureMessageKey)}">Macro Interpretation</td>
+                            <td th:text="${record.model}">gpt-4o</td>
+                            <td class="text-end" th:text="${#numbers.formatInteger(record.promptTokens, 1, 'COMMA')}">0</td>
+                            <td class="text-end" th:text="${#numbers.formatInteger(record.completionTokens, 1, 'COMMA')}">0</td>
+                            <td class="text-end" th:text="${#numbers.formatInteger(record.totalTokens, 1, 'COMMA')}">0</td>
+                            <td class="text-end" th:text="${'$' + #numbers.formatDecimal(record.estimatedUsdCost, 1, 4)}">$0.0000</td>
+                            <td class="text-end" th:text="${#numbers.formatDecimal(record.estimatedKrwCost, 1, 0) + ' KRW'}">0 KRW</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="row g-3">
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h5 fw-bold mb-3" th:text="#{admin.openai.daily.heading}">Daily Summary</h2>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                            <tr>
+                                <th th:text="#{admin.openai.period}">Period</th>
+                                <th class="text-end" th:text="#{admin.openai.requests}">Requests</th>
+                                <th class="text-end" th:text="#{admin.openai.totalTokens}">Total Tokens</th>
+                                <th class="text-end" th:text="#{admin.openai.estimatedUsd}">Estimated USD</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:if="${#lists.isEmpty(usageDashboard.dailyAggregates)}">
+                                <td colspan="4" class="text-secondary" th:text="#{admin.openai.empty}">No usage records yet.</td>
+                            </tr>
+                            <tr th:each="item : ${usageDashboard.dailyAggregates}">
+                                <td th:text="${item.label}">2026-03-16</td>
+                                <td class="text-end" th:text="${#numbers.formatInteger(item.requestCount, 1, 'COMMA')}">0</td>
+                                <td class="text-end" th:text="${#numbers.formatInteger(item.totalTokens, 1, 'COMMA')}">0</td>
+                                <td class="text-end" th:text="${'$' + #numbers.formatDecimal(item.estimatedUsdCost, 1, 4)}">$0.0000</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h5 fw-bold mb-3" th:text="#{admin.openai.monthly.heading}">Monthly Summary</h2>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                            <tr>
+                                <th th:text="#{admin.openai.period}">Period</th>
+                                <th class="text-end" th:text="#{admin.openai.requests}">Requests</th>
+                                <th class="text-end" th:text="#{admin.openai.totalTokens}">Total Tokens</th>
+                                <th class="text-end" th:text="#{admin.openai.estimatedKrw}">Estimated KRW</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:if="${#lists.isEmpty(usageDashboard.monthlyAggregates)}">
+                                <td colspan="4" class="text-secondary" th:text="#{admin.openai.empty}">No usage records yet.</td>
+                            </tr>
+                            <tr th:each="item : ${usageDashboard.monthlyAggregates}">
+                                <td th:text="${item.label}">2026-03</td>
+                                <td class="text-end" th:text="${#numbers.formatInteger(item.requestCount, 1, 'COMMA')}">0</td>
+                                <td class="text-end" th:text="${#numbers.formatInteger(item.totalTokens, 1, 'COMMA')}">0</td>
+                                <td class="text-end" th:text="${#numbers.formatDecimal(item.estimatedKrwCost, 1, 0) + ' KRW'}">0 KRW</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</th:block>
+</html>
+

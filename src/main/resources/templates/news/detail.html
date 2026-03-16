@@ -48,7 +48,7 @@
             font-size: clamp(1.7rem, 2.4vw, 2.55rem);
             line-height: 1.08;
             letter-spacing: -0.03em;
-            max-width: 18ch;
+            max-width: 22ch;
             color: var(--surface-strong);
         }
 
@@ -269,15 +269,26 @@
             color: var(--surface-strong);
         }
 
+        .detail-impact-table th:nth-child(2),
+        .detail-impact-table td:nth-child(2) {
+            width: 7.5rem;
+            text-align: center;
+        }
+
+        .detail-impact-table th:nth-child(3),
+        .detail-impact-table td:nth-child(3) {
+            width: 7rem;
+        }
+
         .detail-direction-chip {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 5.75rem;
-            padding: 0.46rem 0.78rem;
+            min-width: 6.35rem;
+            padding: 0.5rem 0.9rem;
             border-radius: 999px;
             border: 1px solid transparent;
-            font-weight: 600;
+            font-weight: 700;
             font-size: 0.84rem;
         }
 
@@ -292,21 +303,21 @@
         }
 
         .detail-direction-chip--up {
-            color: var(--tone-positive-fg);
-            background: var(--tone-positive-bg);
-            border-color: var(--tone-positive-border);
+            color: #b42318;
+            background: rgba(254, 226, 226, 0.96);
+            border-color: rgba(220, 38, 38, 0.24);
         }
 
         .detail-direction-chip--down {
-            color: var(--tone-negative-fg);
-            background: var(--tone-negative-bg);
-            border-color: var(--tone-negative-border);
+            color: #1d4ed8;
+            background: rgba(219, 234, 254, 0.96);
+            border-color: rgba(37, 99, 235, 0.26);
         }
 
         .detail-direction-chip--neutral {
-            color: var(--tone-neutral-fg);
-            background: var(--tone-neutral-bg);
-            border-color: var(--tone-neutral-border);
+            color: #475569;
+            background: rgba(226, 232, 240, 0.92);
+            border-color: rgba(148, 163, 184, 0.28);
         }
 
         .detail-confidence {
@@ -488,7 +499,7 @@
 
     <section class="detail-page-header d-flex justify-content-between align-items-start gap-3">
         <div class="detail-page-header-copy">
-            <h1 class="h3 fw-bold mb-1" th:text="${newsDetail.title ?: #messages.msg('news.untitled')}">News Title</h1>
+            <h1 class="h3 fw-bold mb-1" th:text="${localizedDetailTitle ?: (newsDetail.title ?: #messages.msg('news.untitled'))}">News Title</h1>
             <p class="text-secondary mb-0" th:text="#{news.detail.subheading}">AI market interpretation built from the latest news context.</p>
         </div>
         <a class="btn btn-sm btn-outline-primary text-nowrap" th:href="@{/news}" th:text="#{news.detail.back}">Back to List</a>
@@ -498,7 +509,7 @@
         <div class="card-body p-4 d-flex flex-column gap-3">
             <div class="detail-hero-copy">
                 <div class="detail-section-kicker" th:text="#{news.detail.summary}">Summary</div>
-                <h2 class="fw-bold mb-0 detail-heading" th:text="${newsDetail.title ?: #messages.msg('news.untitled')}">News Title</h2>
+                <h2 class="fw-bold mb-0 detail-heading" th:text="${localizedDetailTitle ?: (newsDetail.title ?: #messages.msg('news.untitled'))}">News Title</h2>
                 <p class="text-secondary mb-0 detail-subheading" th:text="#{news.detail.subheading}">AI market interpretation built from the latest news context.</p>
             </div>
             <div class="detail-meta-list">
@@ -533,18 +544,13 @@
     </section>
 
     <section class="card border-0 mb-4 detail-surface detail-section-card detail-interpretation-card"
-             th:if="${newsDetail.status != null and newsDetail.status.name() == 'ANALYZED' and newsDetail.analysisResult != null}"
-             th:with="localizedSummary=${#locale.language == 'ko'
-                ? (!#strings.isEmpty(newsDetail.analysisResult.summaryKo) ? newsDetail.analysisResult.summaryKo
-                    : (!#strings.isEmpty(newsDetail.analysisResult.summaryEn) ? newsDetail.analysisResult.summaryEn : newsDetail.summary))
-                : (!#strings.isEmpty(newsDetail.analysisResult.summaryEn) ? newsDetail.analysisResult.summaryEn
-                    : (!#strings.isEmpty(newsDetail.analysisResult.summaryKo) ? newsDetail.analysisResult.summaryKo : newsDetail.summary))}">
+             th:if="${newsDetail.status != null and newsDetail.status.name() == 'ANALYZED' and newsDetail.analysisResult != null}">
         <div class="card-body p-4 d-flex flex-column gap-3">
             <div class="detail-section-header detail-section-divider">
                 <div class="detail-section-headline">
                     <div class="detail-section-kicker" th:text="#{news.detail.interpretationBadge}">AI Market Take</div>
                     <h2 class="fw-bold detail-section-title" th:text="#{news.detail.interpretationSummary}">Interpretation Summary</h2>
-                    <p class="detail-ai-support">The key market read distilled from the article context and AI interpretation.</p>
+                    <p class="detail-ai-support" th:text="#{news.detail.interpretationSupport}">The key market read distilled from the article context and AI interpretation.</p>
                 </div>
                 <div class="detail-status-badges">
                     <span class="badge text-bg-primary" th:text="#{news.detail.interpretationBadge}">AI Market Take</span>
@@ -557,7 +563,7 @@
                 </div>
             </div>
             <div class="detail-callout">
-                <p class="detail-copy detail-ai-summary" th:text="${localizedSummary ?: '-'}"></p>
+                <p class="detail-copy detail-ai-summary" th:text="${localizedInterpretationSummary ?: '-'}"></p>
             </div>
         </div>
     </section>
@@ -594,7 +600,7 @@
             <div class="detail-section-header detail-section-divider">
                 <div class="detail-section-headline">
                     <div class="detail-section-kicker" th:text="#{news.detail.interpretationBadge}">AI Market Take</div>
-                    <h2 class="fw-bold detail-section-title">Impact Breakdown</h2>
+                    <h2 class="fw-bold detail-section-title" th:text="#{news.detail.impactBreakdown}">Impact Breakdown</h2>
                 </div>
             </div>
 
@@ -606,7 +612,7 @@
                             <h3 class="fw-bold detail-section-title" th:text="#{news.detail.macroImpacts}">Macro Signals</h3>
                         </div>
                     </div>
-                    <p class="detail-impact-note">Compare direction and confidence across macro variables at a glance.</p>
+                    <p class="detail-impact-note" th:text="#{news.detail.macroImpactNote}">Compare direction and confidence across macro variables at a glance.</p>
                     <div th:if="${newsDetail.analysisResult.macroImpacts == null or #lists.isEmpty(newsDetail.analysisResult.macroImpacts)}"
                          class="detail-empty"
                          th:text="#{news.detail.noMacroImpacts}">No macro impacts.</div>
@@ -621,11 +627,19 @@
                             </thead>
                             <tbody>
                             <tr th:each="impact : ${newsDetail.analysisResult.macroImpacts}">
-                                <td class="detail-impact-name" th:text="${impact.variable ?: '-'}"></td>
-                                <td class="detail-direction-cell" th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
-                                    <span th:case="'UP'" class="detail-direction-chip detail-direction-chip--up">UP</span>
-                                    <span th:case="'DOWN'" class="detail-direction-chip detail-direction-chip--down">DOWN</span>
-                                    <span th:case="'NEUTRAL'" class="detail-direction-chip detail-direction-chip--neutral">NEUTRAL</span>
+                                <td class="detail-impact-name"
+                                    th:with="variableKey=${impact.variable != null ? 'news.detail.variable.' + #strings.toLowerCase(impact.variable.name()) : ''}"
+                                    th:text="${impact.variable != null ? (#messages.msgOrNull(variableKey) != null ? #messages.msg(variableKey) : impact.variable.name()) : '-'}"></td>
+                                <td class="detail-direction-cell"
+                                    th:with="semanticTone=${impact.variable != null and impact.direction != null ? impact.variable.sentimentFor(impact.direction).name() : 'NEUTRAL'}"
+                                    th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
+                                    <span th:case="'UP'" class="detail-direction-chip"
+                                          th:classappend="${semanticTone == 'POSITIVE' ? ' detail-direction-chip--up' : (semanticTone == 'NEGATIVE' ? ' detail-direction-chip--down' : ' detail-direction-chip--neutral')}"
+                                          th:text="#{news.direction.up}">UP</span>
+                                    <span th:case="'DOWN'" class="detail-direction-chip"
+                                          th:classappend="${semanticTone == 'POSITIVE' ? ' detail-direction-chip--up' : (semanticTone == 'NEGATIVE' ? ' detail-direction-chip--down' : ' detail-direction-chip--neutral')}"
+                                          th:text="#{news.direction.down}">DOWN</span>
+                                    <span th:case="'NEUTRAL'" class="detail-direction-chip detail-direction-chip--neutral" th:text="#{news.direction.neutral}">NEUTRAL</span>
                                     <span th:case="*" class="detail-direction-chip detail-direction-chip--neutral">-</span>
                                 </td>
                                 <td class="text-end detail-confidence detail-confidence-cell" th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>
@@ -642,7 +656,7 @@
                             <h3 class="fw-bold detail-section-title" th:text="#{news.detail.marketImpacts}">Market Signals</h3>
                         </div>
                     </div>
-                    <p class="detail-impact-note">Scan risk direction and conviction side by side across markets.</p>
+                    <p class="detail-impact-note" th:text="#{news.detail.marketImpactNote}">Scan risk direction and conviction side by side across markets.</p>
                     <div th:if="${newsDetail.analysisResult.marketImpacts == null or #lists.isEmpty(newsDetail.analysisResult.marketImpacts)}"
                          class="detail-empty"
                          th:text="#{news.detail.noMarketImpacts}">No market impacts.</div>
@@ -657,11 +671,19 @@
                             </thead>
                             <tbody>
                             <tr th:each="impact : ${newsDetail.analysisResult.marketImpacts}">
-                                <td class="detail-impact-name" th:text="${impact.market ?: '-'}"></td>
-                                <td class="detail-direction-cell" th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
-                                    <span th:case="'UP'" class="detail-direction-chip detail-direction-chip--up">UP</span>
-                                    <span th:case="'DOWN'" class="detail-direction-chip detail-direction-chip--down">DOWN</span>
-                                    <span th:case="'NEUTRAL'" class="detail-direction-chip detail-direction-chip--neutral">NEUTRAL</span>
+                                <td class="detail-impact-name"
+                                    th:with="marketKey=${impact.market != null ? 'news.detail.market.' + #strings.toLowerCase(impact.market.name()) : ''}"
+                                    th:text="${impact.market != null ? (#messages.msgOrNull(marketKey) != null ? #messages.msg(marketKey) : impact.market.name()) : '-'}"></td>
+                                <td class="detail-direction-cell"
+                                    th:with="semanticTone=${impact.market != null and impact.direction != null ? impact.market.sentimentFor(impact.direction).name() : 'NEUTRAL'}"
+                                    th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
+                                    <span th:case="'UP'" class="detail-direction-chip"
+                                          th:classappend="${semanticTone == 'POSITIVE' ? ' detail-direction-chip--up' : (semanticTone == 'NEGATIVE' ? ' detail-direction-chip--down' : ' detail-direction-chip--neutral')}"
+                                          th:text="#{news.direction.up}">UP</span>
+                                    <span th:case="'DOWN'" class="detail-direction-chip"
+                                          th:classappend="${semanticTone == 'POSITIVE' ? ' detail-direction-chip--up' : (semanticTone == 'NEGATIVE' ? ' detail-direction-chip--down' : ' detail-direction-chip--neutral')}"
+                                          th:text="#{news.direction.down}">DOWN</span>
+                                    <span th:case="'NEUTRAL'" class="detail-direction-chip detail-direction-chip--neutral" th:text="#{news.direction.neutral}">NEUTRAL</span>
                                     <span th:case="*" class="detail-direction-chip detail-direction-chip--neutral">-</span>
                                 </td>
                                 <td class="text-end detail-confidence detail-confidence-cell" th:text="${#numbers.formatDecimal(impact.confidence * 100, 1, 1) + '%'}"></td>

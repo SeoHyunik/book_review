@@ -83,6 +83,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-cache")
+    implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.springframework.boot:spring-boot-starter-log4j2")
     implementation("org.springframework:spring-aop")
     implementation("org.aspectj:aspectjrt:1.9.25")

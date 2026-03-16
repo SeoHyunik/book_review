@@ -31,6 +31,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private static final DateTimeFormatter NAVER_PUB_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
+    private static final String KOREAN_BREAKING_MARKER = "\uC18D\uBCF4";
 
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
@@ -165,8 +166,9 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     private List<ExternalNewsItem> deduplicateAndLimit(List<NaverCandidate> candidates, int limit) {
         Map<String, ExternalNewsItem> deduplicated = new LinkedHashMap<>();
         candidates.stream()
-                .sorted(Comparator.comparing(candidate -> candidate.item().publishedAt(),
-                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .sorted(Comparator.comparing((NaverCandidate candidate) -> candidate.item().publishedAt(),
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(candidate -> candidate.item().url(), Comparator.nullsLast(Comparator.naturalOrder())))
                 .forEach(candidate -> deduplicated.putIfAbsent(resolveDedupKey(candidate), candidate.item()));
         return deduplicated.values().stream()
                 .limit(limit)
@@ -212,7 +214,16 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     }
 
     private String normalizeTitle(String title) {
-        return title == null ? "" : title.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+        if (title == null) {
+            return "";
+        }
+        return title.trim()
+                .replaceAll("\\[(?:\\uC18D\\uBCF4|(?i:breaking))]", " ")
+                .replace(KOREAN_BREAKING_MARKER, " ")
+                .replaceAll("(?i)\\bbreaking\\b", " ")
+                .replaceAll("\\s+", " ")
+                .trim()
+                .toLowerCase(Locale.ROOT);
     }
 
     private String defaultText(String value, String fallback) {

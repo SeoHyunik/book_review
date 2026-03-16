@@ -41,6 +41,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         const fab = document.getElementById('theme-fab');
         const iconEl = document.getElementById('theme-fab-icon');
+        const scrollTopFab = document.getElementById('scroll-top-fab');
 
         const initialTheme = root.getAttribute('data-bs-theme') || getPreferredTheme();
         const hasStored = Boolean(getStoredTheme());
@@ -56,6 +57,12 @@
                 const current = root.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
                 const nextTheme = current === 'dark' ? 'light' : 'dark';
                 applyTheme(nextTheme, { persist: true, iconEl });
+            });
+        }
+
+        if (scrollTopFab) {
+            scrollTopFab.addEventListener('click', () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             });
         }
     });

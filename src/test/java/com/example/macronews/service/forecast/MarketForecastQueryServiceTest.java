@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 import com.example.macronews.domain.ImpactDirection;
 import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.MarketMood;
+import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
@@ -56,7 +57,8 @@ class MarketForecastQueryServiceTest {
                 3
         );
         NewsListItemDto relatedNews = new NewsListItemDto(
-                "news-1", "KOSPI rises", "Reuters", Instant.now(), Instant.now(), null, true, true, "", "summary", 1);
+                "news-1", "KOSPI rises", "KOSPI rises", "Reuters", Instant.now(), Instant.now(), null, true, true,
+                ImpactDirection.UP, SignalSentiment.POSITIVE, "", "summary", 1);
 
         given(newsAggregationService.getCurrentSnapshot()).willReturn(Optional.of(snapshot));
         given(newsQueryService.getNewsItemsByIds(List.of("news-1"))).willReturn(List.of(relatedNews));

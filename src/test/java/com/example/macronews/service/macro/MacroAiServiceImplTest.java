@@ -3,10 +3,12 @@ package com.example.macronews.service.macro;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.repository.NewsEventRepository;
+import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,39 +32,49 @@ class MacroAiServiceImplTest {
     @Mock
     private NewsEventRepository newsEventRepository;
 
+    @Mock
+    private OpenAiUsageLoggingService openAiUsageLoggingService;
+
     private MacroAiServiceImpl macroAiService;
 
     @BeforeEach
     void setUp() {
-        macroAiService = new MacroAiServiceImpl(externalApiUtils, new ObjectMapper(), newsEventRepository);
+        macroAiService = new MacroAiServiceImpl(externalApiUtils, new ObjectMapper(), newsEventRepository, openAiUsageLoggingService);
         ReflectionTestUtils.setField(macroAiService, "openAiApiKey", "test-key");
         ReflectionTestUtils.setField(macroAiService, "openAiUrl", "https://example.com/openai");
         ReflectionTestUtils.setField(macroAiService, "openAiModel", "gpt-test");
-        ReflectionTestUtils.setField(macroAiService, "macroPromptFile", new ByteArrayResource(("{\"messages\":[{\"role\":\"system\",\"content\":\"Return JSON\"},{\"role\":\"user\",\"template\":\"Title: {{title}}\"}]}" ).getBytes(StandardCharsets.UTF_8)));
+        ReflectionTestUtils.setField(macroAiService, "macroPromptFile", new ByteArrayResource((
+                "{\"messages\":[{\"role\":\"system\",\"content\":\"Return JSON\"},{\"role\":\"user\",\"template\":\"Title: {{title}}\"}]}")
+                .getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
-    @DisplayName("interpret should parse localized summaries when both are present")
+    @DisplayName("interpret should parse localized headlines and summaries when both are present")
     void interpret_parsesLocalizedSummaries() {
-        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200,
-                "{\"choices\":[{\"message\":{\"content\":\"{\\\"summaryKo\\\":\\\"한국어 요약\\\",\\\"summaryEn\\\":\\\"English summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}"));
+        String response = "{\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":80,\"total_tokens\":200},\"choices\":[{\"message\":{\"content\":\"{\\\"headlineKo\\\":\\\"Korean headline\\\",\\\"headlineEn\\\":\\\"English headline\\\",\\\"summaryKo\\\":\\\"Korean summary\\\",\\\"summaryEn\\\":\\\"English summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}";
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, response));
 
         var result = macroAiService.interpret(sampleEvent());
 
-        assertThat(result.summaryKo()).isEqualTo("한국어 요약");
+        assertThat(result.headlineKo()).isEqualTo("Korean headline");
+        assertThat(result.headlineEn()).isEqualTo("English headline");
+        assertThat(result.summaryKo()).isEqualTo("Korean summary");
         assertThat(result.summaryEn()).isEqualTo("English summary");
         assertThat(result.macroImpacts()).isEmpty();
         assertThat(result.marketImpacts()).isEmpty();
+        verify(openAiUsageLoggingService).recordUsage(any(), any(), any());
     }
 
     @Test
-    @DisplayName("interpret should allow one localized summary to be missing")
+    @DisplayName("interpret should allow one localized headline or summary to be missing")
     void interpret_allowsMissingLocalizedSummary() {
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200,
-                "{\"choices\":[{\"message\":{\"content\":\"{\\\"summaryEn\\\":\\\"English only summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}"));
+                "{\"choices\":[{\"message\":{\"content\":\"{\\\"headlineEn\\\":\\\"English only headline\\\",\\\"summaryEn\\\":\\\"English only summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}"));
 
         var result = macroAiService.interpret(sampleEvent());
 
+        assertThat(result.headlineKo()).isNull();
+        assertThat(result.headlineEn()).isEqualTo("English only headline");
         assertThat(result.summaryKo()).isNull();
         assertThat(result.summaryEn()).isEqualTo("English only summary");
     }

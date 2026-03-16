@@ -6,6 +6,7 @@ import com.example.macronews.domain.MacroImpact;
 import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
+import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.AutoIngestionBatchStatusDto;
 import com.example.macronews.dto.MarketSignalItemDto;
 import com.example.macronews.dto.MarketSignalOverviewDto;
@@ -15,7 +16,6 @@ import com.example.macronews.repository.NewsEventRepository;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -33,15 +33,6 @@ import org.springframework.util.StringUtils;
 @Service
 @RequiredArgsConstructor
 public class NewsQueryService {
-
-    private static final EnumSet<MacroVariable> REVERSE_DIRECTION_VARIABLES = EnumSet.of(
-            MacroVariable.OIL,
-            MacroVariable.USD,
-            MacroVariable.INTEREST_RATE,
-            MacroVariable.INFLATION,
-            MacroVariable.VOLATILITY,
-            MacroVariable.GOLD
-    );
 
     private final NewsEventRepository newsEventRepository;
 
@@ -155,18 +146,29 @@ public class NewsQueryService {
 
     private NewsListItemDto toListItem(NewsEvent event) {
         boolean hasAnalysis = event.analysisResult() != null;
-        String macroSummary = buildMacroSummary(event);
+        MacroImpact primaryImpact = findPrimaryMacroImpact(event.analysisResult());
+        ImpactDirection primaryDirection = primaryImpact == null ? ImpactDirection.NEUTRAL : primaryImpact.direction();
+        SignalSentiment primarySentiment = primaryImpact == null
+                ? SignalSentiment.NEUTRAL
+                : primaryImpact.variable().sentimentFor(primaryImpact.direction());
+        String macroSummary = buildMacroSummary(primaryImpact);
+        String preferredSummary = resolvePreferredInterpretationSummary(event.analysisResult());
+        String preferredHeadline = resolvePreferredHeadline(event.analysisResult());
+        String displayTitle = buildDisplayTitle(event, preferredHeadline, preferredSummary);
         return new NewsListItemDto(
                 event.id(),
                 event.title(),
+                displayTitle,
                 event.source(),
                 event.publishedAt(),
                 event.ingestedAt(),
                 event.status(),
                 hasAnalysis,
                 StringUtils.hasText(event.url()),
+                primaryDirection,
+                primarySentiment,
                 macroSummary,
-                buildInterpretationSummary(event, macroSummary),
+                buildInterpretationSummary(event, macroSummary, preferredSummary, displayTitle),
                 calculatePriorityScore(event)
         );
     }
@@ -184,36 +186,81 @@ public class NewsQueryService {
         );
     }
 
-    private String buildInterpretationSummary(NewsEvent event, String macroSummary) {
-        AnalysisResult analysisResult = event.analysisResult();
-        if (analysisResult == null) {
+    private String buildInterpretationSummary(NewsEvent event, String macroSummary, String preferredSummary, String displayTitle) {
+        if (!StringUtils.hasText(preferredSummary)) {
             return macroSummary;
         }
 
-        Locale locale = LocaleContextHolder.getLocale();
-        boolean korean = locale != null && "ko".equalsIgnoreCase(locale.getLanguage());
-        String preferred = korean ? analysisResult.summaryKo() : analysisResult.summaryEn();
-        String fallback = korean ? analysisResult.summaryEn() : analysisResult.summaryKo();
-
-        if (StringUtils.hasText(preferred)) {
-            return preferred;
+        String remainder = removeLeadingSentence(preferredSummary, displayTitle);
+        if (StringUtils.hasText(remainder)) {
+            return remainder;
         }
-        if (StringUtils.hasText(fallback)) {
-            return fallback;
+        if (StringUtils.hasText(preferredSummary)) {
+            return preferredSummary;
         }
         return macroSummary;
     }
 
-    private String buildMacroSummary(NewsEvent event) {
-        if (event.analysisResult() == null || event.analysisResult().macroImpacts() == null
-                || event.analysisResult().macroImpacts().isEmpty()) {
+    private String resolvePreferredInterpretationSummary(AnalysisResult analysisResult) {
+        if (analysisResult == null) {
             return "";
         }
-        MacroImpact first = event.analysisResult().macroImpacts().get(0);
-        if (first == null || first.variable() == null || first.direction() == null) {
+        Locale locale = LocaleContextHolder.getLocale();
+        boolean korean = locale != null && "ko".equalsIgnoreCase(locale.getLanguage());
+        String preferred = korean ? analysisResult.summaryKo() : analysisResult.summaryEn();
+        String fallback = korean ? analysisResult.summaryEn() : analysisResult.summaryKo();
+        if (StringUtils.hasText(preferred)) {
+            return preferred.trim();
+        }
+        if (StringUtils.hasText(fallback)) {
+            return fallback.trim();
+        }
+        return "";
+    }
+
+    private String resolvePreferredHeadline(AnalysisResult analysisResult) {
+        if (analysisResult == null) {
             return "";
         }
-        String summary = first.variable().name() + " " + first.direction().name();
+        Locale locale = LocaleContextHolder.getLocale();
+        boolean korean = locale != null && "ko".equalsIgnoreCase(locale.getLanguage());
+        String preferred = korean ? analysisResult.headlineKo() : analysisResult.headlineEn();
+        String fallback = korean ? analysisResult.headlineEn() : analysisResult.headlineKo();
+        if (StringUtils.hasText(preferred)) {
+            return preferred.trim();
+        }
+        if (StringUtils.hasText(fallback)) {
+            return fallback.trim();
+        }
+        return "";
+    }
+
+    private String buildDisplayTitle(NewsEvent event, String preferredHeadline, String preferredSummary) {
+        if (StringUtils.hasText(preferredHeadline)) {
+            return preferredHeadline;
+        }
+        String derivedTitle = extractLeadingSentence(preferredSummary);
+        if (StringUtils.hasText(derivedTitle)) {
+            return derivedTitle;
+        }
+        return StringUtils.hasText(event.title()) ? event.title() : "";
+    }
+
+    private MacroImpact findPrimaryMacroImpact(AnalysisResult analysisResult) {
+        if (analysisResult == null || analysisResult.macroImpacts() == null || analysisResult.macroImpacts().isEmpty()) {
+            return null;
+        }
+        return analysisResult.macroImpacts().stream()
+                .filter(impact -> impact != null && impact.variable() != null && impact.direction() != null)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String buildMacroSummary(MacroImpact primaryImpact) {
+        if (primaryImpact == null) {
+            return "";
+        }
+        String summary = primaryImpact.variable().name() + " " + primaryImpact.direction().name();
         return StringUtils.hasText(summary) ? summary : "";
     }
 
@@ -238,10 +285,43 @@ public class NewsQueryService {
         }
 
         ImpactDirection dominantDirection = resolveDominantDirection(counts);
-        if (REVERSE_DIRECTION_VARIABLES.contains(variable)) {
-            dominantDirection = invertDirection(dominantDirection);
+        return new MarketSignalItemDto(variable, dominantDirection, variable.sentimentFor(dominantDirection), sampleCount);
+    }
+
+    private String extractLeadingSentence(String text) {
+        if (!StringUtils.hasText(text)) {
+            return "";
         }
-        return new MarketSignalItemDto(variable, dominantDirection, sampleCount);
+        String trimmed = text.trim();
+        int sentenceBoundary = findSentenceBoundary(trimmed);
+        if (sentenceBoundary < 0) {
+            return trimmed;
+        }
+        return trimmed.substring(0, sentenceBoundary + 1).trim();
+    }
+
+    private String removeLeadingSentence(String text, String headline) {
+        if (!StringUtils.hasText(text)) {
+            return "";
+        }
+        String trimmed = text.trim();
+        String lead = StringUtils.hasText(headline) ? headline.trim() : extractLeadingSentence(trimmed);
+        if (!StringUtils.hasText(lead) || !trimmed.startsWith(lead)) {
+            return trimmed;
+        }
+        String remainder = trimmed.substring(lead.length()).trim();
+        return remainder.replaceFirst("^[\\-:;,.\\s]+", "").trim();
+    }
+
+    private int findSentenceBoundary(String text) {
+        int boundary = -1;
+        for (char marker : new char[] {'.', '!', '?'}) {
+            int index = text.indexOf(marker);
+            if (index >= 0 && (boundary < 0 || index < boundary)) {
+                boundary = index;
+            }
+        }
+        return boundary;
     }
 
     private ImpactDirection resolveDominantDirection(Map<ImpactDirection, Integer> counts) {
@@ -254,16 +334,6 @@ public class NewsQueryService {
         }
         if (down > up && down > neutral) {
             return ImpactDirection.DOWN;
-        }
-        return ImpactDirection.NEUTRAL;
-    }
-
-    private ImpactDirection invertDirection(ImpactDirection direction) {
-        if (direction == ImpactDirection.UP) {
-            return ImpactDirection.DOWN;
-        }
-        if (direction == ImpactDirection.DOWN) {
-            return ImpactDirection.UP;
         }
         return ImpactDirection.NEUTRAL;
     }
