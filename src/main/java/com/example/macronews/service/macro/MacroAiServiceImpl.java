@@ -233,6 +233,8 @@ public class MacroAiServiceImpl implements MacroAiService {
             return new AnalysisResult(
                     openAiModel,
                     Instant.now(),
+                    readOptionalText(node, "headlineKo"),
+                    readOptionalText(node, "headlineEn"),
                     readOptionalText(node, "summaryKo"),
                     readOptionalText(node, "summaryEn"),
                     macroImpacts,

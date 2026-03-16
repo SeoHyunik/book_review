@@ -153,14 +153,14 @@ public class NewsController {
     }
 
     private String resolveLocalizedDetailTitle(NewsDetailDto newsDetail) {
+        String preferredHeadline = resolvePreferredAnalysisHeadline(newsDetail.analysisResult());
+        if (StringUtils.hasText(preferredHeadline)) {
+            return preferredHeadline;
+        }
         String preferredSummary = resolvePreferredAnalysisSummary(newsDetail.analysisResult());
-        var locale = LocaleContextHolder.getLocale();
-        boolean korean = locale != null && "ko".equalsIgnoreCase(locale.getLanguage());
-        if (korean) {
-            String summaryHeadline = extractLeadingSentence(preferredSummary);
-            if (StringUtils.hasText(summaryHeadline)) {
-                return summaryHeadline;
-            }
+        String summaryHeadline = extractLeadingSentence(preferredSummary);
+        if (StringUtils.hasText(summaryHeadline)) {
+            return summaryHeadline;
         }
         return StringUtils.hasText(newsDetail.title()) ? newsDetail.title() : "News Detail";
     }
@@ -186,6 +186,20 @@ public class NewsController {
         boolean korean = "ko".equalsIgnoreCase(locale.getLanguage());
         String preferred = korean ? analysisResult.summaryKo() : analysisResult.summaryEn();
         String fallback = korean ? analysisResult.summaryEn() : analysisResult.summaryKo();
+        if (StringUtils.hasText(preferred)) {
+            return preferred.trim();
+        }
+        return StringUtils.hasText(fallback) ? fallback.trim() : "";
+    }
+
+    private String resolvePreferredAnalysisHeadline(AnalysisResult analysisResult) {
+        if (analysisResult == null) {
+            return "";
+        }
+        var locale = LocaleContextHolder.getLocale();
+        boolean korean = "ko".equalsIgnoreCase(locale.getLanguage());
+        String preferred = korean ? analysisResult.headlineKo() : analysisResult.headlineEn();
+        String fallback = korean ? analysisResult.headlineEn() : analysisResult.headlineKo();
         if (StringUtils.hasText(preferred)) {
             return preferred.trim();
         }

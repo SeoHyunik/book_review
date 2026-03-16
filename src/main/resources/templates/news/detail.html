@@ -630,9 +630,15 @@
                                 <td class="detail-impact-name"
                                     th:with="variableKey=${impact.variable != null ? 'news.detail.variable.' + #strings.toLowerCase(impact.variable.name()) : ''}"
                                     th:text="${impact.variable != null ? (#messages.msgOrNull(variableKey) != null ? #messages.msg(variableKey) : impact.variable.name()) : '-'}"></td>
-                                <td class="detail-direction-cell" th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
-                                    <span th:case="'UP'" class="detail-direction-chip detail-direction-chip--up" th:text="#{news.direction.up}">UP</span>
-                                    <span th:case="'DOWN'" class="detail-direction-chip detail-direction-chip--down" th:text="#{news.direction.down}">DOWN</span>
+                                <td class="detail-direction-cell"
+                                    th:with="semanticTone=${impact.variable != null and impact.direction != null ? impact.variable.sentimentFor(impact.direction).name() : 'NEUTRAL'}"
+                                    th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
+                                    <span th:case="'UP'" class="detail-direction-chip"
+                                          th:classappend="${semanticTone == 'POSITIVE' ? ' detail-direction-chip--up' : (semanticTone == 'NEGATIVE' ? ' detail-direction-chip--down' : ' detail-direction-chip--neutral')}"
+                                          th:text="#{news.direction.up}">UP</span>
+                                    <span th:case="'DOWN'" class="detail-direction-chip"
+                                          th:classappend="${semanticTone == 'POSITIVE' ? ' detail-direction-chip--up' : (semanticTone == 'NEGATIVE' ? ' detail-direction-chip--down' : ' detail-direction-chip--neutral')}"
+                                          th:text="#{news.direction.down}">DOWN</span>
                                     <span th:case="'NEUTRAL'" class="detail-direction-chip detail-direction-chip--neutral" th:text="#{news.direction.neutral}">NEUTRAL</span>
                                     <span th:case="*" class="detail-direction-chip detail-direction-chip--neutral">-</span>
                                 </td>
@@ -668,9 +674,15 @@
                                 <td class="detail-impact-name"
                                     th:with="marketKey=${impact.market != null ? 'news.detail.market.' + #strings.toLowerCase(impact.market.name()) : ''}"
                                     th:text="${impact.market != null ? (#messages.msgOrNull(marketKey) != null ? #messages.msg(marketKey) : impact.market.name()) : '-'}"></td>
-                                <td class="detail-direction-cell" th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
-                                    <span th:case="'UP'" class="detail-direction-chip detail-direction-chip--up" th:text="#{news.direction.up}">UP</span>
-                                    <span th:case="'DOWN'" class="detail-direction-chip detail-direction-chip--down" th:text="#{news.direction.down}">DOWN</span>
+                                <td class="detail-direction-cell"
+                                    th:with="semanticTone=${impact.market != null and impact.direction != null ? impact.market.sentimentFor(impact.direction).name() : 'NEUTRAL'}"
+                                    th:switch="${impact.direction != null ? impact.direction.name() : 'UNKNOWN'}">
+                                    <span th:case="'UP'" class="detail-direction-chip"
+                                          th:classappend="${semanticTone == 'POSITIVE' ? ' detail-direction-chip--up' : (semanticTone == 'NEGATIVE' ? ' detail-direction-chip--down' : ' detail-direction-chip--neutral')}"
+                                          th:text="#{news.direction.up}">UP</span>
+                                    <span th:case="'DOWN'" class="detail-direction-chip"
+                                          th:classappend="${semanticTone == 'POSITIVE' ? ' detail-direction-chip--up' : (semanticTone == 'NEGATIVE' ? ' detail-direction-chip--down' : ' detail-direction-chip--neutral')}"
+                                          th:text="#{news.direction.down}">DOWN</span>
                                     <span th:case="'NEUTRAL'" class="detail-direction-chip detail-direction-chip--neutral" th:text="#{news.direction.neutral}">NEUTRAL</span>
                                     <span th:case="*" class="detail-direction-chip detail-direction-chip--neutral">-</span>
                                 </td>

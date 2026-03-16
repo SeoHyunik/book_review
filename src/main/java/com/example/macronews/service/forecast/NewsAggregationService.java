@@ -233,6 +233,8 @@ public class NewsAggregationService {
                     "title", defaultText(event.title(), ""),
                     "source", defaultText(event.source(), ""),
                     "publishedAt", event.publishedAt() == null ? "" : event.publishedAt().toString(),
+                    "headlineKo", analysis == null ? "" : defaultText(analysis.headlineKo(), ""),
+                    "headlineEn", analysis == null ? "" : defaultText(analysis.headlineEn(), ""),
                     "summaryKo", analysis == null ? "" : defaultText(analysis.summaryKo(), ""),
                     "summaryEn", analysis == null ? "" : defaultText(analysis.summaryEn(), ""),
                     "macroImpacts", summarizeMacroImpacts(analysis == null ? List.of() : analysis.macroImpacts()),
