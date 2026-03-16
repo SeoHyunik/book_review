@@ -170,6 +170,12 @@
             text-wrap: balance;
         }
 
+        .featured-card .featured-heading,
+        [data-bs-theme="dark"] .featured-card .featured-heading {
+            color: #0f172a;
+            opacity: 1;
+        }
+
         .featured-badge-primary {
             background: rgba(15, 23, 42, 0.82);
             color: #fff;
@@ -243,6 +249,12 @@
             max-width: 60ch;
             color: color-mix(in srgb, var(--surface-muted) 90%, #243246);
             -webkit-line-clamp: 3;
+        }
+
+        .featured-card .featured-summary,
+        [data-bs-theme="dark"] .featured-card .featured-summary {
+            color: #334155;
+            opacity: 1;
         }
 
         .featured-card-panel-label {
@@ -570,12 +582,12 @@
             transition: transform 0.2s ease, box-shadow 0.24s ease, background-color 0.24s ease, border-color 0.24s ease;
         }
 
-        .signal-arrow--up {
+        .signal-arrow--positive {
             background: linear-gradient(180deg, #ef4444, #b91c1c);
             border-color: rgba(153, 27, 27, 0.4);
         }
 
-        .signal-arrow--down {
+        .signal-arrow--negative {
             background: linear-gradient(180deg, #3b82f6, #1d4ed8);
             border-color: rgba(29, 78, 216, 0.38);
         }
@@ -900,7 +912,7 @@
                                     </div>
                                 </div>
                                 <span class="badge rounded-pill signal-arrow fs-6 py-2"
-                                      th:classappend="${signal.direction.name() == 'UP' ? ' signal-arrow--up' : (signal.direction.name() == 'DOWN' ? ' signal-arrow--down' : ' signal-arrow--neutral')}"
+                                      th:classappend="${signal.sentiment.name() == 'POSITIVE' ? ' signal-arrow--positive' : (signal.sentiment.name() == 'NEGATIVE' ? ' signal-arrow--negative' : ' signal-arrow--neutral')}"
                                       th:text="${signal.direction.name() == 'UP' ? '↑' : (signal.direction.name() == 'DOWN' ? '↓' : '•')}">
                                     ↑
                                 </span>
