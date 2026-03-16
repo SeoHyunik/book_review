@@ -6,7 +6,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.dto.AutoIngestionBatchStatusDto;
+import com.example.macronews.service.news.AutoIngestionControlService;
+import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
+import com.example.macronews.service.news.NewsQueryService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import java.time.Instant;
 import java.util.List;
@@ -28,17 +32,37 @@ class ScheduledNewsIngestionJobTest {
     @Mock
     private NewsSourceProviderSelector newsSourceProviderSelector;
 
+    @Mock
+    private NewsQueryService newsQueryService;
+
+    @Mock
+    private AutoIngestionControlService autoIngestionControlService;
+
     @InjectMocks
     private ScheduledNewsIngestionJob scheduledNewsIngestionJob;
+
+    @Test
+    @DisplayName("Scheduled ingestion should skip when scheduler is disabled")
+    void ingestTopHeadlines_skipsWhenSchedulerIsDisabled() {
+        ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 12);
+        given(autoIngestionControlService.isSchedulerEnabled()).willReturn(false);
+
+        scheduledNewsIngestionJob.ingestTopHeadlines();
+
+        verify(autoIngestionControlService).isSchedulerEnabled();
+        verifyNoInteractions(newsSourceProviderSelector, newsIngestionService, newsQueryService);
+    }
 
     @Test
     @DisplayName("Scheduled ingestion should skip when News API is not configured")
     void ingestTopHeadlines_skipsWhenNewsApiIsNotConfigured() {
         ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 12);
+        given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
         given(newsSourceProviderSelector.isConfigured()).willReturn(false);
 
         scheduledNewsIngestionJob.ingestTopHeadlines();
 
+        verify(autoIngestionControlService).isSchedulerEnabled();
         verify(newsSourceProviderSelector).isConfigured();
         verifyNoInteractions(newsIngestionService);
     }
@@ -47,26 +71,36 @@ class ScheduledNewsIngestionJobTest {
     @DisplayName("Scheduled ingestion should use configured page size when enabled")
     void ingestTopHeadlines_usesConfiguredPageSize() {
         ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 12);
+        given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
         given(newsSourceProviderSelector.isConfigured()).willReturn(true);
-        given(newsIngestionService.ingestTopHeadlines(12)).willReturn(List.of(sampleNewsEvent("event-1")));
+        given(autoIngestionControlService.beginScheduledRun(12)).willReturn(AutoIngestionRunCommandResult.STARTED);
+        List<NewsEvent> ingested = List.of(sampleNewsEvent("event-1"));
+        given(newsIngestionService.ingestTopHeadlines(12)).willReturn(ingested);
+        given(newsQueryService.getAutoIngestionBatchStatus(12, 1, List.of("event-1")))
+                .willReturn(new AutoIngestionBatchStatusDto(12, 1, 1, 0, 0, 1, false, List.of()));
 
         scheduledNewsIngestionJob.ingestTopHeadlines();
 
+        verify(autoIngestionControlService).beginScheduledRun(12);
         verify(newsSourceProviderSelector).isConfigured();
         verify(newsIngestionService).ingestTopHeadlines(12);
+        verify(autoIngestionControlService).completeRun(org.mockito.ArgumentMatchers.any(AutoIngestionBatchStatusDto.class));
     }
 
     @Test
     @DisplayName("Scheduled ingestion should keep running flag clear after failures")
     void ingestTopHeadlines_clearsRunningFlagAfterFailure() {
         ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 12);
+        given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
         given(newsSourceProviderSelector.isConfigured()).willReturn(true);
+        given(autoIngestionControlService.beginScheduledRun(12)).willReturn(AutoIngestionRunCommandResult.STARTED);
         given(newsIngestionService.ingestTopHeadlines(12)).willThrow(new IllegalStateException("boom"));
 
         scheduledNewsIngestionJob.ingestTopHeadlines();
 
         AtomicBoolean running = (AtomicBoolean) ReflectionTestUtils.getField(scheduledNewsIngestionJob, "running");
         verify(newsIngestionService).ingestTopHeadlines(12);
+        verify(autoIngestionControlService).failRun(12);
         org.assertj.core.api.Assertions.assertThat(running).isNotNull();
         org.assertj.core.api.Assertions.assertThat(running.get()).isFalse();
     }
@@ -75,8 +109,12 @@ class ScheduledNewsIngestionJobTest {
     @DisplayName("Scheduled ingestion should fall back to default page size when configured value is invalid")
     void ingestTopHeadlines_fallsBackToDefaultPageSizeWhenInvalid() {
         ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 0);
+        given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
         given(newsSourceProviderSelector.isConfigured()).willReturn(true);
+        given(autoIngestionControlService.beginScheduledRun(10)).willReturn(AutoIngestionRunCommandResult.STARTED);
         given(newsIngestionService.ingestTopHeadlines(10)).willReturn(List.of());
+        given(newsQueryService.getAutoIngestionBatchStatus(10, 0, List.of()))
+                .willReturn(new AutoIngestionBatchStatusDto(10, 0, 0, 0, 0, 0, true, List.of()));
 
         scheduledNewsIngestionJob.ingestTopHeadlines();
 
@@ -88,11 +126,25 @@ class ScheduledNewsIngestionJobTest {
     void ingestTopHeadlines_skipsWhenLocalRunAlreadyInProgress() {
         AtomicBoolean running = (AtomicBoolean) ReflectionTestUtils.getField(scheduledNewsIngestionJob, "running");
         running.set(true);
+        given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
 
         scheduledNewsIngestionJob.ingestTopHeadlines();
 
         verify(newsSourceProviderSelector, never()).isConfigured();
         verifyNoInteractions(newsIngestionService);
+    }
+
+    @Test
+    @DisplayName("Scheduled ingestion should skip when auto-ingestion control already has a run in progress")
+    void ingestTopHeadlines_skipsWhenControlServiceReportsAlreadyRunning() {
+        ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 12);
+        given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
+        given(newsSourceProviderSelector.isConfigured()).willReturn(true);
+        given(autoIngestionControlService.beginScheduledRun(12)).willReturn(AutoIngestionRunCommandResult.ALREADY_RUNNING);
+
+        scheduledNewsIngestionJob.ingestTopHeadlines();
+
+        verify(newsIngestionService, never()).ingestTopHeadlines(12);
     }
 
     private NewsEvent sampleNewsEvent(String id) {

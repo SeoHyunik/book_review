@@ -6,12 +6,14 @@ import static org.mockito.Mockito.mock;
 import com.example.macronews.controller.AdminNewsController;
 import com.example.macronews.controller.LoginController;
 import com.example.macronews.service.macro.MacroAiService;
-import com.example.macronews.service.news.source.NewsSourceProviderSelector;
+import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSource;
 import org.springframework.core.env.Environment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -30,7 +32,9 @@ class RedirectHardeningTest {
             mock(NewsIngestionService.class),
             mock(NewsSourceProviderSelector.class),
             mock(MacroAiService.class),
-            mock(NewsQueryService.class));
+            mock(NewsQueryService.class),
+            mock(AutoIngestionControlService.class),
+            mock(MessageSource.class));
 
     @Test
     @DisplayName("Admin redirect should fall back to /news and drop invalid status and sort")
@@ -40,7 +44,8 @@ class RedirectHardeningTest {
                 "resolveAdminRedirect",
                 "https://evil.example/news",
                 "bogus",
-                "bogus");
+                "bogus",
+                null);
 
         assertThat(redirect).isEqualTo("/news");
     }
@@ -53,7 +58,8 @@ class RedirectHardeningTest {
                 "resolveAdminRedirect",
                 "/news",
                 "analyzed",
-                "published_desc");
+                "published_desc",
+                null);
 
         assertThat(redirect).isEqualTo("/news?status=ANALYZED&sort=published_desc");
     }
