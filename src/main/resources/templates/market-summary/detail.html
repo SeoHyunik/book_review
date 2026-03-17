@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <style>
+        :root {
+            --tone-positive-fg: #b9382d;
+            --tone-positive-border: rgba(255, 133, 94, 0.28);
+            --tone-positive-bg: rgba(255, 237, 231, 0.94);
+            --tone-negative-fg: #2158b5;
+            --tone-negative-border: rgba(96, 165, 250, 0.28);
+            --tone-negative-bg: rgba(230, 241, 255, 0.94);
+            --tone-neutral-fg: #8a5a00;
+            --tone-neutral-border: rgba(245, 158, 11, 0.24);
+            --tone-neutral-bg: rgba(255, 247, 214, 0.94);
+            --surface-strong: #162033;
+            --surface-muted: #526077;
+        }
+
+        .summary-surface {
+            border: 1px solid color-mix(in srgb, var(--bs-border-color) 74%, transparent);
+            box-shadow: 0 1rem 2.4rem rgba(15, 23, 42, 0.06);
+        }
+
+        .summary-hero {
+            background:
+                radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 34%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
+        }
+
+        .summary-heading {
+            font-size: clamp(1.45rem, 2.1vw, 2.1rem);
+            line-height: 1.15;
+            letter-spacing: -0.03em;
+            color: var(--surface-strong);
+            margin-bottom: 0;
+        }
+
+        .summary-copy {
+            color: color-mix(in srgb, var(--surface-muted) 90%, #243246);
+            line-height: 1.75;
+            margin-bottom: 0;
+        }
+
+        .summary-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+        }
+
+        .summary-meta-chip,
+        .summary-driver-chip,
+        .summary-sentiment-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 999px;
+            padding: 0.45rem 0.75rem;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .summary-section + .summary-section {
+            margin-top: 1.25rem;
+        }
+
+        .summary-section-card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+        }
+
+        .summary-section-kicker {
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: color-mix(in srgb, var(--surface-muted) 88%, #243246);
+            font-weight: 700;
+        }
+
+        .summary-section-title {
+            color: var(--surface-strong);
+        }
+
+        .summary-language-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .summary-language-block {
+            border-radius: 1rem;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: rgba(255, 255, 255, 0.82);
+            padding: 1rem 1.1rem;
+        }
+
+        .summary-language-label {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.06);
+            color: var(--surface-muted);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 0.7rem;
+        }
+
+        .summary-driver-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+        }
+
+        .summary-sentiment-chip--positive {
+            color: var(--tone-positive-fg);
+            background: var(--tone-positive-bg);
+            border-color: var(--tone-positive-border);
+        }
+
+        .summary-sentiment-chip--negative {
+            color: var(--tone-negative-fg);
+            background: var(--tone-negative-bg);
+            border-color: var(--tone-negative-border);
+        }
+
+        .summary-sentiment-chip--neutral {
+            color: var(--tone-neutral-fg);
+            background: var(--tone-neutral-bg);
+            border-color: var(--tone-neutral-border);
+        }
+
+        .summary-support-list .list-group-item {
+            background: transparent;
+            border-color: color-mix(in srgb, var(--bs-border-color) 64%, transparent);
+        }
+
+        .summary-support-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            align-items: center;
+            font-size: 0.84rem;
+            color: color-mix(in srgb, var(--surface-muted) 86%, #243246);
+        }
+
+        .summary-support-dot {
+            opacity: 0.4;
+        }
+
+        .summary-news-sentiment--positive {
+            color: var(--tone-positive-fg);
+        }
+
+        .summary-news-sentiment--negative {
+            color: var(--tone-negative-fg);
+        }
+
+        .summary-news-sentiment--neutral {
+            color: var(--tone-neutral-fg);
+        }
+
+        .summary-news-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-weight: 700;
+        }
+
+        @media (min-width: 992px) {
+            .summary-language-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+    </style>
+
+    <section class="d-flex justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-1" th:text="#{market.summary.detail.heading}">AI Market Summary</h1>
+            <p class="text-secondary mb-0" th:text="#{market.summary.detail.subheading}">Stored AI market snapshot and supporting news.</p>
+        </div>
+        <a class="btn btn-sm btn-outline-primary text-nowrap" th:href="@{/news}" th:text="#{news.detail.back}">Back to List</a>
+    </section>
+
+    <section class="card border-0 summary-surface summary-hero mb-4" th:if="${marketSummaryDetail != null}">
+        <div class="card-body p-4 p-lg-5 d-flex flex-column gap-3">
+            <div class="summary-meta">
+                <span class="badge rounded-pill bg-dark-subtle text-dark-emphasis" th:text="#{news.featured.marketSummary.snapshotLabel}">AI Market Snapshot</span>
+                <span class="summary-meta-chip" th:text="${#messages.msg('forecast.generatedAt') + ' / ' + marketSummaryDetail.generatedAt}">Generated</span>
+                <span class="summary-meta-chip" th:text="#{news.featured.marketSummary.sources(${marketSummaryDetail.sourceCount})}">Sources</span>
+                <span class="summary-meta-chip" th:text="#{news.featured.marketSummary.window(${marketSummaryDetail.windowHours})}">Window</span>
+            </div>
+            <div class="summary-language-grid">
+                <div class="summary-language-block">
+                    <div class="summary-language-label">KO</div>
+                    <h2 class="summary-heading"
+                        th:text="${marketSummaryDetail.headlineKo != null and !#strings.isEmpty(marketSummaryDetail.headlineKo) ? marketSummaryDetail.headlineKo : '-'}">
+                        Headline KO
+                    </h2>
+                </div>
+                <div class="summary-language-block">
+                    <div class="summary-language-label">EN</div>
+                    <h2 class="summary-heading"
+                        th:text="${marketSummaryDetail.headlineEn != null and !#strings.isEmpty(marketSummaryDetail.headlineEn) ? marketSummaryDetail.headlineEn : '-'}">
+                        Headline EN
+                    </h2>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
+        <div class="card-body p-4">
+            <div class="summary-section-kicker" th:text="#{news.detail.summary}">Summary</div>
+            <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{news.detail.summary}">Summary</h2>
+            <div class="summary-language-grid">
+                <div class="summary-language-block">
+                    <div class="summary-language-label">KO</div>
+                    <p class="summary-copy"
+                       th:text="${marketSummaryDetail.summaryKo != null and !#strings.isEmpty(marketSummaryDetail.summaryKo) ? marketSummaryDetail.summaryKo : '-'}">
+                        Summary KO
+                    </p>
+                </div>
+                <div class="summary-language-block">
+                    <div class="summary-language-label">EN</div>
+                    <p class="summary-copy"
+                       th:text="${marketSummaryDetail.summaryEn != null and !#strings.isEmpty(marketSummaryDetail.summaryEn) ? marketSummaryDetail.summaryEn : '-'}">
+                        Summary EN
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
+        <div class="card-body p-4">
+            <div class="summary-section-kicker" th:text="#{market.summary.detail.marketView}">Market View</div>
+            <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.marketViewTitle}">Market View</h2>
+            <div class="summary-language-grid">
+                <div class="summary-language-block">
+                    <div class="summary-language-label">KO</div>
+                    <p class="summary-copy"
+                       th:text="${marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo) ? marketSummaryDetail.marketViewKo : '-'}">
+                        Market View KO
+                    </p>
+                </div>
+                <div class="summary-language-block">
+                    <div class="summary-language-label">EN</div>
+                    <p class="summary-copy"
+                       th:text="${marketSummaryDetail.marketViewEn != null and !#strings.isEmpty(marketSummaryDetail.marketViewEn) ? marketSummaryDetail.marketViewEn : '-'}">
+                        Market View EN
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}"
+             th:with="sentiment=${marketSummaryDetail.dominantSentiment != null ? marketSummaryDetail.dominantSentiment.name() : 'NEUTRAL'}">
+        <div class="card-body p-4">
+            <div class="summary-section-kicker" th:text="#{market.summary.detail.signal}">Signal</div>
+            <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.signalTitle}">Dominant Sentiment</h2>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="summary-sentiment-chip"
+                      th:classappend="${sentiment == 'POSITIVE' ? ' summary-sentiment-chip--positive' : (sentiment == 'NEGATIVE' ? ' summary-sentiment-chip--negative' : ' summary-sentiment-chip--neutral')}"
+                      th:text="${sentiment == 'POSITIVE' ? #messages.msg('news.overview.sentiment.positive') : (sentiment == 'NEGATIVE' ? #messages.msg('news.overview.sentiment.negative') : #messages.msg('news.overview.sentiment.neutral'))}">
+                    Sentiment
+                </span>
+                <span class="summary-meta-chip" th:if="${marketSummaryDetail.confidence != null}"
+                      th:text="#{market.summary.detail.confidence(${#numbers.formatDecimal(marketSummaryDetail.confidence * 100, 1, 1) + '%'})}">
+                    Confidence
+                </span>
+            </div>
+        </div>
+    </section>
+
+    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
+        <div class="card-body p-4">
+            <div class="summary-section-kicker" th:text="#{forecast.keyDrivers}">Key Drivers</div>
+            <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.driversTitle}">Key Drivers</h2>
+            <div class="summary-driver-list" th:if="${marketSummaryDetail.keyDrivers != null and !#lists.isEmpty(marketSummaryDetail.keyDrivers)}">
+                <span class="summary-driver-chip" th:each="driver : ${marketSummaryDetail.keyDrivers}" th:text="${driver}">Driver</span>
+            </div>
+            <div class="text-secondary small" th:if="${marketSummaryDetail.keyDrivers == null or #lists.isEmpty(marketSummaryDetail.keyDrivers)}"
+                 th:text="#{market.summary.detail.driversEmpty}">No key drivers.</div>
+        </div>
+    </section>
+
+    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
+        <div class="card-body p-4">
+            <div class="summary-section-kicker" th:text="#{market.summary.detail.supportingNews}">Supporting News</div>
+            <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.supportingNewsTitle}">Supporting News</h2>
+            <div class="list-group list-group-flush summary-support-list"
+                 th:if="${marketSummaryDetail.supportingNews != null and !#lists.isEmpty(marketSummaryDetail.supportingNews)}">
+                <a class="list-group-item list-group-item-action px-0"
+                   th:each="news : ${marketSummaryDetail.supportingNews}"
+                   th:with="direction=${news.primaryDirection != null ? news.primaryDirection.name() : 'NEUTRAL'},
+                            sentiment=${news.primarySentiment != null ? news.primarySentiment.name() : 'NEUTRAL'}"
+                   th:href="@{'/news/' + ${news.id}}">
+                    <div class="fw-semibold mb-1" th:text="${news.title ?: #messages.msg('news.untitled')}">News title</div>
+                    <div class="summary-support-meta">
+                        <span th:text="${news.source ?: '-'}">Source</span>
+                        <span class="summary-support-dot">&middot;</span>
+                        <span th:text="${news.publishedAt ?: '-'}">Published</span>
+                        <span class="summary-support-dot">&middot;</span>
+                        <span class="summary-news-indicator"
+                              th:classappend="${sentiment == 'POSITIVE' ? ' summary-news-sentiment--positive' : (sentiment == 'NEGATIVE' ? ' summary-news-sentiment--negative' : ' summary-news-sentiment--neutral')}"
+                              th:text="${direction == 'UP' ? '↑ ' + #messages.msg('news.direction.up') : (direction == 'DOWN' ? '↓ ' + #messages.msg('news.direction.down') : '• ' + #messages.msg('news.direction.neutral'))}">
+                            • Neutral
+                        </span>
+                    </div>
+                </a>
+            </div>
+            <div class="text-secondary small" th:if="${marketSummaryDetail.supportingNews == null or #lists.isEmpty(marketSummaryDetail.supportingNews)}"
+                 th:text="#{market.summary.detail.supportingNewsEmpty}">No supporting news.</div>
+        </div>
+    </section>
+</th:block>
+</html>
