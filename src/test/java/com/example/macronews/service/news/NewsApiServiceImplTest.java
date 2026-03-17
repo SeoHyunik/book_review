@@ -71,15 +71,20 @@ class NewsApiServiceImplTest {
     }
 
     @Test
-    @DisplayName("fetchForeignTopHeadlines should merge top headlines only when recent search underfills")
+    @DisplayName("fetchForeignTopHeadlines should merge top headlines only when recent search variants still underfill")
     void fetchForeignTopHeadlines_mergesRecentAndHeadlineResults() {
         setUpDefaults();
 
         Instant recent = Instant.now().minusSeconds(60 * 60);
+        Instant fallbackRecent = Instant.now().minusSeconds(60 * 65);
         Instant headline = Instant.now().minusSeconds(60 * 70);
         String searchBody = "{" +
                 "\"articles\":[" +
                 articleJson("Search Source", "Recent market article", "Summary", "https://example.com/search", recent.toString()) +
+                "]}";
+        String fallbackSearchBody = "{" +
+                "\"articles\":[" +
+                articleJson("Fallback Search Source", "Fresh inflation article", "Summary", "https://example.com/search-fallback", fallbackRecent.toString()) +
                 "]}";
         String headlineBody = "{" +
                 "\"articles\":[" +
@@ -88,13 +93,41 @@ class NewsApiServiceImplTest {
 
         given(externalApiUtils.callAPI(any()))
                 .willReturn(new ExternalApiResult(200, searchBody))
+                .willReturn(new ExternalApiResult(200, fallbackSearchBody))
                 .willReturn(new ExternalApiResult(200, headlineBody));
 
         var results = newsApiService.fetchForeignTopHeadlines(2);
 
         assertThat(results).hasSize(2);
         assertThat(results).extracting(item -> item.url())
-                .containsExactly("https://example.com/search", "https://example.com/headline");
+                .containsExactly("https://example.com/search", "https://example.com/search-fallback");
+    }
+
+    @Test
+    @DisplayName("fetchForeignTopHeadlines should try fallback recent query before top-headlines")
+    void fetchForeignTopHeadlines_triesFallbackRecentQueryBeforeTopHeadlines() {
+        setUpDefaults();
+
+        Instant fallbackRecent = Instant.now().minusSeconds(60 * 60);
+        String emptyBody = "{\"articles\":[]}";
+        String fallbackBody = "{" +
+                "\"articles\":[" +
+                articleJson("Fallback Source", "Breaking fed article", "Summary", "https://example.com/fallback", fallbackRecent.toString()) +
+                "]}";
+
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, emptyBody))
+                .willReturn(new ExternalApiResult(200, fallbackBody));
+
+        var results = newsApiService.fetchForeignTopHeadlines(1);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).url()).isEqualTo("https://example.com/fallback");
+
+        ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
+        verify(externalApiUtils, times(2)).callAPI(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues().get(0).url()).contains("q=market%20OR%20stocks");
+        assertThat(requestCaptor.getAllValues().get(1).url()).contains("q=breaking%20market%20OR%20intraday%20stocks");
     }
 
     @Test
@@ -156,13 +189,36 @@ class NewsApiServiceImplTest {
         assertThat(results).isEmpty();
     }
 
+    @Test
+    @DisplayName("semi-fresh bucket should allow controlled fallback global items")
+    void fetchForeignTopHeadlines_allowsSemiFreshBucket() {
+        setUpDefaults();
+        ReflectionTestUtils.setField(newsApiService, "globalFallbackMaxAgeHours", 36L);
+
+        Instant semiFresh = Instant.now().minusSeconds(60L * 60L * 30L);
+        String body = "{" +
+                "\"articles\":[" +
+                articleJson("Fallback Source", "Fed recap", "Fallback summary", "https://example.com/semi", semiFresh.toString()) +
+                "]}";
+
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, body));
+
+        var results = newsApiService.fetchTopHeadlines(5, com.example.macronews.service.news.source.NewsFreshnessBucket.SEMI_FRESH);
+
+        assertThat(results).extracting(item -> item.url())
+                .containsExactly("https://example.com/semi");
+    }
+
     private void setUpDefaults() {
         ReflectionTestUtils.setField(newsApiService, "objectMapper", new ObjectMapper());
         ReflectionTestUtils.setField(newsApiService, "apiKey", "test-key");
         ReflectionTestUtils.setField(newsApiService, "defaultLimit", 10);
         ReflectionTestUtils.setField(newsApiService, "recencyHours", 48L);
         ReflectionTestUtils.setField(newsApiService, "globalMaxAgeHours", 24L);
+        ReflectionTestUtils.setField(newsApiService, "globalFallbackMaxAgeHours", 36L);
         ReflectionTestUtils.setField(newsApiService, "recentQuery", "market OR stocks");
+        ReflectionTestUtils.setField(newsApiService, "recentQueryFallback",
+                "breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi");
         ReflectionTestUtils.setField(newsApiService, "filterKeywords", "fed, kospi, inflation, market");
         ReflectionTestUtils.setField(newsApiService, "searchUrl", "https://newsapi.org/v2/everything");
         ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");

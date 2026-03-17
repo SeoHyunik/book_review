@@ -53,11 +53,16 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     private static final List<String> DEFAULT_QUERIES = List.of(
             "\uCF54\uC2A4\uD53C",
             "\uCF54\uC2A4\uB2E5",
-            "\uD658\uC728",
-            "\uAE08\uB9AC",
-            "\uC720\uAC00",
+            "\uC6D0\uB2EC\uB7EC \uD658\uC728",
+            "\uAE30\uC900\uAE08\uB9AC",
+            "\uAD6D\uC81C\uC720\uAC00",
             "\uBC18\uB3C4\uCCB4",
-            "\uC5F0\uC900"
+            "\uC5F0\uC900",
+            "\uBBF8\uAD6D\uAE08\uB9AC",
+            "\uC99D\uC2DC \uC18D\uBCF4",
+            "\uC7A5\uC911",
+            "\uB9C8\uAC10",
+            "\uBC1C\uD45C"
     );
 
     private final ExternalApiUtils externalApiUtils;
@@ -87,6 +92,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     @Value("${app.news.naver.max-age-hours:12}")
     private long maxAgeHours;
 
+    @Value("${app.news.naver.fallback-max-age-hours:24}")
+    private long fallbackMaxAgeHours;
+
+    @Value("${app.news.naver.max-pages:3}")
+    private int maxPages;
+
     private Clock clock = DEFAULT_CLOCK;
 
     @Override
@@ -101,6 +112,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     @Override
     public List<ExternalNewsItem> fetchTopHeadlines(int limit) {
+        return fetchTopHeadlines(limit, NewsFreshnessBucket.FRESH);
+    }
+
+    @Override
+    public List<ExternalNewsItem> fetchTopHeadlines(int limit, NewsFreshnessBucket bucket) {
         if (!isConfigured()) {
             log.info("[NAVER] provider disabled or incomplete configuration");
             return List.of();
@@ -110,11 +126,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         List<NaverCandidate> candidates = new ArrayList<>();
         List<String> queries = resolveQueries();
         for (String query : queries) {
-            candidates.addAll(fetchQuery(query, resolvedLimit));
+            candidates.addAll(fetchQuery(query, resolvedLimit, bucket));
+            if (deduplicateAndLimit(candidates, resolvedLimit).size() >= resolvedLimit) {
+                break;
+            }
         }
         List<ExternalNewsItem> merged = deduplicateAndLimit(candidates, resolvedLimit);
-        log.info("[NAVER] merged usableItems={} requestedLimit={} queries={}",
-                merged.size(), resolvedLimit, queries.size());
+        log.info("[NAVER] bucket={} merged usableItems={} requestedLimit={} queries={}",
+                bucket, merged.size(), resolvedLimit, queries.size());
         return merged;
     }
 
@@ -139,48 +158,48 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         return DEFAULT_QUERIES;
     }
 
-    private List<NaverCandidate> fetchQuery(String query, int limit) {
-        log.info("[NAVER] query start query='{}' requestedLimit={}", query, limit);
-        String url = UriComponentsBuilder.fromUriString(baseUrl)
-                .path("/v1/search/news.json")
-                .queryParam("query", query)
-                .queryParam("display", resolveDisplay(limit))
-                .queryParam("start", resolveStart())
-                .queryParam("sort", "date")
-                .build()
-                .encode()
-                .toUriString();
+    private List<NaverCandidate> fetchQuery(String query, int limit, NewsFreshnessBucket bucket) {
+        log.info("[NAVER] query start bucket={} query='{}' requestedLimit={}", bucket, query, limit);
+        int pageSize = resolveDisplay(limit);
+        List<NaverCandidate> collected = new ArrayList<>();
+        for (int pageIndex = 0; pageIndex < resolveMaxPages(); pageIndex++) {
+            int pageStart = resolvePageStart(pageIndex, pageSize);
+            ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
+                    HttpMethod.GET,
+                    buildHeaders(),
+                    buildQueryUrl(query, pageSize, pageStart),
+                    null
+            ));
+            if (result == null || result.statusCode() < 200 || result.statusCode() >= 300) {
+                log.warn("[NAVER] query failed query='{}' pageStart={} status={}",
+                        query, pageStart, result == null ? -1 : result.statusCode());
+                break;
+            }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.add("X-Naver-Client-Id", clientId);
-        headers.add("X-Naver-Client-Secret", clientSecret);
-
-        ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
-                HttpMethod.GET,
-                headers,
-                url,
-                null
-        ));
-        if (result == null || result.statusCode() < 200 || result.statusCode() >= 300) {
-            log.warn("[NAVER] query failed query='{}' status={}", query, result == null ? -1 : result.statusCode());
-            return List.of();
+            NaverParseResult parsed = parseItems(query, pageStart, result.body(), resolveMaxAgeHours(bucket), bucket);
+            collected.addAll(parsed.items());
+            if (collected.size() >= limit) {
+                break;
+            }
+            if (parsed.rawItemCount() <= 0) {
+                break;
+            }
         }
-
-        return parseItems(query, result.body());
+        return collected;
     }
 
-    private List<NaverCandidate> parseItems(String query, String body) {
+    private NaverParseResult parseItems(String query, int pageStart, String body, long maxAgeHours, NewsFreshnessBucket bucket) {
         if (!StringUtils.hasText(body)) {
-            log.info("[NAVER] query='{}' rawItems=0 bodyEmpty=true", query);
-            return List.of();
+            log.info("[NAVER] bucket={} query='{}' pageStart={} rawItems=0 bodyEmpty=true", bucket, query, pageStart);
+            return new NaverParseResult(List.of(), 0);
         }
 
         try {
             JsonNode root = objectMapper.readTree(body);
             JsonNode items = root.path("items");
             if (!items.isArray()) {
-                log.info("[NAVER] query='{}' rawItems=0 itemsArray=false", query);
-                return List.of();
+                log.info("[NAVER] bucket={} query='{}' pageStart={} rawItems=0 itemsArray=false", bucket, query, pageStart);
+                return new NaverParseResult(List.of(), 0);
             }
 
             int rawItemCount = items.size();
@@ -210,7 +229,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     nullPublishedAtCount++;
                     continue;
                 }
-                if (!isFreshEnough(publishedAt)) {
+                if (!isFreshEnough(publishedAt, maxAgeHours)) {
                     staleItemCount++;
                     continue;
                 }
@@ -231,14 +250,34 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 );
                 mapped.add(new NaverCandidate(mappedItem, originalLink, fallbackLink, dedupTitle));
             }
-            log.info("[NAVER] query='{}' rawItems={}", query, rawItemCount);
-            log.info("[NAVER] query='{}' parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} missingUsableLink={} emptyTitle={}",
-                    query, mapped.size(), nullPublishedAtCount, invalidPubDateCount, staleItemCount, missingUrlCount, emptyTitleCount);
-            return mapped;
+            log.info("[NAVER] bucket={} query='{}' pageStart={} rawItems={}", bucket, query, pageStart, rawItemCount);
+            log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} missingUsableLink={} emptyTitle={}",
+                    bucket, query, pageStart, mapped.size(), nullPublishedAtCount, invalidPubDateCount, staleItemCount,
+                    missingUrlCount, emptyTitleCount);
+            return new NaverParseResult(mapped, rawItemCount);
         } catch (Exception ex) {
-            log.warn("[NAVER] failed to parse response query='{}'", query, ex);
-            return List.of();
+            log.warn("[NAVER] failed to parse response bucket={} query='{}' pageStart={}", bucket, query, pageStart, ex);
+            return new NaverParseResult(List.of(), 0);
         }
+    }
+
+    private HttpHeaders buildHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Naver-Client-Id", clientId);
+        headers.add("X-Naver-Client-Secret", clientSecret);
+        return headers;
+    }
+
+    private String buildQueryUrl(String query, int pageSize, int pageStart) {
+        return UriComponentsBuilder.fromUriString(baseUrl)
+                .path("/v1/search/news.json")
+                .queryParam("query", query)
+                .queryParam("display", pageSize)
+                .queryParam("start", pageStart)
+                .queryParam("sort", "date")
+                .build()
+                .encode()
+                .toUriString();
     }
 
     private List<ExternalNewsItem> deduplicateAndLimit(List<NaverCandidate> candidates, int limit) {
@@ -293,11 +332,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         return null;
     }
 
-    private boolean isFreshEnough(Instant publishedAt) {
+    private boolean isFreshEnough(Instant publishedAt, long allowedMaxAgeHours) {
         if (publishedAt == null) {
             return false;
         }
-        return !publishedAt.isBefore(Instant.now(clock).minus(Duration.ofHours(resolveMaxAgeHours())));
+        return !publishedAt.isBefore(Instant.now(clock).minus(Duration.ofHours(allowedMaxAgeHours)));
     }
 
     private int resolveDisplay(int requestedLimit) {
@@ -307,6 +346,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private int resolveStart() {
         return start > 0 ? start : 1;
+    }
+
+    private int resolvePageStart(int pageIndex, int pageSize) {
+        return resolveStart() + (pageIndex * Math.max(pageSize, 1));
+    }
+
+    private int resolveMaxPages() {
+        return maxPages > 0 ? maxPages : 3;
     }
 
     private String normalizeTitle(String title) {
@@ -326,7 +373,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         return StringUtils.hasText(value) ? value : fallback;
     }
 
-    private long resolveMaxAgeHours() {
+    private long resolveMaxAgeHours(NewsFreshnessBucket bucket) {
+        if (bucket == NewsFreshnessBucket.SEMI_FRESH) {
+            return fallbackMaxAgeHours > 0 ? fallbackMaxAgeHours : 24L;
+        }
         return maxAgeHours > 0 ? maxAgeHours : 12L;
     }
 
@@ -405,6 +455,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             String originalLink,
             String fallbackLink,
             String normalizedTitle
+    ) {
+    }
+
+    private record NaverParseResult(
+            List<NaverCandidate> items,
+            int rawItemCount
     ) {
     }
 }

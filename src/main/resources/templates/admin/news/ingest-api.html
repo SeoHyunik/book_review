@@ -137,13 +137,13 @@
                                     Runtime state resets on restart or redeploy.
                                 </span>
                             </div>
-                            <div class="d-flex flex-wrap gap-2" th:if="${keepAliveStatus.configEnabled}">
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
                                 <form th:action="@{/admin/news/auto/keep-alive/start}" method="post" class="m-0">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="btn"
-                                            th:classappend="${keepAliveStatus.runtimeEnabled} ? ' btn-outline-success' : ' btn-success'"
+                                            th:classappend="${keepAliveStatus.configEnabled and !keepAliveStatus.runtimeEnabled} ? ' btn-success' : ' btn-outline-secondary'"
                                             type="submit"
-                                            th:disabled="${keepAliveStatus.runtimeEnabled}"
+                                            th:disabled="${!keepAliveStatus.configEnabled or keepAliveStatus.runtimeEnabled}"
                                             th:text="#{admin.news.auto.keepAlive.control.start}">
                                         Start
                                     </button>
@@ -151,13 +151,18 @@
                                 <form th:action="@{/admin/news/auto/keep-alive/stop}" method="post" class="m-0">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="btn"
-                                            th:classappend="${keepAliveStatus.runtimeEnabled} ? ' btn-outline-danger' : ' btn-secondary'"
+                                            th:classappend="${keepAliveStatus.configEnabled and keepAliveStatus.runtimeEnabled} ? ' btn-outline-danger' : ' btn-outline-secondary'"
                                             type="submit"
-                                            th:disabled="${!keepAliveStatus.runtimeEnabled}"
+                                            th:disabled="${!keepAliveStatus.configEnabled or !keepAliveStatus.runtimeEnabled}"
                                             th:text="#{admin.news.auto.keepAlive.control.stop}">
                                         Stop
                                     </button>
                                 </form>
+                                <span class="small text-secondary"
+                                      th:if="${!keepAliveStatus.configEnabled}"
+                                      th:text="#{admin.news.auto.keepAlive.control.disabled}">
+                                    Enable keep-alive in static configuration to use runtime controls.
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -216,13 +221,13 @@
                                     Runtime state resets on restart or redeploy.
                                 </span>
                             </div>
-                            <div class="d-flex flex-wrap gap-2" th:if="${emailNotificationStatus.configEnabled}">
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
                                 <form th:action="@{/admin/news/auto/email/start}" method="post" class="m-0">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="btn"
-                                            th:classappend="${emailNotificationStatus.runtimeEnabled} ? ' btn-outline-success' : ' btn-success'"
+                                            th:classappend="${emailNotificationStatus.configEnabled and !emailNotificationStatus.runtimeEnabled} ? ' btn-success' : ' btn-outline-secondary'"
                                             type="submit"
-                                            th:disabled="${emailNotificationStatus.runtimeEnabled}"
+                                            th:disabled="${!emailNotificationStatus.configEnabled or emailNotificationStatus.runtimeEnabled}"
                                             th:text="#{admin.news.auto.email.control.start}">
                                         Start
                                     </button>
@@ -230,13 +235,18 @@
                                 <form th:action="@{/admin/news/auto/email/stop}" method="post" class="m-0">
                                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                     <button class="btn"
-                                            th:classappend="${emailNotificationStatus.runtimeEnabled} ? ' btn-outline-danger' : ' btn-secondary'"
+                                            th:classappend="${emailNotificationStatus.configEnabled and emailNotificationStatus.runtimeEnabled} ? ' btn-outline-danger' : ' btn-outline-secondary'"
                                             type="submit"
-                                            th:disabled="${!emailNotificationStatus.runtimeEnabled}"
+                                            th:disabled="${!emailNotificationStatus.configEnabled or !emailNotificationStatus.runtimeEnabled}"
                                             th:text="#{admin.news.auto.email.control.stop}">
                                         Stop
                                     </button>
                                 </form>
+                                <span class="small text-secondary"
+                                      th:if="${!emailNotificationStatus.configEnabled}"
+                                      th:text="#{admin.news.auto.email.control.disabled}">
+                                    Enable email notification in static configuration to use runtime controls.
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -251,7 +261,7 @@
             <div class="card-body d-flex flex-column flex-md-row align-items-md-end gap-3 justify-content-between">
                 <div>
                     <label class="form-label" for="pageSize" th:text="#{admin.news.auto.fetchPageSize}">Fetch Page Size</label>
-                    <input id="pageSize" name="pageSize" type="number" min="1" max="50" value="10" class="form-control"
+                    <input id="pageSize" name="pageSize" type="number" min="1" max="50" value="5" class="form-control"
                            th:disabled="${newsApiConfigured == false or autoIngestionControlStatus.runInProgress}">
                 </div>
                 <button class="btn btn-primary text-nowrap"
