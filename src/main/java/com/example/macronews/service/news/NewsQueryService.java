@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +38,7 @@ import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class NewsQueryService {
 
     private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
@@ -49,7 +51,17 @@ public class NewsQueryService {
     @Value("${app.news.global.max-age-hours:24}")
     private long globalMaxAgeHours;
 
+    @Value("${app.news.naver.fallback-max-age-hours:24}")
+    private long naverFallbackMaxAgeHours;
+
+    @Value("${app.news.global.fallback-max-age-hours:36}")
+    private long globalFallbackMaxAgeHours;
+
     private Clock clock = DEFAULT_CLOCK;
+
+    void setClock(Clock clock) {
+        this.clock = clock == null ? DEFAULT_CLOCK : clock;
+    }
 
     public List<NewsListItemDto> getRecentNews() {
         return getRecentNews(null, NewsListSort.PUBLISHED_DESC);
@@ -60,8 +72,9 @@ public class NewsQueryService {
     }
 
     public List<NewsListItemDto> getRecentNews(NewsStatus status, NewsListSort sort) {
-        return loadCandidates(status).stream()
-                .filter(this::isFreshEnough)
+        List<NewsEvent> candidates = loadCandidates(status);
+        return candidates.stream()
+                .filter(this::isDisplayEligible)
                 .sorted(buildComparator(sort))
                 .limit(20)
                 .map(this::toListItem)
@@ -69,13 +82,18 @@ public class NewsQueryService {
     }
 
     public MarketSignalOverviewDto getMarketSignalOverview(NewsStatus status, NewsListSort sort) {
-        List<NewsEvent> recentAnalyzed = loadCandidates(status).stream()
-                .filter(this::isFreshEnough)
+        List<NewsEvent> candidates = loadCandidates(status);
+        List<NewsEvent> recentAnalyzed = candidates.stream()
+                .filter(this::isSignalEligible)
                 .sorted(buildComparator(sort))
                 .limit(20)
-                .filter(event -> event.status() == NewsStatus.ANALYZED)
-                .filter(event -> event.analysisResult() != null)
                 .toList();
+
+        if (log.isDebugEnabled()) {
+            Instant cutoff = Instant.now(clock).minus(Duration.ofHours(Math.max(globalFallbackMaxAgeHours, naverFallbackMaxAgeHours)));
+            log.debug("[NEWS-QUERY] displayCandidates={} signalCandidates={} signalBasis=analysisResult.createdAt|ingestedAt|publishedAt cutoff={}",
+                    candidates.size(), recentAnalyzed.size(), cutoff);
+        }
 
         List<MarketSignalItemDto> items = Arrays.stream(MacroVariable.values())
                 .map(variable -> aggregateSignal(variable, recentAnalyzed))
@@ -139,7 +157,7 @@ public class NewsQueryService {
 
     private List<NewsEvent> loadCandidates(NewsStatus status) {
         return status == null
-                ? newsEventRepository.findTop20ByOrderByPublishedAtDesc()
+                ? newsEventRepository.findTop20ByOrderByIngestedAtDesc()
                 : newsEventRepository.findByStatus(status);
     }
 
@@ -444,16 +462,54 @@ public class NewsQueryService {
         return (int) items.stream().filter(item -> item.status() == status).count();
     }
 
-    private boolean isFreshEnough(NewsEvent event) {
-        if (event == null || event.publishedAt() == null) {
+    private boolean isDisplayEligible(NewsEvent event) {
+        Instant basis = resolveDisplayBasis(event);
+        if (basis == null) {
             return false;
         }
-        return !event.publishedAt().isBefore(Instant.now(clock).minus(resolveMaxAge(event)));
+        return !basis.isBefore(Instant.now(clock).minus(resolveDisplayMaxAge(event)));
     }
 
-    private Duration resolveMaxAge(NewsEvent event) {
+    private boolean isSignalEligible(NewsEvent event) {
+        if (event == null || event.status() != NewsStatus.ANALYZED || event.analysisResult() == null) {
+            return false;
+        }
+        Instant basis = resolveSignalBasis(event);
+        if (basis == null) {
+            return false;
+        }
+        return !basis.isBefore(Instant.now(clock).minus(resolveDisplayMaxAge(event)));
+    }
+
+    private Instant resolveDisplayBasis(NewsEvent event) {
+        if (event == null) {
+            return null;
+        }
+        if (event.ingestedAt() != null) {
+            return event.ingestedAt();
+        }
+        return event.publishedAt();
+    }
+
+    private Instant resolveSignalBasis(NewsEvent event) {
+        if (event == null) {
+            return null;
+        }
+        if (event.analysisResult() != null && event.analysisResult().createdAt() != null) {
+            return event.analysisResult().createdAt();
+        }
+        if (event.ingestedAt() != null) {
+            return event.ingestedAt();
+        }
+        return event.publishedAt();
+    }
+
+    private Duration resolveDisplayMaxAge(NewsEvent event) {
         String source = event == null ? "" : normalize(event.source());
-        long hours = "naver".equals(source) ? naverMaxAgeHours : globalMaxAgeHours;
-        return Duration.ofHours(hours > 0 ? hours : ("naver".equals(source) ? 12L : 24L));
+        boolean naver = "naver".equals(source);
+        long hours = naver ? naverFallbackMaxAgeHours : globalFallbackMaxAgeHours;
+        long fallbackHours = naver ? naverMaxAgeHours : globalMaxAgeHours;
+        long resolvedHours = hours > 0 ? hours : fallbackHours;
+        return Duration.ofHours(resolvedHours > 0 ? resolvedHours : (naver ? 24L : 36L));
     }
 }

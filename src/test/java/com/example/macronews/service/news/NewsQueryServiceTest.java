@@ -10,10 +10,16 @@ import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
+import com.example.macronews.dto.MarketSignalOverviewDto;
+import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.repository.NewsEventRepository;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,11 +32,18 @@ import org.springframework.context.i18n.LocaleContextHolder;
 @ExtendWith(MockitoExtension.class)
 class NewsQueryServiceTest {
 
+    private static final Instant FIXED_NOW = Instant.parse("2026-03-10T12:00:00Z");
+
     @Mock
     private NewsEventRepository newsEventRepository;
 
     @InjectMocks
     private NewsQueryService newsQueryService;
+
+    @BeforeEach
+    void setUp() {
+        newsQueryService.setClock(Clock.fixed(FIXED_NOW, ZoneOffset.UTC));
+    }
 
     @AfterEach
     void tearDown() {
@@ -61,7 +74,7 @@ class NewsQueryServiceTest {
                 NewsStatus.INGESTED,
                 null);
 
-        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
                 .willReturn(List.of(genericUsMarket, koreaSemiconductor));
 
         List<String> orderedIds = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY).stream()
@@ -86,7 +99,7 @@ class NewsQueryServiceTest {
                 NewsStatus.ANALYZED,
                 analyzedResult("Korean headline", "English headline", "Korean summary body", "English summary body"));
 
-        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
                 .willReturn(List.of(analyzed));
 
         var result = newsQueryService.getRecentNews().get(0);
@@ -124,7 +137,7 @@ class NewsQueryServiceTest {
                         List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.9d)),
                         List.of()));
 
-        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
                 .willReturn(List.of(englishFallback, macroFallback));
 
         var results = newsQueryService.getRecentNews();
@@ -231,7 +244,7 @@ class NewsQueryServiceTest {
                         ),
                         List.of()));
 
-        given(newsEventRepository.findTop20ByOrderByPublishedAtDesc())
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
                 .willReturn(List.of(analyzedOne, analyzedTwo));
 
         var overview = newsQueryService.getMarketSignalOverview(null, NewsListSort.PUBLISHED_DESC);
@@ -272,6 +285,67 @@ class NewsQueryServiceTest {
                 .satisfies(item -> {
                     assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
                     assertThat(item.sentiment()).isEqualTo(SignalSentiment.NEUTRAL);
+                });
+    }
+
+    @Test
+    @DisplayName("Recent news list should stay visible for recently ingested items even when publishedAt is older")
+    void getRecentNews_usesIngestedAtForDisplayWindow() {
+        Instant now = FIXED_NOW;
+        NewsEvent recentlyIngested = new NewsEvent(
+                "recently-ingested",
+                null,
+                "Older article still newly collected",
+                "Summary",
+                "NAVER",
+                "https://example.com/recently-ingested",
+                now.minus(Duration.ofDays(3)),
+                now.minus(Duration.ofHours(2)),
+                NewsStatus.INGESTED,
+                null
+        );
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(recentlyIngested));
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNews();
+
+        assertThat(items).extracting(NewsListItemDto::id).containsExactly("recently-ingested");
+    }
+
+    @Test
+    @DisplayName("Market signal overview should use analysis completion timing instead of old publishedAt")
+    void getMarketSignalOverview_usesAnalysisCreatedAtForSignalWindow() {
+        Instant now = FIXED_NOW;
+        NewsEvent recentlyAnalyzed = new NewsEvent(
+                "recently-analyzed",
+                null,
+                "Older article with fresh analysis",
+                "Summary",
+                "Reuters",
+                "https://example.com/recently-analyzed",
+                now.minus(Duration.ofDays(2)),
+                now.minus(Duration.ofHours(2)),
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", now.minus(Duration.ofMinutes(30)),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.8d)),
+                        List.of())
+        );
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(recentlyAnalyzed));
+
+        MarketSignalOverviewDto overview = newsQueryService.getMarketSignalOverview(null, NewsListSort.PUBLISHED_DESC);
+
+        assertThat(overview.hasSignals()).isTrue();
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.USD)
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.sampleCount()).isEqualTo(1);
+                    assertThat(item.direction()).isEqualTo(ImpactDirection.DOWN);
+                    assertThat(item.sentiment()).isEqualTo(SignalSentiment.POSITIVE);
                 });
     }
 
