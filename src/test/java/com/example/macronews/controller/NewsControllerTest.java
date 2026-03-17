@@ -103,7 +103,8 @@ class NewsControllerTest {
                 null,
                 null,
                 null,
-                false
+                false,
+                null
         );
 
         given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
@@ -142,7 +143,8 @@ class NewsControllerTest {
                 "defensive view ko",
                 "defensive view en",
                 0.78d,
-                true
+                true,
+                null
         );
 
         given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
@@ -180,7 +182,8 @@ class NewsControllerTest {
                 "defensive view ko",
                 "defensive view en",
                 0.78d,
-                true
+                true,
+                "snapshot-1"
         );
 
         given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))

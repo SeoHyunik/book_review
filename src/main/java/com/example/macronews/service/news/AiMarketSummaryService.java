@@ -232,7 +232,8 @@ public class AiMarketSummaryService {
                     readOptionalText(node, "marketViewKo"),
                     readOptionalText(node, "marketViewEn"),
                     parseConfidence(node.path("confidence")),
-                    true
+                    true,
+                    null
             );
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to parse featured market summary response", ex);

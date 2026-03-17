@@ -87,7 +87,8 @@ public class RecentMarketSummaryService {
                 null,
                 null,
                 null,
-                false
+                false,
+                null
         ));
     }
 

@@ -20,6 +20,7 @@ public record FeaturedMarketSummaryDto(
         String marketViewKo,
         String marketViewEn,
         Double confidence,
-        boolean aiSynthesized
+        boolean aiSynthesized,
+        String snapshotId
 ) {
 }

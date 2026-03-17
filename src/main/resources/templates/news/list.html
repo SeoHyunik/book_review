@@ -894,7 +894,7 @@
                     <div class="featured-card-panel p-3 rounded-4">
                         <div class="small text-secondary text-uppercase featured-card-panel-label" th:text="#{news.featured.kicker}">AI Analysis</div>
                         <a class="btn btn-sm btn-primary px-3 text-nowrap shadow-sm"
-                           th:href="${activeFeaturedSummary != null and activeFeaturedSummary.supportingNewsIds != null and !#lists.isEmpty(activeFeaturedSummary.supportingNewsIds) ? '/news/' + activeFeaturedSummary.supportingNewsIds[0] : (featuredForecast != null ? '/market-forecast' : '/news/' + featuredNews.id)}"
+                           th:href="${featuredStoredSummary != null and featuredStoredSummary.snapshotId != null and !#strings.isEmpty(featuredStoredSummary.snapshotId) ? '/market-summary/' + featuredStoredSummary.snapshotId : (activeFeaturedSummary != null and activeFeaturedSummary.supportingNewsIds != null and !#lists.isEmpty(activeFeaturedSummary.supportingNewsIds) ? '/news/' + activeFeaturedSummary.supportingNewsIds[0] : (featuredForecast != null ? '/market-forecast' : '/news/' + featuredNews.id))}"
                            th:text="${featuredStoredSummary != null ? #messages.msg('news.featured.marketSummary.snapshotAction') : (featuredAiSummary != null ? #messages.msg('news.featured.marketSummary.aiAction') : (featuredSummary != null ? #messages.msg('news.featured.marketSummary.action') : (featuredForecast != null ? #messages.msg('news.featured.forecast.action') : #messages.msg('news.featured.action'))))}">View Details</a>
                     </div>
                 </div>

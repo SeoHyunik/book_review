@@ -2,11 +2,15 @@ package com.example.macronews.service.news;
 
 import com.example.macronews.domain.MarketSummarySnapshot;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
+import com.example.macronews.dto.MarketSummaryDetailDto;
+import com.example.macronews.dto.MarketSummarySupportingNewsDto;
+import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.repository.MarketSummarySnapshotRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +26,7 @@ public class MarketSummarySnapshotService {
 
     private final MarketSummarySnapshotRepository marketSummarySnapshotRepository;
     private final AiMarketSummaryService aiMarketSummaryService;
+    private final NewsQueryService newsQueryService;
 
     @Value("${app.featured.market-summary.snapshot-enabled:true}")
     private boolean snapshotEnabled;
@@ -78,6 +83,27 @@ public class MarketSummarySnapshotService {
         return Optional.of(marketSummarySnapshotRepository.save(snapshot));
     }
 
+    public Optional<MarketSummaryDetailDto> getSnapshotDetail(String id) {
+        return marketSummarySnapshotRepository.findById(id)
+                .filter(snapshot -> snapshot.valid())
+                .map(snapshot -> new MarketSummaryDetailDto(
+                        snapshot.id(),
+                        snapshot.generatedAt(),
+                        snapshot.sourceCount(),
+                        snapshot.windowHours(),
+                        snapshot.headlineKo(),
+                        snapshot.headlineEn(),
+                        snapshot.summaryKo(),
+                        snapshot.summaryEn(),
+                        snapshot.marketViewKo(),
+                        snapshot.marketViewEn(),
+                        snapshot.dominantSentiment(),
+                        snapshot.confidence(),
+                        snapshot.keyDrivers(),
+                        mapSupportingNews(newsQueryService.getNewsItemsByIds(snapshot.supportingNewsIds()))
+                ));
+    }
+
     boolean isFresh(MarketSummarySnapshot snapshot) {
         if (snapshot == null || snapshot.generatedAt() == null) {
             return false;
@@ -104,11 +130,28 @@ public class MarketSummarySnapshotService {
                 snapshot.marketViewKo(),
                 snapshot.marketViewEn(),
                 snapshot.confidence(),
-                snapshot.aiSynthesized()
+                snapshot.aiSynthesized(),
+                snapshot.id()
         );
     }
 
     private Duration resolveMaxAge() {
         return Duration.ofMinutes(snapshotMaxAgeMinutes > 0 ? snapshotMaxAgeMinutes : 180L);
+    }
+
+    private List<MarketSummarySupportingNewsDto> mapSupportingNews(List<NewsListItemDto> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        return items.stream()
+                .map(item -> new MarketSummarySupportingNewsDto(
+                        item.id(),
+                        item.displayTitle() != null && !item.displayTitle().isBlank() ? item.displayTitle() : item.title(),
+                        item.source(),
+                        item.publishedAt(),
+                        item.primaryDirection(),
+                        item.primarySentiment()
+                ))
+                .toList();
     }
 }
