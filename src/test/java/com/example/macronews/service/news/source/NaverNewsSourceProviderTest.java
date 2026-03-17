@@ -70,6 +70,80 @@ class NaverNewsSourceProviderTest {
     }
 
     @Test
+    @DisplayName("NAVER provider should parse alternate pubDate formats safely")
+    void fetchTopHeadlines_parsesAlternatePubDateFormat() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "kospi");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "Market tone firms",
+                      "description": "Alternate date format",
+                      "originallink": "https://news.example.com/alternate-date",
+                      "link": "https://search.naver.com/alternate-date",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 GMT"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).publishedAt()).isEqualTo(Instant.parse("2026-03-13T09:15:00Z"));
+    }
+
+    @Test
+    @DisplayName("NAVER provider should use link when original link is missing")
+    void fetchTopHeadlines_usesLinkWhenOriginalLinkMissing() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "usd");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "USD pulls back",
+                      "description": "Fallback link should be used",
+                      "originallink": "",
+                      "link": "https://search.naver.com/usd-pullback",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).url()).isEqualTo("https://search.naver.com/usd-pullback");
+        assertThat(results.get(0).externalId()).isEqualTo("https://search.naver.com/usd-pullback");
+    }
+
+    @Test
+    @DisplayName("NAVER provider should keep items when pubDate is unparseable")
+    void fetchTopHeadlines_keepsItemsWhenPubDateIsUnparseable() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "oil");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "Oil volatility returns",
+                      "description": "Date is malformed but item should remain usable",
+                      "originallink": "https://news.example.com/oil-volatility",
+                      "link": "https://search.naver.com/oil-volatility",
+                      "pubDate": "not-a-date"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).url()).isEqualTo("https://news.example.com/oil-volatility");
+        assertThat(results.get(0).publishedAt()).isNull();
+    }
+
+    @Test
     @DisplayName("NAVER provider should merge multi-query results and deduplicate by link newest first")
     void fetchTopHeadlines_mergesQueriesAndDeduplicatesNewestFirst() {
         ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C,\uD658\uC728");

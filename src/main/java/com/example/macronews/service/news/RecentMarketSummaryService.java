@@ -99,12 +99,17 @@ public class RecentMarketSummaryService {
     List<NewsEvent> loadRecentAnalyzedNews(int requestedWindowHours, int requestedMaxItems) {
         Instant cutoff = Instant.now(clock).minus(Duration.ofHours(requestedWindowHours > 0 ? requestedWindowHours : 3));
         int effectiveMaxItems = requestedMaxItems > 0 ? requestedMaxItems : 10;
-        return newsEventRepository.findByStatus(NewsStatus.ANALYZED).stream()
+        List<NewsEvent> analyzedCandidates = newsEventRepository.findByStatus(NewsStatus.ANALYZED).stream()
                 .filter(event -> event.analysisResult() != null)
+                .toList();
+        List<NewsEvent> recentItems = analyzedCandidates.stream()
                 .filter(event -> event.publishedAt() != null && !event.publishedAt().isBefore(cutoff))
                 .sorted(Comparator.comparing(NewsEvent::publishedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .limit(effectiveMaxItems)
                 .toList();
+        log.debug("[FEATURED_SUMMARY] queryBasis=publishedAt cutoff={} analyzedCandidates={} recentCandidates={}",
+                cutoff, analyzedCandidates.size(), recentItems.size());
+        return recentItems;
     }
 
     private SignalSentiment resolveDominantSentiment(List<NewsEvent> recentItems) {

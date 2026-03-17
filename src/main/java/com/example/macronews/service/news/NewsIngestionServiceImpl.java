@@ -14,7 +14,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
@@ -184,7 +186,9 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
     }
 
     private List<ExternalNewsItem> loadScheduledHeadlineFeed(int limit) {
-        return newsSourceProviderSelector.fetchTopHeadlines(limit);
+        List<ExternalNewsItem> selected = newsSourceProviderSelector.fetchTopHeadlines(limit);
+        log.info("[INGEST] selected sourceSummary={}", summarizeSources(selected));
+        return selected;
     }
 
     private String resolveExternalId(ExternalNewsItem item) {
@@ -220,5 +224,17 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private Map<String, Integer> summarizeSources(List<ExternalNewsItem> items) {
+        Map<String, Integer> summary = new LinkedHashMap<>();
+        if (items == null) {
+            return summary;
+        }
+        for (ExternalNewsItem item : items) {
+            String source = item == null ? "UNKNOWN" : defaultText(item.source(), "UNKNOWN");
+            summary.merge(source, 1, Integer::sum);
+        }
+        return summary;
     }
 }
