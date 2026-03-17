@@ -199,11 +199,12 @@ app:
       cron: ${APP_INGESTION_SCHEDULER_CRON:0 */30 * * * *}
       page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:5}
   keep-alive:
-    # Static gate for keep-alive availability. Admin runtime toggle can only operate when this is true.
+    # Static gate for keep-alive availability. Default remains false because external uptime monitoring
+    # is more reliable than self-calling the same Render public URL from inside the app.
     enabled: ${APP_KEEP_ALIVE_ENABLED:false}
     # Runtime toggle state is in-memory only and resets on restart or redeploy.
     cron: ${APP_KEEP_ALIVE_CRON:0 */10 * * * *}
-    # Required for effective keep-alive execution.
+    # Required for effective keep-alive execution. Prefer an external monitor or GitHub Actions ping.
     target-url: ${APP_KEEP_ALIVE_TARGET_URL:}
   notification:
     email:
@@ -274,7 +275,7 @@ app:
       snapshot-enabled: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_ENABLED:true}
       snapshot-read-enabled: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_READ_ENABLED:true}
       snapshot-refresh-enabled: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_ENABLED:true}
-      snapshot-refresh-cron: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_CRON:0 0 */3 * * *}
+      snapshot-refresh-cron: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_CRON:0 10 */3 * * *}
       snapshot-max-age-minutes: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_MAX_AGE_MINUTES:180}
   gating:
     free-detail-views: 3

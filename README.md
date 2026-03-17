@@ -34,6 +34,7 @@
 - Scheduled ingestion is disabled by default and can be enabled with: `APP_INGESTION_SCHEDULER_ENABLED`, `APP_INGESTION_SCHEDULER_CRON`, `APP_INGESTION_SCHEDULER_PAGE_SIZE`
 - Current real-time oriented defaults are a 30-minute cron (`APP_INGESTION_SCHEDULER_CRON`) and a 5-item batch size (`APP_INGESTION_SCHEDULER_PAGE_SIZE`)
 - Keep-alive remains statically gated by `APP_KEEP_ALIVE_ENABLED` and `APP_KEEP_ALIVE_TARGET_URL`, but the admin auto-ingestion page can now turn the runtime keep-alive switch on or off while the app is running
+- Keep-alive stays disabled by default; for Render deployments, an external uptime monitor or GitHub Actions ping is preferred over self-calling the same public URL from inside the app
 - Email notification remains statically gated by `APP_NOTIFICATION_EMAIL_ENABLED`, `APP_NOTIFICATION_EMAIL_RECIPIENT`, and Spring mail sender configuration, but the admin auto-ingestion page can now turn the runtime email switch on or off while the app is running
 - Keep-alive and email runtime toggle state is in-memory only and resets on restart or redeploy
 - Automatic headline ingestion switches between the domestic and foreign feed priority windows using: `APP_INGESTION_DOMESTIC_START_HOUR`, `APP_INGESTION_DOMESTIC_END_HOUR` (defaults: `5` to `22`, Asia/Seoul)
@@ -46,13 +47,15 @@
 - Tune the recent foreign/global NewsAPI query with `NEWS_API_RECENT_QUERY` (`news.api.recent-query`)
 - Tune macro relevance filtering with `NEWS_API_FILTER_KEYWORDS` (`news.api.filter-keywords`), which matches configured keywords against article title + description before items are accepted
 - The main featured card now prefers a deterministic recent-market aggregation built from analyzed news, controlled by `APP_FEATURED_MARKET_SUMMARY_ENABLED`, `APP_FEATURED_MARKET_SUMMARY_WINDOW_HOURS`, `APP_FEATURED_MARKET_SUMMARY_MAX_ITEMS`, and `APP_FEATURED_MARKET_SUMMARY_MIN_ITEMS`
+- Deterministic recent-market aggregation now selects items by analysis completion timing (`AnalysisResult.createdAt`) rather than raw article `publishedAt`
 - This featured aggregation step is rule-based only for now; if there are not enough recent analyzed items, the homepage safely falls back to the existing market forecast snapshot or featured news behavior
 - The homepage featured card now also supports a higher-level AI market-summary synthesis layer on top of the recent analyzed cluster, controlled by `APP_FEATURED_MARKET_SUMMARY_AI_ENABLED`, `APP_FEATURED_MARKET_SUMMARY_AI_MODEL`, `APP_FEATURED_MARKET_SUMMARY_AI_WINDOW_HOURS`, `APP_FEATURED_MARKET_SUMMARY_AI_MAX_ITEMS`, `APP_FEATURED_MARKET_SUMMARY_AI_MIN_ITEMS`, `APP_FEATURED_MARKET_SUMMARY_AI_MAX_INPUT_CHARS`, and `APP_FEATURED_MARKET_SUMMARY_AI_CACHE_MINUTES`
+- The AI market-summary layer uses the same analysis-completion timing basis, so newly finished interpretations can be summarized even when the source article itself was published earlier
 - Featured-card priority is now: latest fresh stored AI market-summary snapshot -> on-demand AI synthesized market summary -> deterministic recent market summary -> existing market forecast snapshot -> existing featured news
 - The homepage featured hero is now market-summary-first in practice: stored snapshot -> AI summary -> deterministic summary -> article fallback
 - The synthesized layer is generated on demand, uses a small in-memory cache only, and safely falls back whenever AI is disabled, not configured, input is insufficient, the API call fails, or the JSON response is invalid
 - Market summaries can now also be persisted as snapshots. The homepage prefers the latest fresh stored snapshot first, controlled by `APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_ENABLED`, `APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_READ_ENABLED`, `APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_ENABLED`, `APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_CRON`, and `APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_MAX_AGE_MINUTES`
-- A small scheduled refresh hook now supports a 3-hour style snapshot lifecycle, while keeping deterministic and forecast/news fallback paths intact if the snapshot is stale, missing, or generation fails
+- A small scheduled refresh hook now supports a 3-hour style snapshot lifecycle with a safer default offset, while keeping deterministic and forecast/news fallback paths intact if the snapshot is stale, missing, or generation fails
 - Optional market-data providers are scaffolded behind feature flags: `APP_MARKET_FX_ENABLED` + `EXCHANGE_RATE_API_KEY`, `APP_MARKET_GOLD_ENABLED` + `METALPRICE_API_KEY`, `APP_MARKET_OIL_ENABLED` + `OILPRICE_API_KEY`, and future index config via `APP_MARKET_INDEX_PROVIDER`, `APP_MARKET_INDEX_ENABLED`, `TWELVEDATA_API_KEY`
 - Local and production environments should provide these explicitly instead of relying on repository-stored values
 - Default admin seeding is intended only for `dev` and `test` profiles

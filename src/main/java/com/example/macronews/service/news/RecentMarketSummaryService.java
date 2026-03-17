@@ -58,7 +58,8 @@ public class RecentMarketSummaryService {
 
         List<NewsEvent> recentItems = loadRecentAnalyzedNews();
         if (recentItems.size() < resolveMinItems()) {
-            log.debug("[FEATURED_SUMMARY] skipped reason=insufficient-analyzed-news size={}", recentItems.size());
+            log.info("[FEATURED_SUMMARY] skipped reason=insufficient-analyzed-news queryBasis=analysisResult.createdAt|ingestedAt size={} minItems={}",
+                    recentItems.size(), resolveMinItems());
             return Optional.empty();
         }
 
@@ -101,15 +102,25 @@ public class RecentMarketSummaryService {
         int effectiveMaxItems = requestedMaxItems > 0 ? requestedMaxItems : 10;
         List<NewsEvent> analyzedCandidates = newsEventRepository.findByStatus(NewsStatus.ANALYZED).stream()
                 .filter(event -> event.analysisResult() != null)
+                .filter(event -> resolveSummaryBasisInstant(event) != null)
                 .toList();
         List<NewsEvent> recentItems = analyzedCandidates.stream()
-                .filter(event -> event.publishedAt() != null && !event.publishedAt().isBefore(cutoff))
-                .sorted(Comparator.comparing(NewsEvent::publishedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .filter(event -> !resolveSummaryBasisInstant(event).isBefore(cutoff))
+                .sorted(Comparator.comparing(this::resolveSummaryBasisInstant, Comparator.nullsLast(Comparator.reverseOrder())))
                 .limit(effectiveMaxItems)
                 .toList();
-        log.debug("[FEATURED_SUMMARY] queryBasis=publishedAt cutoff={} analyzedCandidates={} recentCandidates={}",
+        log.debug("[FEATURED_SUMMARY] queryBasis=analysisResult.createdAt|ingestedAt cutoff={} analyzedCandidates={} recentCandidates={}",
                 cutoff, analyzedCandidates.size(), recentItems.size());
         return recentItems;
+    }
+
+    Instant resolveSummaryBasisInstant(NewsEvent event) {
+        if (event == null || event.analysisResult() == null) {
+            return null;
+        }
+        return event.analysisResult().createdAt() != null
+                ? event.analysisResult().createdAt()
+                : event.ingestedAt();
     }
 
     private SignalSentiment resolveDominantSentiment(List<NewsEvent> recentItems) {

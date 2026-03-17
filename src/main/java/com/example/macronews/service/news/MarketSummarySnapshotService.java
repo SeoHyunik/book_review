@@ -51,11 +51,13 @@ public class MarketSummarySnapshotService {
 
     public Optional<MarketSummarySnapshot> refreshSnapshot() {
         if (!snapshotEnabled) {
+            log.debug("[MARKET_SUMMARY_SNAPSHOT] skipped reason=snapshot-disabled");
             return Optional.empty();
         }
 
         Optional<FeaturedMarketSummaryDto> generated = aiMarketSummaryService.generateCurrentSummary();
         if (generated.isEmpty()) {
+            log.info("[MARKET_SUMMARY_SNAPSHOT] skipped reason=ai-summary-unavailable");
             return Optional.empty();
         }
 
@@ -80,7 +82,10 @@ public class MarketSummarySnapshotService {
                 true,
                 aiMarketSummaryService.getConfiguredModel()
         );
-        return Optional.of(marketSummarySnapshotRepository.save(snapshot));
+        MarketSummarySnapshot saved = marketSummarySnapshotRepository.save(snapshot);
+        log.info("[MARKET_SUMMARY_SNAPSHOT] saved id={} generatedAt={} sourceCount={}",
+                saved.id(), saved.generatedAt(), saved.sourceCount());
+        return Optional.of(saved);
     }
 
     public Optional<MarketSummaryDetailDto> getSnapshotDetail(String id) {

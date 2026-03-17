@@ -82,7 +82,11 @@ class AiMarketSummaryServiceTest {
     @DisplayName("enough recent analyzed items with AI success should produce synthesized summary")
     void getCurrentSummary_returnsSynthesizedSummaryWhenAiSucceeds() {
         given(recentMarketSummaryService.loadRecentAnalyzedNews(3, 10))
-                .willReturn(List.of(newsEvent("news-1"), newsEvent("news-2"), newsEvent("news-3")));
+                .willReturn(List.of(
+                        newsEvent("news-1", "2026-03-01T02:30:00Z", "2026-03-17T02:30:00Z"),
+                        newsEvent("news-2", "2026-03-02T02:30:00Z", "2026-03-17T02:20:00Z"),
+                        newsEvent("news-3", "2026-03-03T02:30:00Z", "2026-03-17T02:10:00Z")
+                ));
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
                 {
                   "choices": [
@@ -122,7 +126,11 @@ class AiMarketSummaryServiceTest {
     @DisplayName("invalid AI JSON should keep synthesized summary unavailable")
     void getCurrentSummary_returnsEmptyWhenParsingFails() {
         given(recentMarketSummaryService.loadRecentAnalyzedNews(3, 10))
-                .willReturn(List.of(newsEvent("news-1"), newsEvent("news-2"), newsEvent("news-3")));
+                .willReturn(List.of(
+                        newsEvent("news-1", "2026-03-01T02:30:00Z", "2026-03-17T02:30:00Z"),
+                        newsEvent("news-2", "2026-03-02T02:30:00Z", "2026-03-17T02:20:00Z"),
+                        newsEvent("news-3", "2026-03-03T02:30:00Z", "2026-03-17T02:10:00Z")
+                ));
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
                 {
                   "choices": [
@@ -142,13 +150,16 @@ class AiMarketSummaryServiceTest {
     @DisplayName("not enough recent items should keep synthesized summary unavailable")
     void getCurrentSummary_returnsEmptyWhenRecentItemsInsufficient() {
         given(recentMarketSummaryService.loadRecentAnalyzedNews(3, 10))
-                .willReturn(List.of(newsEvent("news-1"), newsEvent("news-2")));
+                .willReturn(List.of(
+                        newsEvent("news-1", "2026-03-01T02:30:00Z", "2026-03-17T02:30:00Z"),
+                        newsEvent("news-2", "2026-03-02T02:30:00Z", "2026-03-17T02:20:00Z")
+                ));
 
         assertThat(aiMarketSummaryService.getCurrentSummary()).isEmpty();
         verify(externalApiUtils, never()).callAPI(any());
     }
 
-    private NewsEvent newsEvent(String id) {
+    private NewsEvent newsEvent(String id, String publishedAt, String analyzedAt) {
         return new NewsEvent(
                 id,
                 null,
@@ -156,12 +167,12 @@ class AiMarketSummaryServiceTest {
                 "Summary " + id,
                 "Source",
                 "https://example.com/" + id,
-                Instant.parse("2026-03-17T02:30:00Z"),
-                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse(publishedAt),
+                Instant.parse(analyzedAt),
                 com.example.macronews.domain.NewsStatus.ANALYZED,
                 new AnalysisResult(
                         "test-model",
-                        Instant.parse("2026-03-17T00:00:00Z"),
+                        Instant.parse(analyzedAt),
                         "headline ko",
                         "headline en",
                         "summary ko",
