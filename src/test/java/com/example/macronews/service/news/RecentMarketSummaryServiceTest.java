@@ -68,6 +68,7 @@ class RecentMarketSummaryServiceTest {
         assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.POSITIVE);
         assertThat(result.get().headlineEn()).isEqualTo("Recent macro signals lean positive");
         assertThat(result.get().keyDrivers()).containsExactly("USD", "KOSPI", "Oil");
+        assertThat(result.get().aiSynthesized()).isFalse();
     }
 
     @Test

@@ -64,6 +64,18 @@
 # - APP_FEATURED_MARKET_SUMMARY_WINDOW_HOURS
 # - APP_FEATURED_MARKET_SUMMARY_MAX_ITEMS
 # - APP_FEATURED_MARKET_SUMMARY_MIN_ITEMS
+# - APP_FEATURED_MARKET_SUMMARY_AI_ENABLED
+# - APP_FEATURED_MARKET_SUMMARY_AI_MODEL
+# - APP_FEATURED_MARKET_SUMMARY_AI_WINDOW_HOURS
+# - APP_FEATURED_MARKET_SUMMARY_AI_MAX_ITEMS
+# - APP_FEATURED_MARKET_SUMMARY_AI_MIN_ITEMS
+# - APP_FEATURED_MARKET_SUMMARY_AI_MAX_INPUT_CHARS
+# - APP_FEATURED_MARKET_SUMMARY_AI_CACHE_MINUTES
+# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_ENABLED
+# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_READ_ENABLED
+# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_ENABLED
+# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_CRON
+# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_MAX_AGE_MINUTES
 server:
   port: ${PORT:8080}
 
@@ -132,6 +144,7 @@ openai:
   temperature: ${OPENAI_TEMPERATURE:0.2}
   macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
   forecast-prompt-file: classpath:ai/prompts/market_forecast_aggregation_prompt.json
+  featured-market-summary-prompt-file: classpath:ai/prompts/featured_market_summary_prompt.json
   pricing:
     primary-model-name: ${OPENAI_PRICING_PRIMARY_MODEL:${OPENAI_MODEL:gpt-4o}}
     primary-model:
@@ -245,6 +258,19 @@ app:
       window-hours: ${APP_FEATURED_MARKET_SUMMARY_WINDOW_HOURS:3}
       max-items: ${APP_FEATURED_MARKET_SUMMARY_MAX_ITEMS:10}
       min-items: ${APP_FEATURED_MARKET_SUMMARY_MIN_ITEMS:3}
+      ai-enabled: ${APP_FEATURED_MARKET_SUMMARY_AI_ENABLED:true}
+      ai-model: ${APP_FEATURED_MARKET_SUMMARY_AI_MODEL:${OPENAI_MODEL:gpt-4o}}
+      ai-window-hours: ${APP_FEATURED_MARKET_SUMMARY_AI_WINDOW_HOURS:3}
+      ai-max-items: ${APP_FEATURED_MARKET_SUMMARY_AI_MAX_ITEMS:10}
+      ai-min-items: ${APP_FEATURED_MARKET_SUMMARY_AI_MIN_ITEMS:3}
+      ai-max-input-chars: ${APP_FEATURED_MARKET_SUMMARY_AI_MAX_INPUT_CHARS:12000}
+      # In-memory cache only. This helps keep homepage synthesis cost under control.
+      ai-cache-minutes: ${APP_FEATURED_MARKET_SUMMARY_AI_CACHE_MINUTES:15}
+      snapshot-enabled: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_ENABLED:true}
+      snapshot-read-enabled: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_READ_ENABLED:true}
+      snapshot-refresh-enabled: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_ENABLED:true}
+      snapshot-refresh-cron: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_CRON:0 0 */3 * * *}
+      snapshot-max-age-minutes: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_MAX_AGE_MINUTES:180}
   gating:
     free-detail-views: 3
   auth:

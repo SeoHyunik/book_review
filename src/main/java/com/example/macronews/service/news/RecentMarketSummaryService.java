@@ -83,17 +83,26 @@ public class RecentMarketSummaryService {
                 recentItems.stream()
                         .map(NewsEvent::id)
                         .filter(StringUtils::hasText)
-                        .toList()
+                        .toList(),
+                null,
+                null,
+                null,
+                false
         ));
     }
 
     List<NewsEvent> loadRecentAnalyzedNews() {
-        Instant cutoff = Instant.now(clock).minus(Duration.ofHours(resolveWindowHours()));
+        return loadRecentAnalyzedNews(resolveWindowHours(), resolveMaxItems());
+    }
+
+    List<NewsEvent> loadRecentAnalyzedNews(int requestedWindowHours, int requestedMaxItems) {
+        Instant cutoff = Instant.now(clock).minus(Duration.ofHours(requestedWindowHours > 0 ? requestedWindowHours : 3));
+        int effectiveMaxItems = requestedMaxItems > 0 ? requestedMaxItems : 10;
         return newsEventRepository.findByStatus(NewsStatus.ANALYZED).stream()
                 .filter(event -> event.analysisResult() != null)
                 .filter(event -> event.publishedAt() != null && !event.publishedAt().isBefore(cutoff))
                 .sorted(Comparator.comparing(NewsEvent::publishedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-                .limit(resolveMaxItems())
+                .limit(effectiveMaxItems)
                 .toList();
     }
 
@@ -205,9 +214,9 @@ public class RecentMarketSummaryService {
 
     private String buildHeadlineKo(SignalSentiment dominantSentiment) {
         return switch (dominantSentiment) {
-            case POSITIVE -> "최근 거시 신호는 긍정 쪽으로 기웁니다";
-            case NEGATIVE -> "최근 거시 신호는 방어적으로 기웁니다";
-            case NEUTRAL -> "최근 거시 신호는 혼조 흐름입니다";
+            case POSITIVE -> "\uCD5C\uADFC \uAC70\uC2DC \uC2E0\uD638\uB294 \uAE0D\uC815 \uCABD\uC73C\uB85C \uAE30\uC6B8\uACE0 \uC788\uC2B5\uB2C8\uB2E4";
+            case NEGATIVE -> "\uCD5C\uADFC \uAC70\uC2DC \uC2E0\uD638\uB294 \uBC29\uC5B4\uC801\uC73C\uB85C \uAE30\uC6B8\uACE0 \uC788\uC2B5\uB2C8\uB2E4";
+            case NEUTRAL -> "\uCD5C\uADFC \uAC70\uC2DC \uC2E0\uD638\uB294 \uD63C\uC870 \uD750\uB984\uC785\uB2C8\uB2E4";
         };
     }
 
@@ -220,11 +229,14 @@ public class RecentMarketSummaryService {
     }
 
     private String buildSummaryKo(int sourceCount, List<DriverCount> topDrivers) {
-        String base = "최근 " + resolveWindowHours() + "시간 동안 분석된 기사 " + sourceCount + "건을 바탕으로 정리했습니다";
+        String base = "\uCD5C\uADFC " + resolveWindowHours()
+                + "\uC2DC\uAC04 \uB3D9\uC548 \uBD84\uC11D\uB41C \uAE30\uC0AC " + sourceCount
+                + "\uAC74\uC744 \uBC14\uD0D5\uC73C\uB85C \uC815\uB9AC\uD588\uC2B5\uB2C8\uB2E4";
         if (topDrivers.isEmpty()) {
             return base + ".";
         }
-        return base + ". " + joinDriverLabels(topDrivers, true) + " 이(가) 가장 자주 등장했습니다.";
+        return base + ". " + joinDriverLabels(topDrivers, true)
+                + " \uC774(\uAC00) \uAC00\uC7A5 \uC790\uC8FC \uB4F1\uC7A5\uD588\uC2B5\uB2C8\uB2E4.";
     }
 
     private String buildSummaryEn(int sourceCount, List<DriverCount> topDrivers) {
@@ -254,14 +266,14 @@ public class RecentMarketSummaryService {
 
     private String driverLabelKo(MacroVariable variable) {
         return switch (variable) {
-            case KOSPI -> "코스피";
-            case KOSDAQ -> "코스닥";
-            case VOLATILITY -> "변동성";
-            case OIL -> "유가";
-            case USD -> "달러";
-            case INTEREST_RATE -> "금리";
-            case INFLATION -> "물가";
-            case GOLD -> "금";
+            case KOSPI -> "\uCF54\uC2A4\uD53C";
+            case KOSDAQ -> "\uCF54\uC2A4\uB2E5";
+            case VOLATILITY -> "\uBCC0\uB3D9\uC131";
+            case OIL -> "\uC720\uAC00";
+            case USD -> "\uB2EC\uB7EC";
+            case INTEREST_RATE -> "\uAE08\uB9AC";
+            case INFLATION -> "\uBB3C\uAC00";
+            case GOLD -> "\uAE08";
         };
     }
 
@@ -280,10 +292,10 @@ public class RecentMarketSummaryService {
 
     private String driverLabelKo(MarketType marketType) {
         return switch (marketType) {
-            case KOSPI -> "코스피";
-            case US_EQUITIES -> "미국 주식";
-            case ENERGY_SECTOR -> "에너지 섹터";
-            case TECH_SECTOR -> "기술 섹터";
+            case KOSPI -> "\uCF54\uC2A4\uD53C";
+            case US_EQUITIES -> "\uBBF8\uAD6D \uC8FC\uC2DD";
+            case ENERGY_SECTOR -> "\uC5D0\uB108\uC9C0 \uC139\uD130";
+            case TECH_SECTOR -> "\uAE30\uC220 \uC139\uD130";
         };
     }
 

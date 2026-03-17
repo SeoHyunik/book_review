@@ -16,6 +16,10 @@ public record FeaturedMarketSummaryDto(
         Instant toPublishedAt,
         SignalSentiment dominantSentiment,
         List<String> keyDrivers,
-        List<String> supportingNewsIds
+        List<String> supportingNewsIds,
+        String marketViewKo,
+        String marketViewEn,
+        Double confidence,
+        boolean aiSynthesized
 ) {
 }
