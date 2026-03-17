@@ -12,6 +12,8 @@ public interface NewsEventRepository extends MongoRepository<NewsEvent, String> 
 
     List<NewsEvent> findTop20ByOrderByPublishedAtDesc();
 
+    List<NewsEvent> findTop20ByOrderByIngestedAtDesc();
+
     List<NewsEvent> findByStatus(NewsStatus status);
 
     Optional<NewsEvent> findByUrl(String url);

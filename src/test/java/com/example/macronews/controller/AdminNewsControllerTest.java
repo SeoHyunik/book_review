@@ -15,6 +15,8 @@ import com.example.macronews.service.notification.AutoIngestionEmailNotification
 import com.example.macronews.service.ops.OpsFeatureToggleService;
 import com.example.macronews.service.ops.RenderKeepAliveService;
 import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ui.ExtendedModelMap;
@@ -131,6 +133,20 @@ class AdminNewsControllerTest {
         assertThat(model.getAttribute("keepAliveStatus")).isNotNull();
         assertThat(model.getAttribute("emailNotificationStatus")).isNotNull();
         assertThat(model.getAttribute("autoIngestionControlStatus")).isNotNull();
+    }
+
+    @Test
+    @DisplayName("korean message bundle should include keep-alive and email operation labels")
+    void koreanMessageBundle_containsOpsPanelKeys() {
+        ResourceBundle bundle = ResourceBundle.getBundle("messages", Locale.KOREAN);
+
+        assertThat(bundle.getString("admin.news.auto.ops.config.enabled")).isNotBlank();
+        assertThat(bundle.getString("admin.news.auto.ops.runtime.enabled")).isNotBlank();
+        assertThat(bundle.getString("admin.news.auto.ops.effective.enabled")).isNotBlank();
+        assertThat(bundle.getString("admin.news.auto.keepAlive.heading")).isNotBlank();
+        assertThat(bundle.getString("admin.news.auto.keepAlive.configHint.disabled")).isNotBlank();
+        assertThat(bundle.getString("admin.news.auto.email.heading")).isNotBlank();
+        assertThat(bundle.getString("admin.news.auto.email.configHint.disabled")).isNotBlank();
     }
 
     private AdminNewsController controller(
