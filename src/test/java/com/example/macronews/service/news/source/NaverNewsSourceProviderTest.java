@@ -3,8 +3,12 @@ package com.example.macronews.service.news.source;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.example.macronews.dto.external.ExternalNewsItem;
+import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -142,5 +147,103 @@ class NaverNewsSourceProviderTest {
         assertThat(results.get(0).title()).isEqualTo("\uCF54\uC2A4\uD53C \uC0C1\uC2B9 \uC804\uD658");
         assertThat(results.get(0).summary()).isEqualTo("\uC624\uC804 \uD750\uB984 \uC5C5\uB370\uC774\uD2B8");
         assertThat(results.get(0).publishedAt()).isEqualTo(Instant.parse("2026-03-13T00:10:00Z"));
+    }
+
+    @Test
+    @DisplayName("NAVER provider should use configured queries as-is when present")
+    void fetchTopHeadlines_usesConfiguredQueriesWhenPresent() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C,\uD658\uC728");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": []
+                }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
+        verify(externalApiUtils, atLeastOnce()).callAPI(requestCaptor.capture());
+        assertThat(requestCaptor.getAllValues())
+                .extracting(ExternalApiRequest::url)
+                .hasSize(2)
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%ED%94%BC"))
+                .anySatisfy(url -> assertThat(url).contains("query=%ED%99%98%EC%9C%A8"))
+                .allSatisfy(url -> assertThat(url)
+                        .doesNotContain("query=%EC%BD%94%EC%8A%A4%EB%8B%A5")
+                        .doesNotContain("query=%EA%B8%88%EB%A6%AC")
+                        .doesNotContain("query=%EC%9C%A0%EA%B0%80")
+                        .doesNotContain("query=%EB%B0%98%EB%8F%84%EC%B2%B4")
+                        .doesNotContain("query=%EC%97%B0%EC%A4%80"));
+    }
+
+    @Test
+    @DisplayName("NAVER provider should use built-in default queries when configured queries are blank")
+    void fetchTopHeadlines_usesDefaultQueriesWhenConfiguredQueriesBlank() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": []
+                }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        assertThat(capturedRequestUrls()).hasSize(7)
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%ED%94%BC"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%EB%8B%A5"))
+                .anySatisfy(url -> assertThat(url).contains("query=%ED%99%98%EC%9C%A8"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EA%B8%88%EB%A6%AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%9C%A0%EA%B0%80"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EB%B0%98%EB%8F%84%EC%B2%B4"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%97%B0%EC%A4%80"));
+    }
+
+    @Test
+    @DisplayName("NAVER provider should use built-in default queries when configured queries are whitespace only")
+    void fetchTopHeadlines_usesDefaultQueriesWhenConfiguredQueriesWhitespaceOnly() {
+        ReflectionTestUtils.setField(provider, "rawQueries", " ,  , ");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": []
+                }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        assertThat(capturedRequestUrls()).hasSize(7)
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%ED%94%BC"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%97%B0%EC%A4%80"));
+    }
+
+    @Test
+    @DisplayName("NAVER provider should remain disabled when the provider flag is false")
+    void fetchTopHeadlines_returnsEmptyWhenDisabled() {
+        ReflectionTestUtils.setField(provider, "enabled", false);
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).isEmpty();
+        verify(externalApiUtils, never()).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("NAVER provider should remain unconfigured when credentials are missing")
+    void fetchTopHeadlines_returnsEmptyWhenCredentialsMissing() {
+        ReflectionTestUtils.setField(provider, "clientId", "");
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).isEmpty();
+        verify(externalApiUtils, never()).callAPI(any());
+    }
+
+    private List<String> capturedRequestUrls() {
+        ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
+        verify(externalApiUtils, atLeastOnce()).callAPI(requestCaptor.capture());
+        return requestCaptor.getAllValues().stream()
+                .map(ExternalApiRequest::url)
+                .toList();
     }
 }

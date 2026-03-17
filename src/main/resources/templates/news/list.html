@@ -550,7 +550,7 @@
             z-index: 1;
         }
 
-        .signal-tile--positive {
+        .signal-sentiment-positive {
             border-color: rgba(220, 38, 38, 0.24);
             background:
                 radial-gradient(circle at top right, rgba(251, 113, 133, 0.32), transparent 34%),
@@ -558,7 +558,7 @@
                 linear-gradient(180deg, rgba(255, 242, 242, 0.98), rgba(255, 250, 250, 0.98));
         }
 
-        .signal-tile--negative {
+        .signal-sentiment-negative {
             border-color: rgba(37, 99, 235, 0.26);
             background:
                 radial-gradient(circle at top right, rgba(96, 165, 250, 0.36), transparent 34%),
@@ -566,12 +566,12 @@
                 linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(248, 251, 255, 0.98));
         }
 
-        .signal-tile--neutral {
+        .signal-sentiment-neutral {
             border-color: rgba(148, 163, 184, 0.28);
             background:
-                radial-gradient(circle at top right, rgba(203, 213, 225, 0.34), transparent 34%),
-                radial-gradient(circle at bottom left, rgba(226, 232, 240, 0.26), transparent 30%),
-                linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 0.98));
+                radial-gradient(circle at top right, rgba(251, 191, 36, 0.24), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(253, 230, 138, 0.22), transparent 30%),
+                linear-gradient(180deg, rgba(255, 251, 235, 0.98), rgba(255, 248, 220, 0.98));
         }
 
         .signal-arrow {
@@ -582,19 +582,19 @@
             transition: transform 0.2s ease, box-shadow 0.24s ease, background-color 0.24s ease, border-color 0.24s ease;
         }
 
-        .signal-arrow--positive {
+        .signal-sentiment-positive .signal-arrow {
             background: linear-gradient(180deg, #ef4444, #b91c1c);
             border-color: rgba(153, 27, 27, 0.4);
         }
 
-        .signal-arrow--negative {
+        .signal-sentiment-negative .signal-arrow {
             background: linear-gradient(180deg, #3b82f6, #1d4ed8);
             border-color: rgba(29, 78, 216, 0.38);
         }
 
-        .signal-arrow--neutral {
-            background: linear-gradient(180deg, #94a3b8, #64748b);
-            border-color: rgba(71, 85, 105, 0.36);
+        .signal-sentiment-neutral .signal-arrow {
+            background: linear-gradient(180deg, #f59e0b, #b45309);
+            border-color: rgba(180, 83, 9, 0.34);
         }
 
         .signal-state {
@@ -603,16 +603,16 @@
             color: var(--surface-strong);
         }
 
-        .signal-tile--positive .signal-state {
+        .signal-sentiment-positive .signal-state {
             color: var(--tone-positive-fg);
         }
 
-        .signal-tile--negative .signal-state {
+        .signal-sentiment-negative .signal-state {
             color: var(--tone-negative-fg);
         }
 
-        .signal-tile--neutral .signal-state {
-            color: #475569;
+        .signal-sentiment-neutral .signal-state {
+            color: var(--tone-neutral-fg);
         }
 
         .signal-direction-copy {
@@ -806,19 +806,28 @@
             line-height: 1;
         }
 
-        .forecast-up {
+        .forecast-direction-up,
+        .forecast-direction-down,
+        .forecast-direction-neutral {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.5rem;
+        }
+
+        .forecast-sentiment-positive {
             color: var(--tone-positive-fg);
             font-size: 22px;
             font-weight: bold;
         }
 
-        .forecast-down {
+        .forecast-sentiment-negative {
             color: var(--tone-negative-fg);
             font-size: 22px;
             font-weight: bold;
         }
 
-        .forecast-flat {
+        .forecast-sentiment-neutral {
             color: var(--tone-neutral-fg);
             font-size: 20px;
             font-weight: 600;
@@ -893,7 +902,7 @@
                 <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3">
                     <div class="col" th:each="signal : ${marketSignalOverview.items}">
                         <div class="border rounded-4 p-3 h-100 signal-tile news-surface"
-                             th:classappend="${signal.sentiment.name() == 'POSITIVE' ? ' signal-tile--positive' : (signal.sentiment.name() == 'NEGATIVE' ? ' signal-tile--negative' : ' signal-tile--neutral')}"
+                             th:classappend="${signal.sentiment.name() == 'POSITIVE' ? ' signal-sentiment-positive' : (signal.sentiment.name() == 'NEGATIVE' ? ' signal-sentiment-negative' : ' signal-sentiment-neutral')}"
                              th:with="specificDirectionKey=${'news.overview.direction.' + #strings.toLowerCase(signal.variable.name()) + '.' + #strings.toLowerCase(signal.direction.name())},
                                       genericDirectionKey=${'news.overview.direction.generic.' + #strings.toLowerCase(signal.direction.name())}">
                             <div class="d-flex justify-content-between align-items-start gap-3">
@@ -912,7 +921,7 @@
                                     </div>
                                 </div>
                                 <span class="badge rounded-pill signal-arrow fs-6 py-2"
-                                      th:classappend="${signal.sentiment.name() == 'POSITIVE' ? ' signal-arrow--positive' : (signal.sentiment.name() == 'NEGATIVE' ? ' signal-arrow--negative' : ' signal-arrow--neutral')}"
+                                      th:classappend="${signal.direction.name() == 'UP' ? ' signal-direction-up' : (signal.direction.name() == 'DOWN' ? ' signal-direction-down' : ' signal-direction-neutral')}"
                                       th:text="${signal.direction.name() == 'UP' ? '↑' : (signal.direction.name() == 'DOWN' ? '↓' : '•')}">
                                     ↑
                                 </span>
@@ -994,9 +1003,11 @@
                             <span th:case="*" class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle" th:text="#{status.unknown}">Unknown</span>
                         </td>
                         <td class="news-col-forecast py-3 forecast-column news-forecast-cell"
-                            th:with="direction=${news.primaryDirection != null ? news.primaryDirection.name() : T(com.example.macronews.domain.ImpactDirection).NEUTRAL.name()}">
+                            th:with="direction=${news.primaryDirection != null ? news.primaryDirection.name() : T(com.example.macronews.domain.ImpactDirection).NEUTRAL.name()},
+                                     sentiment=${news.primarySentiment != null ? news.primarySentiment.name() : T(com.example.macronews.domain.SignalSentiment).NEUTRAL.name()}">
                             <span class="forecast-indicator"
-                                  th:classappend="${direction == T(com.example.macronews.domain.ImpactDirection).UP.name() ? ' forecast-up' : (direction == T(com.example.macronews.domain.ImpactDirection).DOWN.name() ? ' forecast-down' : ' forecast-flat')}"
+                                  th:classappend="${(direction == T(com.example.macronews.domain.ImpactDirection).UP.name() ? ' forecast-direction-up' : (direction == T(com.example.macronews.domain.ImpactDirection).DOWN.name() ? ' forecast-direction-down' : ' forecast-direction-neutral')) +
+                                      (sentiment == T(com.example.macronews.domain.SignalSentiment).POSITIVE.name() ? ' forecast-sentiment-positive' : (sentiment == T(com.example.macronews.domain.SignalSentiment).NEGATIVE.name() ? ' forecast-sentiment-negative' : ' forecast-sentiment-neutral'))}"
                                   th:text="${direction == T(com.example.macronews.domain.ImpactDirection).UP.name() ? '↑' : (direction == T(com.example.macronews.domain.ImpactDirection).DOWN.name() ? '↓' : '•')}">↑</span>
                         </td>
                         <td class="news-col-actions text-nowrap py-3 news-actions-cell">

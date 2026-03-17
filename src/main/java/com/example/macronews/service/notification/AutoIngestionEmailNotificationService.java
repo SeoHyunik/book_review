@@ -3,6 +3,7 @@ package com.example.macronews.service.notification;
 import com.example.macronews.dto.AutoIngestionBatchStatusDto;
 import com.example.macronews.dto.AutoIngestionControlStatusDto;
 import com.example.macronews.dto.AutoIngestionRunOutcome;
+import com.example.macronews.service.ops.OpsFeatureToggleService;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ public class AutoIngestionEmailNotificationService {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ObjectProvider<JavaMailSender> javaMailSenderProvider;
+    private final OpsFeatureToggleService opsFeatureToggleService;
 
     @Value("${app.notification.email.enabled:false}")
     private boolean enabled;
@@ -31,16 +33,46 @@ public class AutoIngestionEmailNotificationService {
     @Value("${app.notification.email.from:}")
     private String from;
 
-    public AutoIngestionEmailNotificationService(ObjectProvider<JavaMailSender> javaMailSenderProvider) {
+    public AutoIngestionEmailNotificationService(
+            ObjectProvider<JavaMailSender> javaMailSenderProvider,
+            OpsFeatureToggleService opsFeatureToggleService) {
         this.javaMailSenderProvider = javaMailSenderProvider;
+        this.opsFeatureToggleService = opsFeatureToggleService;
+    }
+
+    public boolean isConfigured() {
+        return enabled;
+    }
+
+    public boolean isRuntimeEnabled() {
+        return opsFeatureToggleService.isEmailNotificationRuntimeEnabled();
+    }
+
+    public boolean hasRecipient() {
+        return StringUtils.hasText(recipient);
+    }
+
+    public boolean hasMailSender() {
+        return javaMailSenderProvider.getIfAvailable() != null;
+    }
+
+    public boolean isEffectivelyEnabled() {
+        return isConfigured() && isRuntimeEnabled() && hasRecipient() && hasMailSender();
     }
 
     public boolean isEnabled() {
-        return enabled && StringUtils.hasText(recipient);
+        return isEffectivelyEnabled();
     }
 
     public void sendRunResult(AutoIngestionControlStatusDto controlStatus, AutoIngestionBatchStatusDto batchStatus) {
-        if (!isEnabled()) {
+        if (!isConfigured()) {
+            return;
+        }
+        if (!isRuntimeEnabled()) {
+            log.debug("[MAIL] notification skipped reason=runtime-disabled");
+            return;
+        }
+        if (!hasRecipient()) {
             return;
         }
         JavaMailSender mailSender = javaMailSenderProvider.getIfAvailable();

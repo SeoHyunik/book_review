@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.example.macronews.dto.request.ExternalApiRequest;
@@ -30,51 +31,33 @@ class NewsApiServiceImplTest {
     private NewsApiServiceImpl newsApiService;
 
     @Test
-    @DisplayName("fetchTopHeadlines should prefer fresh recent articles and exclude old ones")
-    void fetchTopHeadlines_filtersOutOldArticles() {
-        ReflectionTestUtils.setField(newsApiService, "objectMapper", new ObjectMapper());
-        ReflectionTestUtils.setField(newsApiService, "apiKey", "test-key");
-        ReflectionTestUtils.setField(newsApiService, "defaultLimit", 10);
-        ReflectionTestUtils.setField(newsApiService, "recencyHours", 48L);
-        ReflectionTestUtils.setField(newsApiService, "recentQuery", "market OR stocks");
-        ReflectionTestUtils.setField(newsApiService, "searchUrl", "https://newsapi.org/v2/everything");
-        ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");
-        ReflectionTestUtils.setField(newsApiService, "country", "us");
-        ReflectionTestUtils.setField(newsApiService, "category", "business");
-        ReflectionTestUtils.setField(newsApiService, "enabled", true);
+    @DisplayName("fetchForeignTopHeadlines should return recent search results first when enough articles exist")
+    void fetchForeignTopHeadlines_prefersRecentSearchWhenEnoughResultsExist() {
+        setUpDefaults();
 
         Instant newest = Instant.now().minusSeconds(60 * 60);
         Instant fresh = Instant.now().minusSeconds(60 * 90);
-        Instant old = Instant.now().minusSeconds(60 * 60 * 100);
         String body = "{" +
                 "\"articles\":[" +
-                articleJson("Fresh Source 1", "Newest article", "Latest summary", "https://example.com/newest", newest.toString()) + "," +
-                articleJson("Fresh Source 2", "Fresh article", "Fresh summary", "https://example.com/fresh", fresh.toString()) + "," +
-                articleJson("Old Source", "Old article", "Old summary", "https://example.com/old", old.toString()) +
+                articleJson("Fresh Source 1", "Newest fed article", "Latest summary", "https://example.com/newest", newest.toString()) + "," +
+                articleJson("Fresh Source 2", "Fresh market article", "Fresh summary", "https://example.com/fresh", fresh.toString()) +
                 "]}";
 
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, body));
 
-        var results = newsApiService.fetchTopHeadlines(2);
+        var results = newsApiService.fetchForeignTopHeadlines(2);
 
         assertThat(results).hasSize(2);
         assertThat(results).extracting(item -> item.url())
                 .containsExactly("https://example.com/newest", "https://example.com/fresh");
+        verify(externalApiUtils, times(1)).callAPI(any());
     }
 
     @Test
     @DisplayName("fetchTopHeadlines should encode the recent query before calling NewsAPI")
     void fetchTopHeadlines_encodesRecentQueryParameter() {
-        ReflectionTestUtils.setField(newsApiService, "objectMapper", new ObjectMapper());
-        ReflectionTestUtils.setField(newsApiService, "apiKey", "test-key");
-        ReflectionTestUtils.setField(newsApiService, "defaultLimit", 10);
-        ReflectionTestUtils.setField(newsApiService, "recencyHours", 48L);
+        setUpDefaults();
         ReflectionTestUtils.setField(newsApiService, "recentQuery", "market OR stocks OR economy");
-        ReflectionTestUtils.setField(newsApiService, "searchUrl", "https://newsapi.org/v2/everything");
-        ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");
-        ReflectionTestUtils.setField(newsApiService, "country", "us");
-        ReflectionTestUtils.setField(newsApiService, "category", "business");
-        ReflectionTestUtils.setField(newsApiService, "enabled", true);
 
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, "{\"articles\":[]}"));
 
@@ -88,39 +71,85 @@ class NewsApiServiceImplTest {
     }
 
     @Test
-    @DisplayName("fetchTopHeadlines should merge recent search with top headlines when recent search underfills")
-    void fetchTopHeadlines_mergesRecentAndHeadlineResults() {
-        ReflectionTestUtils.setField(newsApiService, "objectMapper", new ObjectMapper());
-        ReflectionTestUtils.setField(newsApiService, "apiKey", "test-key");
-        ReflectionTestUtils.setField(newsApiService, "defaultLimit", 10);
-        ReflectionTestUtils.setField(newsApiService, "recencyHours", 48L);
-        ReflectionTestUtils.setField(newsApiService, "recentQuery", "market OR stocks");
-        ReflectionTestUtils.setField(newsApiService, "searchUrl", "https://newsapi.org/v2/everything");
-        ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");
-        ReflectionTestUtils.setField(newsApiService, "country", "us");
-        ReflectionTestUtils.setField(newsApiService, "category", "business");
-        ReflectionTestUtils.setField(newsApiService, "enabled", true);
+    @DisplayName("fetchForeignTopHeadlines should merge top headlines only when recent search underfills")
+    void fetchForeignTopHeadlines_mergesRecentAndHeadlineResults() {
+        setUpDefaults();
 
         Instant recent = Instant.now().minusSeconds(60 * 60);
         Instant headline = Instant.now().minusSeconds(60 * 70);
         String searchBody = "{" +
                 "\"articles\":[" +
-                articleJson("Search Source", "Recent search article", "Summary", "https://example.com/search", recent.toString()) +
+                articleJson("Search Source", "Recent market article", "Summary", "https://example.com/search", recent.toString()) +
                 "]}";
         String headlineBody = "{" +
                 "\"articles\":[" +
-                articleJson("Headline Source", "Headline article", "Summary", "https://example.com/headline", headline.toString()) +
+                articleJson("Headline Source", "Headline fed article", "Summary", "https://example.com/headline", headline.toString()) +
                 "]}";
 
         given(externalApiUtils.callAPI(any()))
                 .willReturn(new ExternalApiResult(200, searchBody))
                 .willReturn(new ExternalApiResult(200, headlineBody));
 
-        var results = newsApiService.fetchTopHeadlines(2);
+        var results = newsApiService.fetchForeignTopHeadlines(2);
 
         assertThat(results).hasSize(2);
         assertThat(results).extracting(item -> item.url())
                 .containsExactly("https://example.com/search", "https://example.com/headline");
+    }
+
+    @Test
+    @DisplayName("parseArticles should keep only fresh articles that match configured macro keywords")
+    void fetchForeignTopHeadlines_filtersArticlesByKeywordInTitleOrDescription() {
+        setUpDefaults();
+
+        Instant recent = Instant.now().minusSeconds(60 * 60);
+        String body = "{" +
+                "\"articles\":[" +
+                articleJson("Relevant Title", "Fed signals patience", "General summary", "https://example.com/title", recent.toString()) + "," +
+                articleJson("Relevant Description", "Company update", "KOSPI volatility rises", "https://example.com/description", recent.toString()) + "," +
+                articleJson("Irrelevant", "Celebrity profile", "Entertainment roundup", "https://example.com/irrelevant", recent.toString()) +
+                "]}";
+
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, body));
+
+        var results = newsApiService.fetchForeignTopHeadlines(5);
+
+        assertThat(results).extracting(item -> item.url())
+                .containsExactly("https://example.com/title", "https://example.com/description");
+    }
+
+    @Test
+    @DisplayName("parseArticles should fail open when filter keywords configuration is blank")
+    void fetchForeignTopHeadlines_doesNotFilterEverythingWhenKeywordsAreBlank() {
+        setUpDefaults();
+        ReflectionTestUtils.setField(newsApiService, "filterKeywords", " ,  ");
+
+        Instant recent = Instant.now().minusSeconds(60 * 60);
+        String body = "{" +
+                "\"articles\":[" +
+                articleJson("General", "Company update", "Entertainment roundup", "https://example.com/general", recent.toString()) +
+                "]}";
+
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, body));
+
+        var results = newsApiService.fetchForeignTopHeadlines(1);
+
+        assertThat(results).extracting(item -> item.url())
+                .containsExactly("https://example.com/general");
+    }
+
+    private void setUpDefaults() {
+        ReflectionTestUtils.setField(newsApiService, "objectMapper", new ObjectMapper());
+        ReflectionTestUtils.setField(newsApiService, "apiKey", "test-key");
+        ReflectionTestUtils.setField(newsApiService, "defaultLimit", 10);
+        ReflectionTestUtils.setField(newsApiService, "recencyHours", 48L);
+        ReflectionTestUtils.setField(newsApiService, "recentQuery", "market OR stocks");
+        ReflectionTestUtils.setField(newsApiService, "filterKeywords", "fed, kospi, inflation, market");
+        ReflectionTestUtils.setField(newsApiService, "searchUrl", "https://newsapi.org/v2/everything");
+        ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");
+        ReflectionTestUtils.setField(newsApiService, "country", "us");
+        ReflectionTestUtils.setField(newsApiService, "category", "business");
+        ReflectionTestUtils.setField(newsApiService, "enabled", true);
     }
 
     private String articleJson(String source, String title, String description, String url, String publishedAt) {

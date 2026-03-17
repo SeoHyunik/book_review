@@ -17,6 +17,8 @@
 # - SPRING_MAIL_SMTP_AUTH
 # - SPRING_MAIL_SMTP_STARTTLS_ENABLE
 # - NEWS_API_KEY
+# - NEWS_API_RECENT_QUERY
+# - NEWS_API_FILTER_KEYWORDS
 # - JASYPT_PASSWORD
 # - APP_ADMIN_ALLOWED_USERNAMES
 # - APP_BOOTSTRAP_ADMIN_USERNAME
@@ -152,7 +154,10 @@ news:
     country: us
     category: business
     default-limit: 10
-    recent-query: market OR stocks OR economy OR inflation OR fed OR tariff OR oil OR semiconductor OR korea OR kospi
+    # Primary foreign/global NewsAPI query. Override with NEWS_API_RECENT_QUERY.
+    recent-query: ${NEWS_API_RECENT_QUERY:market OR stocks OR economy OR inflation OR fed OR tariff OR oil OR semiconductor OR korea OR kospi}
+    # Macro relevance filter applied to title + description. Override with NEWS_API_FILTER_KEYWORDS.
+    filter-keywords: ${NEWS_API_FILTER_KEYWORDS:korea,kospi,kosdaq,volatility,oil,usd,interest rate,inflation,gold,semiconductor,tariff,fed}
     recency-hours: 72
 
 logging:
@@ -175,13 +180,19 @@ app:
       cron: ${APP_INGESTION_SCHEDULER_CRON:0 0 * * * *}
       page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:3}
   keep-alive:
+    # Static gate for keep-alive availability. Admin runtime toggle can only operate when this is true.
     enabled: ${APP_KEEP_ALIVE_ENABLED:false}
+    # Runtime toggle state is in-memory only and resets on restart or redeploy.
     cron: ${APP_KEEP_ALIVE_CRON:0 */10 * * * *}
+    # Required for effective keep-alive execution.
     target-url: ${APP_KEEP_ALIVE_TARGET_URL:}
   notification:
     email:
+      # Static gate for email notification availability. Admin runtime toggle can only operate when this is true.
       enabled: ${APP_NOTIFICATION_EMAIL_ENABLED:false}
+      # Required for effective email notification delivery.
       recipient: ${APP_NOTIFICATION_EMAIL_RECIPIENT:}
+      # Spring mail sender configuration is also required; runtime toggle state resets on restart or redeploy.
       from: ${APP_NOTIFICATION_EMAIL_FROM:}
   news:
     global:
@@ -191,6 +202,8 @@ app:
       base-url: ${APP_NEWS_NAVER_BASE_URL:https://openapi.naver.com}
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}
+      # Override with APP_NEWS_NAVER_QUERIES. If left blank, NAVER falls back to a safe built-in
+      # domestic query set: 코스피, 코스닥, 환율, 금리, 유가, 반도체, 연준.
       queries: ${APP_NEWS_NAVER_QUERIES:}
       display: ${APP_NEWS_NAVER_DISPLAY:10}
       start: ${APP_NEWS_NAVER_START:1}
