@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +33,15 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private static final DateTimeFormatter NAVER_PUB_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
     private static final String KOREAN_BREAKING_MARKER = "\uC18D\uBCF4";
+    private static final List<String> DEFAULT_QUERIES = List.of(
+            "\uCF54\uC2A4\uD53C",
+            "\uCF54\uC2A4\uB2E5",
+            "\uD658\uC728",
+            "\uAE08\uB9AC",
+            "\uC720\uAC00",
+            "\uBC18\uB3C4\uCCB4",
+            "\uC5F0\uC900"
+    );
 
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
@@ -88,11 +98,19 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     }
 
     private List<String> resolveQueries() {
-        return java.util.Arrays.stream(rawQueries.split(","))
+        List<String> configuredQueries = Arrays.stream(rawQueries.split(","))
                 .map(String::trim)
                 .filter(StringUtils::hasText)
                 .distinct()
                 .toList();
+        if (!configuredQueries.isEmpty()) {
+            return configuredQueries;
+        }
+
+        log.warn("[NAVER] Naver news queries are empty; using safe defaults. "
+                        + "Configure APP_NEWS_NAVER_QUERIES explicitly for production tuning. defaults={}",
+                String.join(", ", DEFAULT_QUERIES));
+        return DEFAULT_QUERIES;
     }
 
     private List<NaverCandidate> fetchQuery(String query, int limit) {

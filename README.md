@@ -34,6 +34,8 @@
 - Scheduled ingestion is disabled by default and can be enabled with: `APP_INGESTION_SCHEDULER_ENABLED`, `APP_INGESTION_SCHEDULER_CRON`, `APP_INGESTION_SCHEDULER_PAGE_SIZE`
 - Automatic headline ingestion switches between the domestic and foreign feed priority windows using: `APP_INGESTION_DOMESTIC_START_HOUR`, `APP_INGESTION_DOMESTIC_END_HOUR` (defaults: `5` to `22`, Asia/Seoul)
 - News source providers can be toggled independently: `APP_NEWS_GLOBAL_ENABLED`, `APP_NEWS_NAVER_ENABLED`, with NAVER credentials/config from `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `APP_NEWS_NAVER_QUERIES`, `APP_NEWS_NAVER_DISPLAY`, `APP_NEWS_NAVER_START`
+- Domestic NAVER news requires `APP_NEWS_NAVER_ENABLED=true`, `NAVER_CLIENT_ID`, and `NAVER_CLIENT_SECRET`; `APP_NEWS_NAVER_QUERIES` is strongly recommended for production tuning
+- If `APP_NEWS_NAVER_QUERIES` is blank, NAVER domestic news now falls back to the built-in safe query set: `코스피`, `코스닥`, `환율`, `금리`, `유가`, `반도체`, `연준`
 - Foreign/global NewsAPI ingestion now prefers the recent keyword search first and uses `top-headlines` only as fallback when recent results are insufficient
 - Tune the recent foreign/global NewsAPI query with `NEWS_API_RECENT_QUERY` (`news.api.recent-query`)
 - Tune macro relevance filtering with `NEWS_API_FILTER_KEYWORDS` (`news.api.filter-keywords`), which matches configured keywords against article title + description before items are accepted

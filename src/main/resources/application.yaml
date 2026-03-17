@@ -196,6 +196,8 @@ app:
       base-url: ${APP_NEWS_NAVER_BASE_URL:https://openapi.naver.com}
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}
+      # Override with APP_NEWS_NAVER_QUERIES. If left blank, NAVER falls back to a safe built-in
+      # domestic query set: 코스피, 코스닥, 환율, 금리, 유가, 반도체, 연준.
       queries: ${APP_NEWS_NAVER_QUERIES:}
       display: ${APP_NEWS_NAVER_DISPLAY:10}
       start: ${APP_NEWS_NAVER_START:1}
