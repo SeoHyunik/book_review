@@ -24,7 +24,7 @@ public class ScheduledMarketSummarySnapshotJob {
     @Value("${app.featured.market-summary.snapshot-refresh-enabled:true}")
     private boolean refreshEnabled;
 
-    @Scheduled(cron = "${app.featured.market-summary.snapshot-refresh-cron:0 0 */3 * * *}")
+    @Scheduled(cron = "${app.featured.market-summary.snapshot-refresh-cron:0 10 */3 * * *}")
     public void refreshSnapshot() {
         long runId = runSequence.incrementAndGet();
         if (!snapshotEnabled || !refreshEnabled) {
@@ -42,7 +42,7 @@ public class ScheduledMarketSummarySnapshotJob {
                 log.info("[MARKET_SUMMARY_SCHEDULER] runId={} completed generatedAt={} sourceCount={}",
                         runId, snapshot.get().generatedAt(), snapshot.get().sourceCount());
             } else {
-                log.info("[MARKET_SUMMARY_SCHEDULER] runId={} skipped reason=no-snapshot-generated", runId);
+                log.info("[MARKET_SUMMARY_SCHEDULER] runId={} skipped reason=no-eligible-analyzed-items-or-ai-unavailable", runId);
             }
         } catch (RuntimeException ex) {
             log.warn("[MARKET_SUMMARY_SCHEDULER] runId={} failed", runId, ex);

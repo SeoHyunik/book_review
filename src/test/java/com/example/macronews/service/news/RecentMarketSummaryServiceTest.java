@@ -50,13 +50,13 @@ class RecentMarketSummaryServiceTest {
     void getCurrentSummary_returnsAggregationWhenEnoughRecentItemsExist() {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(
-                        analyzedNews("news-1", "2026-03-17T02:30:00Z",
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
                                 List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.8d)),
                                 List.of(new MarketImpact(MarketType.KOSPI, ImpactDirection.UP, 0.6d))),
-                        analyzedNews("news-2", "2026-03-17T02:10:00Z",
+                        analyzedNews("news-2", "2026-03-11T02:10:00Z", "2026-03-17T02:10:00Z",
                                 List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.7d)),
                                 List.of()),
-                        analyzedNews("news-3", "2026-03-17T01:55:00Z",
+                        analyzedNews("news-3", "2026-03-10T01:55:00Z", "2026-03-17T01:55:00Z",
                                 List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.DOWN, 0.7d)),
                                 List.of())
                 ));
@@ -76,10 +76,10 @@ class RecentMarketSummaryServiceTest {
     void getCurrentSummary_returnsEmptyWhenRecentItemsAreInsufficient() {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(
-                        analyzedNews("news-1", "2026-03-17T02:30:00Z",
+                        analyzedNews("news-1", "2026-03-10T02:30:00Z", "2026-03-17T02:30:00Z",
                                 List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.8d)),
                                 List.of()),
-                        analyzedNews("news-2", "2026-03-17T02:10:00Z",
+                        analyzedNews("news-2", "2026-03-10T02:10:00Z", "2026-03-16T20:10:00Z",
                                 List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.7d)),
                                 List.of())
                 ));
@@ -92,13 +92,13 @@ class RecentMarketSummaryServiceTest {
     void getCurrentSummary_resolvesDominantSentimentDeterministically() {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(
-                        analyzedNews("news-1", "2026-03-17T02:30:00Z",
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
                                 List.of(new MacroImpact(MacroVariable.VOLATILITY, ImpactDirection.UP, 0.8d)),
                                 List.of()),
-                        analyzedNews("news-2", "2026-03-17T02:10:00Z",
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
                                 List.of(new MacroImpact(MacroVariable.KOSPI, ImpactDirection.DOWN, 0.7d)),
                                 List.of()),
-                        analyzedNews("news-3", "2026-03-17T01:55:00Z",
+                        analyzedNews("news-3", "2026-03-12T01:55:00Z", "2026-03-17T01:55:00Z",
                                 List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.7d)),
                                 List.of())
                 ));
@@ -115,16 +115,16 @@ class RecentMarketSummaryServiceTest {
     void getCurrentSummary_extractsTopDrivers() {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(
-                        analyzedNews("news-1", "2026-03-17T02:30:00Z",
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
                                 List.of(
                                         new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.8d),
                                         new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.5d)
                                 ),
                                 List.of(new MarketImpact(MarketType.TECH_SECTOR, ImpactDirection.DOWN, 0.6d))),
-                        analyzedNews("news-2", "2026-03-17T02:10:00Z",
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
                                 List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.7d)),
                                 List.of(new MarketImpact(MarketType.TECH_SECTOR, ImpactDirection.UP, 0.4d))),
-                        analyzedNews("news-3", "2026-03-17T01:55:00Z",
+                        analyzedNews("news-3", "2026-03-12T01:55:00Z", "2026-03-17T01:55:00Z",
                                 List.of(new MacroImpact(MacroVariable.KOSPI, ImpactDirection.UP, 0.7d)),
                                 List.of())
                 ));
@@ -135,7 +135,29 @@ class RecentMarketSummaryServiceTest {
         assertThat(result.get().keyDrivers()).containsExactly("Tech Sector", "USD", "KOSPI");
     }
 
-    private NewsEvent analyzedNews(String id, String publishedAt, List<MacroImpact> macroImpacts, List<MarketImpact> marketImpacts) {
+    @Test
+    @DisplayName("recent summary should use analysis completion timing even when publishedAt is old")
+    void loadRecentAnalyzedNews_usesAnalysisCreatedAtBasis() {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(
+                        analyzedNews("news-1", "2026-03-01T02:30:00Z", "2026-03-17T02:30:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.8d)),
+                                List.of()),
+                        analyzedNews("news-2", "2026-03-02T02:10:00Z", "2026-03-17T02:10:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.7d)),
+                                List.of()),
+                        analyzedNews("news-3", "2026-03-03T01:55:00Z", "2026-03-17T01:55:00Z",
+                                List.of(new MacroImpact(MacroVariable.KOSPI, ImpactDirection.UP, 0.7d)),
+                                List.of())
+                ));
+
+        List<NewsEvent> recentItems = recentMarketSummaryService.loadRecentAnalyzedNews();
+
+        assertThat(recentItems).hasSize(3);
+    }
+
+    private NewsEvent analyzedNews(String id, String publishedAt, String analyzedAt,
+            List<MacroImpact> macroImpacts, List<MarketImpact> marketImpacts) {
         return new NewsEvent(
                 id,
                 null,
@@ -148,7 +170,7 @@ class RecentMarketSummaryServiceTest {
                 NewsStatus.ANALYZED,
                 new AnalysisResult(
                         "test-model",
-                        Instant.parse("2026-03-17T00:00:00Z"),
+                        Instant.parse(analyzedAt),
                         null,
                         null,
                         null,

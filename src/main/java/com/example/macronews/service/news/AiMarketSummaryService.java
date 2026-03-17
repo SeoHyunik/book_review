@@ -117,7 +117,8 @@ public class AiMarketSummaryService {
         List<NewsEvent> recentItems = recentMarketSummaryService.loadRecentAnalyzedNews(
                 resolveWindowHours(), resolveMaxItems());
         if (recentItems.size() < resolveMinItems()) {
-            log.debug("[MARKET_SUMMARY] skipped reason=insufficient-analyzed-news size={}", recentItems.size());
+            log.info("[MARKET_SUMMARY] skipped reason=insufficient-analyzed-news queryBasis=analysisResult.createdAt|ingestedAt size={} minItems={}",
+                    recentItems.size(), resolveMinItems());
             return Optional.empty();
         }
 

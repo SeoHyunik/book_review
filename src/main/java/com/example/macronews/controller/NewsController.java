@@ -71,11 +71,23 @@ public class NewsController {
                 ? recentMarketSummaryService.getCurrentSummary().orElse(null)
                 : null;
         NewsListItemDto featuredNews = allNewsItems.isEmpty() ? null : allNewsItems.get(0);
+        String featuredPrimaryMode = featuredStoredMarketSummary != null
+                ? "stored-summary"
+                : (featuredAiMarketSummary != null
+                ? "ai-summary"
+                : (featuredMarketSummary != null
+                ? "recent-summary"
+                : "article"));
+        boolean featuredSummaryMode = featuredStoredMarketSummary != null
+                || featuredAiMarketSummary != null
+                || featuredMarketSummary != null;
         model.addAttribute("newsItems", newsItems);
         model.addAttribute("featuredNews", featuredNews);
         model.addAttribute("featuredStoredMarketSummary", featuredStoredMarketSummary);
         model.addAttribute("featuredAiMarketSummary", featuredAiMarketSummary);
         model.addAttribute("featuredMarketSummary", featuredMarketSummary);
+        model.addAttribute("featuredPrimaryMode", featuredPrimaryMode);
+        model.addAttribute("featuredSummaryMode", featuredSummaryMode);
         model.addAttribute("marketSignalOverview", marketSignalOverview);
         model.addAttribute("marketForecastSnapshot", marketForecastSnapshot);
         model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());

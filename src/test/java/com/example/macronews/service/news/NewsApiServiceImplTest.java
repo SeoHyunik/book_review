@@ -138,11 +138,30 @@ class NewsApiServiceImplTest {
                 .containsExactly("https://example.com/general");
     }
 
+    @Test
+    @DisplayName("parseArticles should skip stale global articles beyond configured max age")
+    void fetchForeignTopHeadlines_skipsStaleGlobalArticles() {
+        setUpDefaults();
+
+        Instant stale = Instant.now().minusSeconds(60L * 60L * 30L);
+        String body = "{" +
+                "\"articles\":[" +
+                articleJson("Old Source", "Fed recap", "Old summary", "https://example.com/old", stale.toString()) +
+                "]}";
+
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, body));
+
+        var results = newsApiService.fetchForeignTopHeadlines(5);
+
+        assertThat(results).isEmpty();
+    }
+
     private void setUpDefaults() {
         ReflectionTestUtils.setField(newsApiService, "objectMapper", new ObjectMapper());
         ReflectionTestUtils.setField(newsApiService, "apiKey", "test-key");
         ReflectionTestUtils.setField(newsApiService, "defaultLimit", 10);
         ReflectionTestUtils.setField(newsApiService, "recencyHours", 48L);
+        ReflectionTestUtils.setField(newsApiService, "globalMaxAgeHours", 24L);
         ReflectionTestUtils.setField(newsApiService, "recentQuery", "market OR stocks");
         ReflectionTestUtils.setField(newsApiService, "filterKeywords", "fed, kospi, inflation, market");
         ReflectionTestUtils.setField(newsApiService, "searchUrl", "https://newsapi.org/v2/everything");

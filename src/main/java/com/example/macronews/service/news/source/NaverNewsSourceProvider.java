@@ -6,7 +6,12 @@ import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -32,6 +37,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class NaverNewsSourceProvider implements NewsSourceProvider {
 
+    private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
     private static final DateTimeFormatter NAVER_PUB_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
     private static final List<DateTimeFormatter> NAVER_PUB_DATE_FALLBACK_FORMATTERS = List.of(
             new DateTimeFormatterBuilder()
@@ -77,6 +83,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     @Value("${app.news.naver.start:1}")
     private int start;
+
+    @Value("${app.news.naver.max-age-hours:12}")
+    private long maxAgeHours;
+
+    private Clock clock = DEFAULT_CLOCK;
 
     @Override
     public String sourceCode() {
@@ -175,14 +186,19 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             int rawItemCount = items.size();
             int invalidPubDateCount = 0;
             int nullPublishedAtCount = 0;
+            int staleItemCount = 0;
             int missingUrlCount = 0;
             int emptyTitleCount = 0;
             List<NaverCandidate> mapped = new ArrayList<>();
             for (JsonNode item : items) {
                 String cleanedTitle = cleanHtml(item.path("title").asText(""));
-                String cleanedDescription = cleanHtml(item.path("description").asText(""));
                 String originalLink = item.path("originallink").asText("");
                 String fallbackLink = item.path("link").asText("");
+                String cleanedDescription = normalizeNaverDescription(
+                        item.path("description").asText(""),
+                        originalLink,
+                        fallbackLink
+                );
                 String rawPubDate = item.path("pubDate").asText("");
                 Instant publishedAt = parsePubDate(rawPubDate);
                 String resolvedUrl = StringUtils.hasText(originalLink) ? originalLink : fallbackLink;
@@ -192,6 +208,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 }
                 if (publishedAt == null) {
                     nullPublishedAtCount++;
+                    continue;
+                }
+                if (!isFreshEnough(publishedAt)) {
+                    staleItemCount++;
+                    continue;
                 }
                 if (!StringUtils.hasText(resolvedUrl)) {
                     missingUrlCount++;
@@ -211,8 +232,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 mapped.add(new NaverCandidate(mappedItem, originalLink, fallbackLink, dedupTitle));
             }
             log.info("[NAVER] query='{}' rawItems={}", query, rawItemCount);
-            log.info("[NAVER] query='{}' parsedItems={} nullPublishedAt={} invalidPubDate={} missingUsableLink={} emptyTitle={}",
-                    query, mapped.size(), nullPublishedAtCount, invalidPubDateCount, missingUrlCount, emptyTitleCount);
+            log.info("[NAVER] query='{}' parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} missingUsableLink={} emptyTitle={}",
+                    query, mapped.size(), nullPublishedAtCount, invalidPubDateCount, staleItemCount, missingUrlCount, emptyTitleCount);
             return mapped;
         } catch (Exception ex) {
             log.warn("[NAVER] failed to parse response query='{}'", query, ex);
@@ -272,6 +293,13 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         return null;
     }
 
+    private boolean isFreshEnough(Instant publishedAt) {
+        if (publishedAt == null) {
+            return false;
+        }
+        return !publishedAt.isBefore(Instant.now(clock).minus(Duration.ofHours(resolveMaxAgeHours())));
+    }
+
     private int resolveDisplay(int requestedLimit) {
         int configuredDisplay = display > 0 ? display : requestedLimit;
         return Math.max(1, Math.min(Math.max(requestedLimit, 1), configuredDisplay));
@@ -298,6 +326,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         return StringUtils.hasText(value) ? value : fallback;
     }
 
+    private long resolveMaxAgeHours() {
+        return maxAgeHours > 0 ? maxAgeHours : 12L;
+    }
+
     private String resolveExternalId(String resolvedUrl, String normalizedTitle, String rawPubDate) {
         if (StringUtils.hasText(resolvedUrl)) {
             return resolvedUrl;
@@ -305,6 +337,67 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         String titleSeed = StringUtils.hasText(normalizedTitle) ? normalizedTitle : "untitled";
         String dateSeed = StringUtils.hasText(rawPubDate) ? rawPubDate.trim() : "unknown-pubdate";
         return "naver:" + titleSeed + "|" + dateSeed;
+    }
+
+    private String normalizeNaverDescription(String rawDescription, String originalLink, String fallbackLink) {
+        String cleaned = cleanHtml(rawDescription);
+        if (!StringUtils.hasText(cleaned)) {
+            return "";
+        }
+        if (sameText(cleaned, originalLink) || sameText(cleaned, fallbackLink)) {
+            return "";
+        }
+        if (!looksPercentEncoded(cleaned)) {
+            return cleaned;
+        }
+        try {
+            String decoded = URLDecoder.decode(cleaned, StandardCharsets.UTF_8);
+            if (isReadableDecodedText(cleaned, decoded)) {
+                return decoded.trim();
+            }
+        } catch (Exception ex) {
+            log.debug("[NAVER] description decode failed");
+        }
+        return cleaned;
+    }
+
+    private boolean looksPercentEncoded(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        int encodedTriplets = 0;
+        for (int i = 0; i < value.length() - 2; i++) {
+            if (value.charAt(i) == '%'
+                    && isHexCharacter(value.charAt(i + 1))
+                    && isHexCharacter(value.charAt(i + 2))) {
+                encodedTriplets++;
+            }
+        }
+        return encodedTriplets >= 2;
+    }
+
+    private boolean isReadableDecodedText(String original, String decoded) {
+        if (!StringUtils.hasText(decoded) || decoded.equals(original) || looksPercentEncoded(decoded)) {
+            return false;
+        }
+        for (char ch : decoded.toCharArray()) {
+            if (Character.isLetter(ch) || Character.isDigit(ch) || Character.UnicodeBlock.of(ch) == Character.UnicodeBlock.HANGUL_SYLLABLES) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isHexCharacter(char value) {
+        return (value >= '0' && value <= '9')
+                || (value >= 'a' && value <= 'f')
+                || (value >= 'A' && value <= 'F');
+    }
+
+    private boolean sameText(String left, String right) {
+        return StringUtils.hasText(left)
+                && StringUtils.hasText(right)
+                && left.trim().equals(right.trim());
     }
 
     private record NaverCandidate(

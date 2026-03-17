@@ -13,6 +13,10 @@ import com.example.macronews.dto.MarketSignalOverviewDto;
 import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.repository.NewsEventRepository;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -26,6 +30,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -34,7 +39,17 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class NewsQueryService {
 
+    private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
+
     private final NewsEventRepository newsEventRepository;
+
+    @Value("${app.news.naver.max-age-hours:12}")
+    private long naverMaxAgeHours;
+
+    @Value("${app.news.global.max-age-hours:24}")
+    private long globalMaxAgeHours;
+
+    private Clock clock = DEFAULT_CLOCK;
 
     public List<NewsListItemDto> getRecentNews() {
         return getRecentNews(null, NewsListSort.PUBLISHED_DESC);
@@ -46,6 +61,7 @@ public class NewsQueryService {
 
     public List<NewsListItemDto> getRecentNews(NewsStatus status, NewsListSort sort) {
         return loadCandidates(status).stream()
+                .filter(this::isFreshEnough)
                 .sorted(buildComparator(sort))
                 .limit(20)
                 .map(this::toListItem)
@@ -54,6 +70,7 @@ public class NewsQueryService {
 
     public MarketSignalOverviewDto getMarketSignalOverview(NewsStatus status, NewsListSort sort) {
         List<NewsEvent> recentAnalyzed = loadCandidates(status).stream()
+                .filter(this::isFreshEnough)
                 .sorted(buildComparator(sort))
                 .limit(20)
                 .filter(event -> event.status() == NewsStatus.ANALYZED)
@@ -425,5 +442,18 @@ public class NewsQueryService {
 
     private int countByStatus(List<NewsListItemDto> items, NewsStatus status) {
         return (int) items.stream().filter(item -> item.status() == status).count();
+    }
+
+    private boolean isFreshEnough(NewsEvent event) {
+        if (event == null || event.publishedAt() == null) {
+            return false;
+        }
+        return !event.publishedAt().isBefore(Instant.now(clock).minus(resolveMaxAge(event)));
+    }
+
+    private Duration resolveMaxAge(NewsEvent event) {
+        String source = event == null ? "" : normalize(event.source());
+        long hours = "naver".equals(source) ? naverMaxAgeHours : globalMaxAgeHours;
+        return Duration.ofHours(hours > 0 ? hours : ("naver".equals(source) ? 12L : 24L));
     }
 }
