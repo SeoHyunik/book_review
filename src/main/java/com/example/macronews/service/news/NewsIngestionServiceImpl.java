@@ -45,8 +45,14 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
     @Value("${app.news.naver.max-age-hours:12}")
     private long naverMaxAgeHours;
 
+    @Value("${app.news.naver.fallback-max-age-hours:24}")
+    private long naverFallbackMaxAgeHours;
+
     @Value("${app.news.global.max-age-hours:24}")
     private long globalMaxAgeHours;
+
+    @Value("${app.news.global.fallback-max-age-hours:36}")
+    private long globalFallbackMaxAgeHours;
 
     @Override
     @Transactional
@@ -261,7 +267,8 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
 
     private java.time.Duration resolveMaxAge(ExternalNewsItem item) {
         String source = item == null ? "" : defaultText(item.source(), "");
-        long hours = "NAVER".equalsIgnoreCase(source) ? naverMaxAgeHours : globalMaxAgeHours;
-        return java.time.Duration.ofHours(hours > 0 ? hours : ("NAVER".equalsIgnoreCase(source) ? 12L : 24L));
+        boolean domesticSource = "NAVER".equalsIgnoreCase(source);
+        long hours = domesticSource ? naverFallbackMaxAgeHours : globalFallbackMaxAgeHours;
+        return java.time.Duration.ofHours(hours > 0 ? hours : (domesticSource ? 24L : 36L));
     }
 }

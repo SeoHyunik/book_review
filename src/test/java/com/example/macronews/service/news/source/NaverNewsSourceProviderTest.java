@@ -43,6 +43,8 @@ class NaverNewsSourceProviderTest {
         ReflectionTestUtils.setField(provider, "display", 10);
         ReflectionTestUtils.setField(provider, "start", 1);
         ReflectionTestUtils.setField(provider, "maxAgeHours", 12L);
+        ReflectionTestUtils.setField(provider, "fallbackMaxAgeHours", 24L);
+        ReflectionTestUtils.setField(provider, "maxPages", 3);
         ReflectionTestUtils.setField(provider, "clock",
                 Clock.fixed(Instant.parse("2026-03-13T03:30:00Z"), ZoneId.of("Asia/Seoul")));
     }
@@ -242,6 +244,104 @@ class NaverNewsSourceProviderTest {
     }
 
     @Test
+    @DisplayName("NAVER semi-fresh bucket should allow controlled fallback items")
+    void fetchTopHeadlines_allowsSemiFreshItemsInsideFallbackWindow() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "fx");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "FX earlier wrap",
+                      "description": "Inside fallback window",
+                      "originallink": "https://news.example.com/fx-semi",
+                      "link": "https://search.naver.com/fx-semi",
+                      "pubDate": "Thu, 12 Mar 2026 18:00:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        assertThat(provider.fetchTopHeadlines(5)).isEmpty();
+        assertThat(provider.fetchTopHeadlines(5, NewsFreshnessBucket.SEMI_FRESH))
+                .extracting(ExternalNewsItem::url)
+                .containsExactly("https://news.example.com/fx-semi");
+    }
+
+    @Test
+    @DisplayName("NAVER provider should fetch a later page when page one is stale only")
+    void fetchTopHeadlines_fetchesLaterPageWhenFirstPageIsStale() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "코스피");
+        ReflectionTestUtils.setField(provider, "display", 5);
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "Old market wrap",
+                              "description": "Too old",
+                              "originallink": "https://news.example.com/old-1",
+                              "link": "https://search.naver.com/old-1",
+                              "pubDate": "Thu, 12 Mar 2026 00:00:00 +0900"
+                            }
+                          ]
+                        }
+                        """))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "Fresh intraday move",
+                              "description": "Fresh page two item",
+                              "originallink": "https://news.example.com/fresh-2",
+                              "link": "https://search.naver.com/fresh-2",
+                              "pubDate": "Fri, 13 Mar 2026 11:45:00 +0900"
+                            }
+                          ]
+                        }
+                        """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).url()).isEqualTo("https://news.example.com/fresh-2");
+        List<String> urls = capturedRequestUrls();
+        assertThat(urls).anySatisfy(url -> assertThat(url).contains("start=1"));
+        assertThat(urls).anySatisfy(url -> assertThat(url).contains("start=6"));
+    }
+
+    @Test
+    @DisplayName("NAVER provider should stop paging once enough fresh items are found")
+    void fetchTopHeadlines_stopsPagingWhenEnoughFreshItemsAreFound() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "코스피");
+        ReflectionTestUtils.setField(provider, "display", 5);
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "Fresh item one",
+                      "description": "Fresh result",
+                      "originallink": "https://news.example.com/fresh-1",
+                      "link": "https://search.naver.com/fresh-1",
+                      "pubDate": "Fri, 13 Mar 2026 11:50:00 +0900"
+                    },
+                    {
+                      "title": "Fresh item two",
+                      "description": "Fresh result",
+                      "originallink": "https://news.example.com/fresh-2",
+                      "link": "https://search.naver.com/fresh-2",
+                      "pubDate": "Fri, 13 Mar 2026 11:45:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(2);
+
+        assertThat(results).hasSize(2);
+        verify(externalApiUtils).callAPI(any());
+    }
+
+    @Test
     @DisplayName("NAVER provider should merge multi-query results and deduplicate by link newest first")
     void fetchTopHeadlines_mergesQueriesAndDeduplicatesNewestFirst() {
         ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C,\uD658\uC728");
@@ -360,14 +460,19 @@ class NaverNewsSourceProviderTest {
 
         provider.fetchTopHeadlines(5);
 
-        assertThat(capturedRequestUrls()).hasSize(7)
+        assertThat(capturedRequestUrls()).hasSize(12)
                 .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%ED%94%BC"))
                 .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%EB%8B%A5"))
-                .anySatisfy(url -> assertThat(url).contains("query=%ED%99%98%EC%9C%A8"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EA%B8%88%EB%A6%AC"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%9C%A0%EA%B0%80"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%9B%90%EB%8B%AC%EB%9F%AC%20%ED%99%98%EC%9C%A8"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EA%B8%B0%EC%A4%80%EA%B8%88%EB%A6%AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EA%B5%AD%EC%A0%9C%EC%9C%A0%EA%B0%80"))
                 .anySatisfy(url -> assertThat(url).contains("query=%EB%B0%98%EB%8F%84%EC%B2%B4"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%97%B0%EC%A4%80"));
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%97%B0%EC%A4%80"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EB%AF%B8%EA%B5%AD%EA%B8%88%EB%A6%AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%A6%9D%EC%8B%9C%20%EC%86%8D%EB%B3%B4"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EC%9E%A5%EC%A4%91"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EB%A7%88%EA%B0%90"))
+                .anySatisfy(url -> assertThat(url).contains("query=%EB%B0%9C%ED%91%9C"));
     }
 
     @Test
@@ -382,7 +487,7 @@ class NaverNewsSourceProviderTest {
 
         provider.fetchTopHeadlines(5);
 
-        assertThat(capturedRequestUrls()).hasSize(7)
+        assertThat(capturedRequestUrls()).hasSize(12)
                 .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%ED%94%BC"))
                 .anySatisfy(url -> assertThat(url).contains("query=%EC%97%B0%EC%A4%80"));
     }

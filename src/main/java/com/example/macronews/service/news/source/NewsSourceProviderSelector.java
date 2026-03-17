@@ -64,23 +64,44 @@ public class NewsSourceProviderSelector {
             return List.of();
         }
 
-        int fetchLimit = Math.max(resolvedLimit * 2, resolvedLimit + 2);
-        Map<String, RankedNewsCandidate> ranked = new LinkedHashMap<>();
-        int preferredReturned = collectCandidates(ranked, preferredProviders, preferredPriority, fetchLimit, true);
-        if (preferredReturned == 0 && !preferredProviders.isEmpty() && !fallbackProviders.isEmpty()) {
-            log.info("[NEWS-SOURCE] preferred provider returned 0 items; falling back to secondary providers");
-        }
-        collectCandidates(ranked, fallbackProviders, fallbackPriority, fetchLimit, false);
+        Map<String, RankedNewsCandidate> freshCandidates = new LinkedHashMap<>();
+        Map<String, RankedNewsCandidate> semiFreshCandidates = new LinkedHashMap<>();
 
-        return ranked.values().stream()
-                .sorted(Comparator.comparing(RankedNewsCandidate::effectivePublishedAt,
-                                Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(RankedNewsCandidate::publishedAt,
-                                Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(RankedNewsCandidate::sourceCode))
-                .limit(resolvedLimit)
-                .map(RankedNewsCandidate::item)
-                .toList();
+        int preferredFresh = collectCandidates(
+                freshCandidates, null, preferredProviders, preferredPriority, resolvedLimit, true, NewsFreshnessBucket.FRESH);
+        if (preferredFresh == 0 && !preferredProviders.isEmpty() && !fallbackProviders.isEmpty()) {
+            log.info("[NEWS-SOURCE] preferred provider returned 0 fresh items; falling back to secondary providers");
+        }
+        if (freshCandidates.size() < resolvedLimit) {
+            collectCandidates(
+                    freshCandidates, null, fallbackProviders, fallbackPriority, resolvedLimit,
+                    false, NewsFreshnessBucket.FRESH);
+        }
+        if (freshCandidates.size() >= resolvedLimit) {
+            log.info("[NEWS-SOURCE] stopping early reason=requested-limit-satisfied bucket=fresh");
+            log.info("[NEWS-SOURCE] freshCandidates={} semiFreshCandidates={} requested={}",
+                    freshCandidates.size(), semiFreshCandidates.size(), resolvedLimit);
+            log.info("[NEWS-SOURCE] finalSelection fresh={} semiFresh={}", resolvedLimit, 0);
+            return finalizeSelection(freshCandidates, semiFreshCandidates, resolvedLimit);
+        }
+
+        int remaining = resolvedLimit - freshCandidates.size();
+        if (remaining > 0) {
+            collectCandidates(semiFreshCandidates, freshCandidates, preferredProviders, preferredPriority,
+                    remaining, true, NewsFreshnessBucket.SEMI_FRESH);
+        }
+        remaining = resolvedLimit - freshCandidates.size() - semiFreshCandidates.size();
+        if (remaining > 0) {
+            collectCandidates(semiFreshCandidates, freshCandidates, fallbackProviders, fallbackPriority,
+                    remaining, false, NewsFreshnessBucket.SEMI_FRESH);
+        }
+
+        log.info("[NEWS-SOURCE] freshCandidates={} semiFreshCandidates={} requested={}",
+                freshCandidates.size(), semiFreshCandidates.size(), resolvedLimit);
+        log.info("[NEWS-SOURCE] finalSelection fresh={} semiFresh={}",
+                Math.min(freshCandidates.size(), resolvedLimit),
+                Math.min(semiFreshCandidates.size(), Math.max(resolvedLimit - freshCandidates.size(), 0)));
+        return finalizeSelection(freshCandidates, semiFreshCandidates, resolvedLimit);
     }
 
     public boolean isConfigured() {
@@ -128,28 +149,82 @@ public class NewsSourceProviderSelector {
         return providers.stream()
                 .filter(provider -> provider.supports(priority))
                 .filter(NewsSourceProvider::isConfigured)
-                .sorted(Comparator.comparing(NewsSourceProvider::sourceCode))
+                .sorted(Comparator.comparingInt((NewsSourceProvider provider) -> providerOrder(priority, provider))
+                        .thenComparing(NewsSourceProvider::sourceCode))
                 .toList();
     }
 
     private int collectCandidates(Map<String, RankedNewsCandidate> ranked,
+            Map<String, RankedNewsCandidate> preferredBucket,
             List<NewsSourceProvider> selectedProviders,
             NewsFeedPriority priority,
             int fetchLimit,
-            boolean preferredSource) {
+            boolean preferredSource,
+            NewsFreshnessBucket bucket) {
         int returnedCount = 0;
         for (NewsSourceProvider provider : selectedProviders) {
+            if (fetchLimit <= 0 || ranked.size() >= fetchLimit) {
+                log.info("[NEWS-SOURCE] stopping early reason=requested-limit-satisfied providerStage={} bucket={}",
+                        priority, bucket);
+                break;
+            }
             log.info("[NEWS-SOURCE] loading provider={} priority={} preferred={} limit={}",
                     provider.sourceCode(), priority, preferredSource, fetchLimit);
-            List<ExternalNewsItem> fetched = provider.fetchTopHeadlines(fetchLimit);
-            log.info("[NEWS-SOURCE] provider={} returned={}", provider.sourceCode(), fetched.size());
+            List<ExternalNewsItem> fetched = provider.fetchTopHeadlines(fetchLimit, bucket);
+            log.info("[NEWS-SOURCE] provider={} returned {}={}", provider.sourceCode(),
+                    bucket == NewsFreshnessBucket.FRESH ? "fresh" : "semiFresh", fetched.size());
             returnedCount += fetched.size();
             for (ExternalNewsItem item : fetched) {
+                String dedupKey = resolveDedupKey(item);
+                if (preferredBucket != null && preferredBucket.containsKey(dedupKey)) {
+                    continue;
+                }
                 RankedNewsCandidate candidate = rank(item, provider.sourceCode(), preferredSource);
-                ranked.merge(resolveDedupKey(item), candidate, this::selectBetterCandidate);
+                ranked.merge(dedupKey, candidate, this::selectBetterCandidate);
             }
         }
         return returnedCount;
+    }
+
+    private List<ExternalNewsItem> finalizeSelection(Map<String, RankedNewsCandidate> freshCandidates,
+            Map<String, RankedNewsCandidate> semiFreshCandidates,
+            int limit) {
+        List<ExternalNewsItem> selected = new java.util.ArrayList<>();
+        selected.addAll(sortCandidates(freshCandidates).stream()
+                .limit(limit)
+                .map(RankedNewsCandidate::item)
+                .toList());
+        if (selected.size() < limit) {
+            selected.addAll(sortCandidates(semiFreshCandidates).stream()
+                    .limit(limit - selected.size())
+                    .map(RankedNewsCandidate::item)
+                    .toList());
+        }
+        return selected;
+    }
+
+    private List<RankedNewsCandidate> sortCandidates(Map<String, RankedNewsCandidate> candidates) {
+        return candidates.values().stream()
+                .sorted(Comparator.comparing(RankedNewsCandidate::effectivePublishedAt,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(RankedNewsCandidate::publishedAt,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(RankedNewsCandidate::sourceCode))
+                .toList();
+    }
+
+    private int providerOrder(NewsFeedPriority priority, NewsSourceProvider provider) {
+        String code = provider.sourceCode();
+        if (priority == NewsFeedPriority.DOMESTIC) {
+            return "naver".equals(code) ? 0 : 10;
+        }
+        if ("newsapi-global".equals(code)) {
+            return 0;
+        }
+        if ("gnews-global".equals(code)) {
+            return 1;
+        }
+        return 10;
     }
 
     private RankedNewsCandidate rank(ExternalNewsItem item, String sourceCode, boolean preferredSource) {

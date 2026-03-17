@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.example.macronews.dto.AutoIngestionControlStatusDto;
+import com.example.macronews.dto.AutoIngestionRunOutcome;
 import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.NewsIngestionService;
@@ -12,8 +14,10 @@ import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
 import com.example.macronews.service.ops.OpsFeatureToggleService;
 import com.example.macronews.service.ops.RenderKeepAliveService;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.ui.ExtendedModelMap;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
@@ -83,6 +87,50 @@ class AdminNewsControllerTest {
         assertThat(emailRedirect).isEqualTo("redirect:/admin/news/auto");
         assertThat(opsFeatureToggleService.isKeepAliveRuntimeEnabled()).isFalse();
         assertThat(opsFeatureToggleService.isEmailNotificationRuntimeEnabled()).isFalse();
+    }
+
+    @Test
+    @DisplayName("auto ingest form should expose keep-alive and email control state for rendering")
+    void autoIngestForm_exposesOpsFeatureStatuses() {
+        OpsFeatureToggleService opsFeatureToggleService = new OpsFeatureToggleService(false, false);
+        RenderKeepAliveService renderKeepAliveService = mock(RenderKeepAliveService.class);
+        AutoIngestionEmailNotificationService emailService = mock(AutoIngestionEmailNotificationService.class);
+        NewsQueryService newsQueryService = mock(NewsQueryService.class);
+        AutoIngestionControlService autoIngestionControlService = mock(AutoIngestionControlService.class);
+        NewsSourceProviderSelector newsSourceProviderSelector = mock(NewsSourceProviderSelector.class);
+
+        when(newsQueryService.getRecentNews(null)).thenReturn(List.of());
+        when(autoIngestionControlService.getStatus()).thenReturn(new AutoIngestionControlStatusDto(
+                false, false, AutoIngestionRunOutcome.IDLE, null, null, null, null, null, null, null));
+        when(newsSourceProviderSelector.isConfigured()).thenReturn(true);
+        when(renderKeepAliveService.isConfigured()).thenReturn(false);
+        when(renderKeepAliveService.isRuntimeEnabled()).thenReturn(false);
+        when(renderKeepAliveService.isEffectivelyEnabled()).thenReturn(false);
+        when(renderKeepAliveService.hasTargetUrl()).thenReturn(false);
+        when(emailService.isConfigured()).thenReturn(false);
+        when(emailService.isRuntimeEnabled()).thenReturn(false);
+        when(emailService.isEffectivelyEnabled()).thenReturn(false);
+        when(emailService.hasRecipient()).thenReturn(false);
+        when(emailService.hasMailSender()).thenReturn(false);
+
+        AdminNewsController controller = new AdminNewsController(
+                mock(NewsIngestionService.class),
+                newsSourceProviderSelector,
+                mock(MacroAiService.class),
+                newsQueryService,
+                autoIngestionControlService,
+                opsFeatureToggleService,
+                renderKeepAliveService,
+                emailService,
+                messageSource());
+        ExtendedModelMap model = new ExtendedModelMap();
+
+        String viewName = controller.autoIngestForm(null, model);
+
+        assertThat(viewName).isEqualTo("admin/news/ingest-api");
+        assertThat(model.getAttribute("keepAliveStatus")).isNotNull();
+        assertThat(model.getAttribute("emailNotificationStatus")).isNotNull();
+        assertThat(model.getAttribute("autoIngestionControlStatus")).isNotNull();
     }
 
     private AdminNewsController controller(

@@ -11,5 +11,9 @@ public interface NewsSourceProvider {
 
     List<ExternalNewsItem> fetchTopHeadlines(int limit);
 
+    default List<ExternalNewsItem> fetchTopHeadlines(int limit, NewsFreshnessBucket bucket) {
+        return fetchTopHeadlines(limit);
+    }
+
     boolean isConfigured();
 }

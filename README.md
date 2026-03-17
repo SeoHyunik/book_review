@@ -38,13 +38,18 @@
 - Email notification remains statically gated by `APP_NOTIFICATION_EMAIL_ENABLED`, `APP_NOTIFICATION_EMAIL_RECIPIENT`, and Spring mail sender configuration, but the admin auto-ingestion page can now turn the runtime email switch on or off while the app is running
 - Keep-alive and email runtime toggle state is in-memory only and resets on restart or redeploy
 - Automatic headline ingestion switches between the domestic and foreign feed priority windows using: `APP_INGESTION_DOMESTIC_START_HOUR`, `APP_INGESTION_DOMESTIC_END_HOUR` (defaults: `5` to `22`, Asia/Seoul)
-- News source providers can be toggled independently: `APP_NEWS_GLOBAL_ENABLED`, `APP_NEWS_NAVER_ENABLED`, with NAVER credentials/config from `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `APP_NEWS_NAVER_QUERIES`, `APP_NEWS_NAVER_DISPLAY`, `APP_NEWS_NAVER_START`
+- News source providers can be toggled independently: `APP_NEWS_GLOBAL_ENABLED`, `APP_NEWS_NAVER_ENABLED`, and `APP_NEWS_GNEWS_ENABLED`, with NAVER credentials/config from `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `APP_NEWS_NAVER_QUERIES`, `APP_NEWS_NAVER_DISPLAY`, `APP_NEWS_NAVER_START`, `APP_NEWS_NAVER_MAX_PAGES`
+- GNews can be added as a second foreign/global provider with `APP_NEWS_GNEWS_API_KEY` and optional tuning such as `APP_NEWS_GNEWS_QUERY`
 - Domestic NAVER news requires `APP_NEWS_NAVER_ENABLED=true`, `NAVER_CLIENT_ID`, and `NAVER_CLIENT_SECRET`; `APP_NEWS_NAVER_QUERIES` is strongly recommended for production tuning
-- If `APP_NEWS_NAVER_QUERIES` is blank, NAVER domestic news now falls back to the built-in safe query set: `코스피`, `코스닥`, `환율`, `금리`, `유가`, `반도체`, `연준`
+- If `APP_NEWS_NAVER_QUERIES` is blank, NAVER domestic news now falls back to a more time-sensitive built-in query set such as `코스피`, `코스닥`, `원달러 환율`, `기준금리`, `국제유가`, `반도체`, `연준`, `미국금리`, `증시 속보`, `장중`, `마감`, `발표`
+- NAVER search now tries a few extra result pages before giving up when page 1 is stale or underfilled, while keeping the existing freshness cutoff
 - NAVER descriptions are normalized before storage so percent-encoded summary text is decoded when it is safe to do so
 - Freshness is now enforced with source-specific cutoffs: `APP_NEWS_NAVER_MAX_AGE_HOURS` for domestic NAVER items and `APP_NEWS_GLOBAL_MAX_AGE_HOURS` for foreign/global items
+- The provider chain now fills batches in two stages: fresh items first, then only the remaining slots from semi-fresh fallback windows such as `APP_NEWS_NAVER_FALLBACK_MAX_AGE_HOURS`, `APP_NEWS_GLOBAL_FALLBACK_MAX_AGE_HOURS`, and `APP_NEWS_GNEWS_FALLBACK_MAX_AGE_HOURS`
 - Foreign/global NewsAPI ingestion now prefers the recent keyword search first and uses `top-headlines` only as fallback when recent results are insufficient
 - Tune the recent foreign/global NewsAPI query with `NEWS_API_RECENT_QUERY` (`news.api.recent-query`)
+- A secondary recent-query variant can be tuned with `NEWS_API_RECENT_QUERY_FALLBACK` when the primary recent search underfills before `top-headlines` fallback
+- Foreign/global acquisition order is now practical and early-stopping: NewsAPI first, then GNews, with semi-fresh fill used only when fresh items are still short of the requested batch size
 - Tune macro relevance filtering with `NEWS_API_FILTER_KEYWORDS` (`news.api.filter-keywords`), which matches configured keywords against article title + description before items are accepted
 - The main featured card now prefers a deterministic recent-market aggregation built from analyzed news, controlled by `APP_FEATURED_MARKET_SUMMARY_ENABLED`, `APP_FEATURED_MARKET_SUMMARY_WINDOW_HOURS`, `APP_FEATURED_MARKET_SUMMARY_MAX_ITEMS`, and `APP_FEATURED_MARKET_SUMMARY_MIN_ITEMS`
 - Deterministic recent-market aggregation now selects items by analysis completion timing (`AnalysisResult.createdAt`) rather than raw article `publishedAt`

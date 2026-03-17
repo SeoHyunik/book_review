@@ -2,6 +2,7 @@ package com.example.macronews.service.news;
 
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.service.news.source.NewsFreshnessBucket;
 import com.example.macronews.service.news.source.NewsFeedPriority;
 import com.example.macronews.service.news.source.NewsSourceProvider;
 import com.example.macronews.util.ExternalApiResult;
@@ -57,8 +58,11 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
     @Value("${news.api.default-limit:10}")
     private int defaultLimit;
 
-    @Value("${news.api.recent-query:market OR stocks OR economy OR inflation OR fed OR tariff OR oil OR semiconductor OR korea OR kospi}")
+    @Value("${news.api.recent-query:market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR selloff OR rally}")
     private String recentQuery;
+
+    @Value("${news.api.recent-query-fallback:breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi}")
+    private String recentQueryFallback;
 
     @Value("${news.api.filter-keywords:korea,kospi,kosdaq,volatility,oil,usd,interest rate,inflation,gold,semiconductor,tariff,fed}")
     private String filterKeywords;
@@ -69,13 +73,21 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
     @Value("${app.news.global.max-age-hours:24}")
     private long globalMaxAgeHours;
 
+    @Value("${app.news.global.fallback-max-age-hours:36}")
+    private long globalFallbackMaxAgeHours;
+
     private volatile String cachedFilterKeywordSource;
     private volatile List<String> cachedFilterKeywords = List.of();
     private final AtomicBoolean emptyFilterKeywordsWarningLogged = new AtomicBoolean(false);
 
     @Override
     public List<ExternalNewsItem> fetchTopHeadlines(int limit) {
-        return fetchForeignTopHeadlines(limit);
+        return fetchForeignTopHeadlines(limit, NewsFreshnessBucket.FRESH);
+    }
+
+    @Override
+    public List<ExternalNewsItem> fetchTopHeadlines(int limit, NewsFreshnessBucket bucket) {
+        return fetchForeignTopHeadlines(limit, bucket);
     }
 
     @Override
@@ -90,39 +102,47 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
     @Override
     public List<ExternalNewsItem> fetchDomesticTopHeadlines(int limit) {
+        return fetchDomesticTopHeadlines(limit, NewsFreshnessBucket.FRESH);
+    }
+
+    public List<ExternalNewsItem> fetchDomesticTopHeadlines(int limit, NewsFreshnessBucket bucket) {
         if (!isConfigured()) {
             log.warn("news.api.key is missing; returning empty top-headlines list");
             return List.of();
         }
 
         int resolvedLimit = limit > 0 ? limit : defaultLimit;
-        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit);
+        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit, bucket);
         if (freshest.size() >= resolvedLimit) {
             return freshest;
         }
 
         List<ExternalNewsItem> headlines = fetchFromUrl(buildTopHeadlinesUrl(resolvedLimit), resolvedLimit,
-                "top-headlines");
+                "top-headlines", bucket);
         return mergeAndLimit(freshest, headlines, resolvedLimit);
     }
 
     @Override
     public List<ExternalNewsItem> fetchForeignTopHeadlines(int limit) {
+        return fetchForeignTopHeadlines(limit, NewsFreshnessBucket.FRESH);
+    }
+
+    public List<ExternalNewsItem> fetchForeignTopHeadlines(int limit, NewsFreshnessBucket bucket) {
         if (!isConfigured()) {
             log.warn("news.api.key is missing; returning empty top-headlines list");
             return List.of();
         }
 
         int resolvedLimit = limit > 0 ? limit : defaultLimit;
-        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit);
+        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit, bucket);
         if (freshest.size() >= resolvedLimit) {
             return freshest;
         }
 
-        log.info("Recent foreign NewsAPI results returned {} of {} items; supplementing with top-headlines",
-                freshest.size(), resolvedLimit);
+        log.info("Recent foreign NewsAPI bucket={} results returned {} of {} items; supplementing with top-headlines",
+                bucket, freshest.size(), resolvedLimit);
         List<ExternalNewsItem> headlines = fetchFromUrl(buildTopHeadlinesUrl(resolvedLimit), resolvedLimit,
-                "top-headlines");
+                "top-headlines", bucket);
         return mergeAndLimit(freshest, headlines, resolvedLimit);
     }
 
@@ -142,14 +162,31 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         return enabled && StringUtils.hasText(apiKey);
     }
 
-    private List<ExternalNewsItem> fetchRecentEverything(int limit) {
+    private List<ExternalNewsItem> fetchRecentEverything(int limit, NewsFreshnessBucket bucket) {
         if (!StringUtils.hasText(recentQuery)) {
             log.warn("news.api.recent-query is blank; skipping recent NewsAPI search");
             return List.of();
         }
+        List<ExternalNewsItem> primary = fetchRecentEverythingQuery(recentQuery, limit, "everything-primary", bucket);
+        if (primary.size() >= limit) {
+            return primary;
+        }
+        if (!StringUtils.hasText(recentQueryFallback)
+                || recentQueryFallback.trim().equalsIgnoreCase(recentQuery.trim())) {
+            return primary;
+        }
+
+        log.info("Primary recent NewsAPI bucket={} query returned {} of {} items; trying fallback recent query",
+                bucket, primary.size(), limit);
+        List<ExternalNewsItem> fallback = fetchRecentEverythingQuery(recentQueryFallback, limit, "everything-fallback", bucket);
+        return mergeAndLimit(primary, fallback, limit);
+    }
+
+    private List<ExternalNewsItem> fetchRecentEverythingQuery(String query, int limit, String feedName,
+            NewsFreshnessBucket bucket) {
         Instant cutoff = effectiveGlobalQueryCutoff();
         String url = UriComponentsBuilder.fromUriString(searchUrl)
-                .queryParam("q", recentQuery)
+                .queryParam("q", query)
                 .queryParam("sortBy", "publishedAt")
                 .queryParam("pageSize", limit)
                 .queryParam("from", cutoff.toString())
@@ -157,7 +194,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                 .build()
                 .encode()
                 .toUriString();
-        return fetchFromUrl(url, limit, "everything");
+        return fetchFromUrl(url, limit, feedName, bucket);
     }
 
     private String buildTopHeadlinesUrl(int limit) {
@@ -171,7 +208,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                 .toUriString();
     }
 
-    private List<ExternalNewsItem> fetchFromUrl(String url, int limit, String feedName) {
+    private List<ExternalNewsItem> fetchFromUrl(String url, int limit, String feedName, NewsFreshnessBucket bucket) {
         ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
                 HttpMethod.GET,
                 new HttpHeaders(),
@@ -183,7 +220,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
             return List.of();
         }
 
-        return parseArticles(result.body(), limit);
+        return parseArticles(result.body(), limit, bucket);
     }
 
     private List<ExternalNewsItem> mergeAndLimit(List<ExternalNewsItem> primary, List<ExternalNewsItem> secondary,
@@ -202,7 +239,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                 .toList();
     }
 
-    private List<ExternalNewsItem> parseArticles(String body, int limit) {
+    private List<ExternalNewsItem> parseArticles(String body, int limit, NewsFreshnessBucket bucket) {
         if (!StringUtils.hasText(body)) {
             return List.of();
         }
@@ -215,7 +252,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
             }
 
             List<ExternalNewsItem> mapped = new ArrayList<>();
-            Instant cutoff = globalFreshnessCutoff();
+            Instant cutoff = globalFreshnessCutoff(bucket);
             List<String> resolvedFilterKeywords = resolveFilterKeywords();
             int skippedNullPublishedAt = 0;
             int skippedStale = 0;
@@ -258,8 +295,8 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                     .limit(limit)
                     .toList();
             if (skippedNullPublishedAt > 0 || skippedStale > 0) {
-                log.info("[NEWSAPI] parsedItems={} skippedNullPublishedAt={} skippedStale={} limit={}",
-                        limited.size(), skippedNullPublishedAt, skippedStale, limit);
+                log.info("[NEWSAPI] bucket={} parsedItems={} skippedNullPublishedAt={} skippedStale={} limit={}",
+                        bucket, limited.size(), skippedNullPublishedAt, skippedStale, limit);
             }
             return limited;
         } catch (Exception ex) {
@@ -273,14 +310,16 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         return Instant.now().minus(Duration.ofHours(resolvedHours));
     }
 
-    private Instant globalFreshnessCutoff() {
-        long resolvedHours = globalMaxAgeHours > 0 ? globalMaxAgeHours : 24L;
+    private Instant globalFreshnessCutoff(NewsFreshnessBucket bucket) {
+        long resolvedHours = bucket == NewsFreshnessBucket.SEMI_FRESH
+                ? (globalFallbackMaxAgeHours > 0 ? globalFallbackMaxAgeHours : 36L)
+                : (globalMaxAgeHours > 0 ? globalMaxAgeHours : 24L);
         return Instant.now().minus(Duration.ofHours(resolvedHours));
     }
 
     private Instant effectiveGlobalQueryCutoff() {
         Instant queryCutoff = recentCutoff();
-        Instant freshnessCutoff = globalFreshnessCutoff();
+        Instant freshnessCutoff = globalFreshnessCutoff(NewsFreshnessBucket.FRESH);
         return queryCutoff.isAfter(freshnessCutoff) ? queryCutoff : freshnessCutoff;
     }
 
