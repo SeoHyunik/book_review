@@ -26,11 +26,13 @@ class RenderKeepAliveServiceTest {
     @Mock
     private ExternalApiUtils externalApiUtils;
 
+    private OpsFeatureToggleService opsFeatureToggleService;
     private RenderKeepAliveService renderKeepAliveService;
 
     @BeforeEach
     void setUp() {
-        renderKeepAliveService = new RenderKeepAliveService(externalApiUtils);
+        opsFeatureToggleService = new OpsFeatureToggleService(true, true);
+        renderKeepAliveService = new RenderKeepAliveService(externalApiUtils, opsFeatureToggleService);
     }
 
     @Test
@@ -54,20 +56,50 @@ class RenderKeepAliveServiceTest {
     }
 
     @Test
-    @DisplayName("ping should skip when keep-alive is disabled or target is blank")
-    void ping_skipsWhenDisabledOrMissingTarget() {
-        ReflectionTestUtils.setField(renderKeepAliveService, "enabled", false);
+    @DisplayName("keep-alive should be effectively enabled only when config, runtime, and target are all ready")
+    void isEffectivelyEnabled_requiresConfigRuntimeAndTarget() {
+        ReflectionTestUtils.setField(renderKeepAliveService, "enabled", true);
         ReflectionTestUtils.setField(renderKeepAliveService, "targetUrl", "https://example.onrender.com/actuator/health");
+
+        assertThatCode(() -> renderKeepAliveService.ping()).doesNotThrowAnyException();
+        org.assertj.core.api.Assertions.assertThat(renderKeepAliveService.isEffectivelyEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("ping should skip when keep-alive runtime toggle is disabled")
+    void ping_skipsWhenRuntimeDisabled() {
+        ReflectionTestUtils.setField(renderKeepAliveService, "enabled", true);
+        ReflectionTestUtils.setField(renderKeepAliveService, "targetUrl", "https://example.onrender.com/actuator/health");
+        opsFeatureToggleService.disableKeepAlive();
 
         renderKeepAliveService.ping();
 
+        org.assertj.core.api.Assertions.assertThat(renderKeepAliveService.isEffectivelyEnabled()).isFalse();
         verify(externalApiUtils, never()).callAPI(any());
+    }
 
+    @Test
+    @DisplayName("ping should remain ineffective when keep-alive is globally disabled")
+    void ping_skipsWhenConfigDisabledEvenIfRuntimeEnabled() {
+        ReflectionTestUtils.setField(renderKeepAliveService, "enabled", false);
+        ReflectionTestUtils.setField(renderKeepAliveService, "targetUrl", "https://example.onrender.com/actuator/health");
+        opsFeatureToggleService.enableKeepAlive();
+
+        renderKeepAliveService.ping();
+
+        org.assertj.core.api.Assertions.assertThat(renderKeepAliveService.isEffectivelyEnabled()).isFalse();
+        verify(externalApiUtils, never()).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("ping should skip when keep-alive target is blank")
+    void ping_skipsWhenTargetBlank() {
         ReflectionTestUtils.setField(renderKeepAliveService, "enabled", true);
         ReflectionTestUtils.setField(renderKeepAliveService, "targetUrl", "   ");
 
         renderKeepAliveService.ping();
 
+        org.assertj.core.api.Assertions.assertThat(renderKeepAliveService.isEffectivelyEnabled()).isFalse();
         verify(externalApiUtils, never()).callAPI(any());
     }
 

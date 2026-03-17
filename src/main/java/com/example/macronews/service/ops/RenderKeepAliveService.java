@@ -18,6 +18,7 @@ import org.springframework.util.StringUtils;
 public class RenderKeepAliveService {
 
     private final ExternalApiUtils externalApiUtils;
+    private final OpsFeatureToggleService opsFeatureToggleService;
 
     @Value("${app.keep-alive.enabled:false}")
     private boolean enabled;
@@ -25,16 +26,36 @@ public class RenderKeepAliveService {
     @Value("${app.keep-alive.target-url:}")
     private String targetUrl;
 
+    public boolean isConfigured() {
+        return enabled;
+    }
+
+    public boolean isRuntimeEnabled() {
+        return opsFeatureToggleService.isKeepAliveRuntimeEnabled();
+    }
+
+    public boolean hasTargetUrl() {
+        return StringUtils.hasText(targetUrl);
+    }
+
+    public boolean isEffectivelyEnabled() {
+        return isConfigured() && isRuntimeEnabled() && hasTargetUrl();
+    }
+
     public boolean isEnabled() {
-        return enabled && StringUtils.hasText(targetUrl);
+        return isEffectivelyEnabled();
     }
 
     @Scheduled(cron = "${app.keep-alive.cron:0 */10 * * * *}")
     public void ping() {
-        if (!enabled) {
+        if (!isConfigured()) {
             return;
         }
-        if (!StringUtils.hasText(targetUrl)) {
+        if (!isRuntimeEnabled()) {
+            log.debug("[KEEP-ALIVE] skipped reason=runtime-disabled");
+            return;
+        }
+        if (!hasTargetUrl()) {
             log.debug("[KEEP-ALIVE] skipped reason=missing-target-url");
             return;
         }

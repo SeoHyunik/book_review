@@ -5,6 +5,7 @@ import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.AutoIngestionBatchStatusDto;
 import com.example.macronews.dto.AutoIngestionControlStatusDto;
 import com.example.macronews.dto.NewsListItemDto;
+import com.example.macronews.dto.OpsFeatureStatusDto;
 import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
@@ -13,6 +14,7 @@ import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.ops.OpsFeatureToggleService;
 import com.example.macronews.service.ops.RenderKeepAliveService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import com.example.macronews.util.RedirectPathUtils;
@@ -53,6 +55,7 @@ public class AdminNewsController {
     private final MacroAiService macroAiService;
     private final NewsQueryService newsQueryService;
     private final AutoIngestionControlService autoIngestionControlService;
+    private final OpsFeatureToggleService opsFeatureToggleService;
     private final RenderKeepAliveService renderKeepAliveService;
     private final AutoIngestionEmailNotificationService autoIngestionEmailNotificationService;
     private final MessageSource messageSource;
@@ -122,6 +125,70 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("successMessage", msg("admin.news.auto.scheduler.disabled"));
         } else {
             redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.scheduler.alreadyDisabled"));
+        }
+        return "redirect:" + AUTO_PAGE;
+    }
+
+    @PostMapping("/auto/keep-alive/start")
+    public String startKeepAlive(RedirectAttributes redirectAttributes) {
+        if (!renderKeepAliveService.isConfigured()) {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.keepAlive.unavailable"));
+            return "redirect:" + AUTO_PAGE;
+        }
+
+        boolean changed = opsFeatureToggleService.enableKeepAlive();
+        if (changed) {
+            redirectAttributes.addFlashAttribute("successMessage", msg("admin.news.auto.keepAlive.started"));
+        } else {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.keepAlive.alreadyStarted"));
+        }
+        return "redirect:" + AUTO_PAGE;
+    }
+
+    @PostMapping("/auto/keep-alive/stop")
+    public String stopKeepAlive(RedirectAttributes redirectAttributes) {
+        if (!renderKeepAliveService.isConfigured()) {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.keepAlive.unavailable"));
+            return "redirect:" + AUTO_PAGE;
+        }
+
+        boolean changed = opsFeatureToggleService.disableKeepAlive();
+        if (changed) {
+            redirectAttributes.addFlashAttribute("successMessage", msg("admin.news.auto.keepAlive.stopped"));
+        } else {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.keepAlive.alreadyStopped"));
+        }
+        return "redirect:" + AUTO_PAGE;
+    }
+
+    @PostMapping("/auto/email/start")
+    public String startEmailNotification(RedirectAttributes redirectAttributes) {
+        if (!autoIngestionEmailNotificationService.isConfigured()) {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.email.unavailable"));
+            return "redirect:" + AUTO_PAGE;
+        }
+
+        boolean changed = opsFeatureToggleService.enableEmailNotification();
+        if (changed) {
+            redirectAttributes.addFlashAttribute("successMessage", msg("admin.news.auto.email.started"));
+        } else {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.email.alreadyStarted"));
+        }
+        return "redirect:" + AUTO_PAGE;
+    }
+
+    @PostMapping("/auto/email/stop")
+    public String stopEmailNotification(RedirectAttributes redirectAttributes) {
+        if (!autoIngestionEmailNotificationService.isConfigured()) {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.email.unavailable"));
+            return "redirect:" + AUTO_PAGE;
+        }
+
+        boolean changed = opsFeatureToggleService.disableEmailNotification();
+        if (changed) {
+            redirectAttributes.addFlashAttribute("successMessage", msg("admin.news.auto.email.stopped"));
+        } else {
+            redirectAttributes.addFlashAttribute("warningMessage", msg("admin.news.auto.email.alreadyStopped"));
         }
         return "redirect:" + AUTO_PAGE;
     }
@@ -251,8 +318,18 @@ public class AdminNewsController {
     private void populateAutoIngestionControlModel(Model model) {
         AutoIngestionControlStatusDto controlStatus = autoIngestionControlService.getStatus();
         model.addAttribute("autoIngestionControlStatus", controlStatus);
-        model.addAttribute("keepAliveEnabled", renderKeepAliveService.isEnabled());
-        model.addAttribute("emailNotificationEnabled", autoIngestionEmailNotificationService.isEnabled());
+        model.addAttribute("keepAliveStatus", new OpsFeatureStatusDto(
+                renderKeepAliveService.isConfigured(),
+                renderKeepAliveService.isRuntimeEnabled(),
+                renderKeepAliveService.isEffectivelyEnabled(),
+                renderKeepAliveService.hasTargetUrl(),
+                false));
+        model.addAttribute("emailNotificationStatus", new OpsFeatureStatusDto(
+                autoIngestionEmailNotificationService.isConfigured(),
+                autoIngestionEmailNotificationService.isRuntimeEnabled(),
+                autoIngestionEmailNotificationService.isEffectivelyEnabled(),
+                autoIngestionEmailNotificationService.hasRecipient(),
+                autoIngestionEmailNotificationService.hasMailSender()));
     }
 
     private void populateAutoBatchStatusFromFlash(Model model) {

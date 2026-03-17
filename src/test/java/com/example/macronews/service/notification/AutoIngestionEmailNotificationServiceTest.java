@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import com.example.macronews.dto.AutoIngestionBatchStatusDto;
 import com.example.macronews.dto.AutoIngestionControlStatusDto;
 import com.example.macronews.dto.AutoIngestionRunOutcome;
+import com.example.macronews.service.ops.OpsFeatureToggleService;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,24 +34,52 @@ class AutoIngestionEmailNotificationServiceTest {
     @Mock
     private ObjectProvider<JavaMailSender> javaMailSenderProvider;
 
+    private OpsFeatureToggleService opsFeatureToggleService;
     private AutoIngestionEmailNotificationService autoIngestionEmailNotificationService;
 
     @BeforeEach
     void setUp() {
         lenient().when(javaMailSenderProvider.getIfAvailable()).thenReturn(javaMailSender);
+        opsFeatureToggleService = new OpsFeatureToggleService(true, true);
         autoIngestionEmailNotificationService =
-                new AutoIngestionEmailNotificationService(javaMailSenderProvider);
+                new AutoIngestionEmailNotificationService(javaMailSenderProvider, opsFeatureToggleService);
     }
 
     @Test
-    @DisplayName("sendRunResult should skip when email notification is disabled")
-    void sendRunResult_skipsWhenDisabled() {
-        ReflectionTestUtils.setField(autoIngestionEmailNotificationService, "enabled", false);
+    @DisplayName("email notification should be effectively enabled only when config, runtime, recipient, and mail sender are ready")
+    void isEffectivelyEnabled_requiresConfigRuntimeRecipientAndMailSender() {
+        ReflectionTestUtils.setField(autoIngestionEmailNotificationService, "enabled", true);
         ReflectionTestUtils.setField(autoIngestionEmailNotificationService, "recipient", "ops@example.com");
+
+        org.assertj.core.api.Assertions.assertThat(autoIngestionEmailNotificationService.isEffectivelyEnabled())
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("sendRunResult should skip when email notification runtime toggle is disabled")
+    void sendRunResult_skipsWhenRuntimeDisabled() {
+        ReflectionTestUtils.setField(autoIngestionEmailNotificationService, "enabled", true);
+        ReflectionTestUtils.setField(autoIngestionEmailNotificationService, "recipient", "ops@example.com");
+        opsFeatureToggleService.disableEmailNotification();
 
         autoIngestionEmailNotificationService.sendRunResult(sampleControlStatus(AutoIngestionRunOutcome.COMPLETED),
                 sampleBatchStatus());
 
+        verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
+    }
+
+    @Test
+    @DisplayName("sendRunResult should remain ineffective when email notification is globally disabled")
+    void sendRunResult_skipsWhenConfigDisabledEvenIfRuntimeEnabled() {
+        ReflectionTestUtils.setField(autoIngestionEmailNotificationService, "enabled", false);
+        ReflectionTestUtils.setField(autoIngestionEmailNotificationService, "recipient", "ops@example.com");
+        opsFeatureToggleService.enableEmailNotification();
+
+        autoIngestionEmailNotificationService.sendRunResult(sampleControlStatus(AutoIngestionRunOutcome.COMPLETED),
+                sampleBatchStatus());
+
+        org.assertj.core.api.Assertions.assertThat(autoIngestionEmailNotificationService.isEffectivelyEnabled())
+                .isFalse();
         verify(javaMailSender, never()).send(any(SimpleMailMessage.class));
     }
 

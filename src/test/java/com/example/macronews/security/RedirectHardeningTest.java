@@ -10,6 +10,7 @@ import com.example.macronews.service.notification.AutoIngestionEmailNotification
 import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.ops.OpsFeatureToggleService;
 import com.example.macronews.service.ops.RenderKeepAliveService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import jakarta.servlet.http.HttpSession;
@@ -36,6 +37,7 @@ class RedirectHardeningTest {
             mock(MacroAiService.class),
             mock(NewsQueryService.class),
             mock(AutoIngestionControlService.class),
+            mock(OpsFeatureToggleService.class),
             mock(RenderKeepAliveService.class),
             mock(AutoIngestionEmailNotificationService.class),
             mock(MessageSource.class));

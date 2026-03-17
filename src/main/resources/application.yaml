@@ -180,13 +180,19 @@ app:
       cron: ${APP_INGESTION_SCHEDULER_CRON:0 0 * * * *}
       page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:3}
   keep-alive:
+    # Static gate for keep-alive availability. Admin runtime toggle can only operate when this is true.
     enabled: ${APP_KEEP_ALIVE_ENABLED:false}
+    # Runtime toggle state is in-memory only and resets on restart or redeploy.
     cron: ${APP_KEEP_ALIVE_CRON:0 */10 * * * *}
+    # Required for effective keep-alive execution.
     target-url: ${APP_KEEP_ALIVE_TARGET_URL:}
   notification:
     email:
+      # Static gate for email notification availability. Admin runtime toggle can only operate when this is true.
       enabled: ${APP_NOTIFICATION_EMAIL_ENABLED:false}
+      # Required for effective email notification delivery.
       recipient: ${APP_NOTIFICATION_EMAIL_RECIPIENT:}
+      # Spring mail sender configuration is also required; runtime toggle state resets on restart or redeploy.
       from: ${APP_NOTIFICATION_EMAIL_FROM:}
   news:
     global:

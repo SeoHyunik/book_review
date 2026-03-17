@@ -32,6 +32,9 @@
 - Runtime secrets and provider settings now come from environment variables: `OPENAI_API_KEY`, `OPENAI_API_URL`, `OPENAI_MODEL`, `OPENAI_MAX_TOKENS`, `OPENAI_TEMPERATURE`, `NEWS_API_KEY`, `JASYPT_PASSWORD`
 - Explicit non-dev/test admin bootstrap uses: `APP_ADMIN_ALLOWED_USERNAMES`, `APP_BOOTSTRAP_ADMIN_USERNAME`, `APP_BOOTSTRAP_ADMIN_PASSWORD`, `APP_BOOTSTRAP_ADMIN_EMAIL`
 - Scheduled ingestion is disabled by default and can be enabled with: `APP_INGESTION_SCHEDULER_ENABLED`, `APP_INGESTION_SCHEDULER_CRON`, `APP_INGESTION_SCHEDULER_PAGE_SIZE`
+- Keep-alive remains statically gated by `APP_KEEP_ALIVE_ENABLED` and `APP_KEEP_ALIVE_TARGET_URL`, but the admin auto-ingestion page can now turn the runtime keep-alive switch on or off while the app is running
+- Email notification remains statically gated by `APP_NOTIFICATION_EMAIL_ENABLED`, `APP_NOTIFICATION_EMAIL_RECIPIENT`, and Spring mail sender configuration, but the admin auto-ingestion page can now turn the runtime email switch on or off while the app is running
+- Keep-alive and email runtime toggle state is in-memory only and resets on restart or redeploy
 - Automatic headline ingestion switches between the domestic and foreign feed priority windows using: `APP_INGESTION_DOMESTIC_START_HOUR`, `APP_INGESTION_DOMESTIC_END_HOUR` (defaults: `5` to `22`, Asia/Seoul)
 - News source providers can be toggled independently: `APP_NEWS_GLOBAL_ENABLED`, `APP_NEWS_NAVER_ENABLED`, with NAVER credentials/config from `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `APP_NEWS_NAVER_QUERIES`, `APP_NEWS_NAVER_DISPLAY`, `APP_NEWS_NAVER_START`
 - Domestic NAVER news requires `APP_NEWS_NAVER_ENABLED=true`, `NAVER_CLIENT_ID`, and `NAVER_CLIENT_SECRET`; `APP_NEWS_NAVER_QUERIES` is strongly recommended for production tuning
