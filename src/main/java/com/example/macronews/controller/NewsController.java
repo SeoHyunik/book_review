@@ -1,6 +1,7 @@
 package com.example.macronews.controller;
 
 import com.example.macronews.dto.NewsDetailDto;
+import com.example.macronews.dto.FeaturedMarketSummaryDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.service.auth.AnonymousDetailViewGateService;
 import com.example.macronews.service.forecast.MarketForecastQueryService;
@@ -13,6 +14,7 @@ import com.example.macronews.dto.MarketSignalOverviewDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.news.RecentMarketSummaryService;
 import java.util.List;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ public class NewsController {
 
     private final NewsQueryService newsQueryService;
     private final MarketForecastQueryService marketForecastQueryService;
+    private final RecentMarketSummaryService recentMarketSummaryService;
     private final AnonymousDetailViewGateService anonymousDetailViewGateService;
 
     @GetMapping
@@ -55,9 +58,11 @@ public class NewsController {
         MarketSignalOverviewDto marketSignalOverview =
                 newsQueryService.getMarketSignalOverview(selectedStatus, selectedSort);
         MarketForecastSnapshotDto marketForecastSnapshot = marketForecastQueryService.getCurrentSnapshot().orElse(null);
+        FeaturedMarketSummaryDto featuredMarketSummary = recentMarketSummaryService.getCurrentSummary().orElse(null);
         NewsListItemDto featuredNews = allNewsItems.isEmpty() ? null : allNewsItems.get(0);
         model.addAttribute("newsItems", newsItems);
         model.addAttribute("featuredNews", featuredNews);
+        model.addAttribute("featuredMarketSummary", featuredMarketSummary);
         model.addAttribute("marketSignalOverview", marketSignalOverview);
         model.addAttribute("marketForecastSnapshot", marketForecastSnapshot);
         model.addAttribute("selectedStatus", selectedStatus == null ? "" : selectedStatus.name());

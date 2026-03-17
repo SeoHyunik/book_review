@@ -6,12 +6,14 @@ import static org.mockito.BDDMockito.given;
 import com.example.macronews.domain.ImpactDirection;
 import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.MarketMood;
+import com.example.macronews.domain.SignalSentiment;
+import com.example.macronews.dto.FeaturedMarketSummaryDto;
 import com.example.macronews.dto.MarketSignalOverviewDto;
-import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.service.auth.AnonymousDetailViewGateService;
 import com.example.macronews.service.forecast.MarketForecastQueryService;
 import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.news.RecentMarketSummaryService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +36,9 @@ class NewsControllerTest {
     private MarketForecastQueryService marketForecastQueryService;
 
     @Mock
+    private RecentMarketSummaryService recentMarketSummaryService;
+
+    @Mock
     private AnonymousDetailViewGateService anonymousDetailViewGateService;
 
     @InjectMocks
@@ -44,9 +49,9 @@ class NewsControllerTest {
     void list_addsAggregatedSnapshotToModel() {
         MarketForecastSnapshotDto snapshot = new MarketForecastSnapshotDto(
                 MarketMood.CLOUD,
-                "한국어 헤드라인",
+                "Korean headline",
                 "English headline",
-                "한국어 요약",
+                "Korean summary",
                 "English summary",
                 List.of("driver-1"),
                 List.of("news-1"),
@@ -59,6 +64,7 @@ class NewsControllerTest {
                 .willReturn(List.of());
         given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(new MarketSignalOverviewDto(List.of()));
+        given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
         given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.of(snapshot));
 
         ConcurrentModel model = new ConcurrentModel();
@@ -66,5 +72,38 @@ class NewsControllerTest {
 
         assertThat(viewName).isEqualTo("news/list");
         assertThat(model.getAttribute("marketForecastSnapshot")).isEqualTo(snapshot);
+    }
+
+    @Test
+    @DisplayName("list should prefer recent market summary when aggregation is available")
+    void list_addsRecentMarketSummaryToModel() {
+        FeaturedMarketSummaryDto summary = new FeaturedMarketSummaryDto(
+                "Recent macro signals lean positive (ko)",
+                "Recent macro signals lean positive",
+                "Recent analyzed headlines over the last 3 hours (ko)",
+                "Built from 3 analyzed headlines over the last 3 hours, with USD / Oil appearing most often.",
+                Instant.parse("2026-03-17T03:00:00Z"),
+                3,
+                3,
+                Instant.parse("2026-03-17T00:30:00Z"),
+                Instant.parse("2026-03-17T02:30:00Z"),
+                SignalSentiment.POSITIVE,
+                List.of("USD", "Oil"),
+                List.of("news-3", "news-2", "news-1")
+        );
+
+        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of());
+        given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(new MarketSignalOverviewDto(List.of()));
+        given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.of(summary));
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.list(null, null, null, model);
+
+        assertThat(viewName).isEqualTo("news/list");
+        assertThat(model.getAttribute("featuredMarketSummary")).isEqualTo(summary);
+        assertThat(model.getAttribute("marketForecastSnapshot")).isNull();
     }
 }

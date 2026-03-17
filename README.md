@@ -42,6 +42,8 @@
 - Foreign/global NewsAPI ingestion now prefers the recent keyword search first and uses `top-headlines` only as fallback when recent results are insufficient
 - Tune the recent foreign/global NewsAPI query with `NEWS_API_RECENT_QUERY` (`news.api.recent-query`)
 - Tune macro relevance filtering with `NEWS_API_FILTER_KEYWORDS` (`news.api.filter-keywords`), which matches configured keywords against article title + description before items are accepted
+- The main featured card now prefers a deterministic recent-market aggregation built from analyzed news, controlled by `APP_FEATURED_MARKET_SUMMARY_ENABLED`, `APP_FEATURED_MARKET_SUMMARY_WINDOW_HOURS`, `APP_FEATURED_MARKET_SUMMARY_MAX_ITEMS`, and `APP_FEATURED_MARKET_SUMMARY_MIN_ITEMS`
+- This featured aggregation step is rule-based only for now; if there are not enough recent analyzed items, the homepage safely falls back to the existing market forecast snapshot or featured news behavior
 - Optional market-data providers are scaffolded behind feature flags: `APP_MARKET_FX_ENABLED` + `EXCHANGE_RATE_API_KEY`, `APP_MARKET_GOLD_ENABLED` + `METALPRICE_API_KEY`, `APP_MARKET_OIL_ENABLED` + `OILPRICE_API_KEY`, and future index config via `APP_MARKET_INDEX_PROVIDER`, `APP_MARKET_INDEX_ENABLED`, `TWELVEDATA_API_KEY`
 - Local and production environments should provide these explicitly instead of relying on repository-stored values
 - Default admin seeding is intended only for `dev` and `test` profiles

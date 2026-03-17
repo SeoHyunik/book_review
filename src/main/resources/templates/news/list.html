@@ -1,7 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security"
       th:replace="~{fragments/layout :: layout(~{::content})}">
-<th:block th:fragment="content" th:with="featuredForecast=${marketForecastSnapshot}">
+<th:block th:fragment="content" th:with="featuredSummary=${featuredMarketSummary}, featuredForecast=${marketForecastSnapshot}">
     <style>
         :root {
             --tone-positive-fg: #b9382d;
@@ -845,8 +845,8 @@
         </div>
     </section>
 
-    <section class="mb-4" th:if="${featuredForecast != null or featuredNews != null}"
-             th:with="featuredSignal=${featuredForecast != null ? (featuredForecast.mood.name() == 'SUN' ? 'bullish' : (featuredForecast.mood.name() == 'RAIN' ? 'bearish' : 'mixed')) : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'POSITIVE' ? 'bullish' : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed'))}">
+    <section class="mb-4" th:if="${featuredSummary != null or featuredForecast != null or featuredNews != null}"
+             th:with="featuredSignal=${featuredSummary != null ? (featuredSummary.dominantSentiment != null and featuredSummary.dominantSentiment.name() == 'POSITIVE' ? 'bullish' : (featuredSummary.dominantSentiment != null and featuredSummary.dominantSentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed')) : (featuredForecast != null ? (featuredForecast.mood.name() == 'SUN' ? 'bullish' : (featuredForecast.mood.name() == 'RAIN' ? 'bearish' : 'mixed')) : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'POSITIVE' ? 'bullish' : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed')))}">
         <div class="card border-0 overflow-hidden news-surface featured-card"
              th:classappend="${featuredSignal == 'bullish' ? ' featured-card--bullish' : (featuredSignal == 'bearish' ? ' featured-card--bearish' : ' featured-card--mixed')}">
             <div class="card-body p-4">
@@ -855,35 +855,42 @@
                         <div class="featured-header featured-meta">
                             <div class="featured-badges">
                                 <span class="badge rounded-pill px-3 py-2 shadow-sm featured-badge-primary"
-                                      th:text="${featuredForecast != null ? #messages.msg('news.featured.forecast.label') : #messages.msg('news.featured.label')}">Featured</span>
+                                      th:text="${featuredSummary != null ? #messages.msg('news.featured.marketSummary.label') : (featuredForecast != null ? #messages.msg('news.featured.forecast.label') : #messages.msg('news.featured.label'))}">Featured</span>
                                 <span class="badge rounded-pill px-3 py-2 featured-badge-tone"
                                       th:text="${featuredSignal == 'bullish' ? #messages.msg('news.signal.bullish') : (featuredSignal == 'bearish' ? #messages.msg('news.signal.bearish') : #messages.msg('news.signal.mixed'))}">Bullish</span>
                                 <span class="featured-weather">
                                     <i class="bi"
-                                       th:classappend="${featuredForecast != null ? (featuredForecast.mood.name() == 'SUN' ? ' bi-sun-fill' : (featuredForecast.mood.name() == 'RAIN' ? ' bi-cloud-rain-fill' : ' bi-cloud-fill')) : (featuredSignal == 'bullish' ? ' bi-sun-fill' : (featuredSignal == 'bearish' ? ' bi-cloud-rain-fill' : ' bi-cloud-fill'))}"></i>
+                                       th:classappend="${featuredSummary != null ? (featuredSignal == 'bullish' ? ' bi-sun-fill' : (featuredSignal == 'bearish' ? ' bi-cloud-rain-fill' : ' bi-cloud-fill')) : (featuredForecast != null ? (featuredForecast.mood.name() == 'SUN' ? ' bi-sun-fill' : (featuredForecast.mood.name() == 'RAIN' ? ' bi-cloud-rain-fill' : ' bi-cloud-fill')) : (featuredSignal == 'bullish' ? ' bi-sun-fill' : (featuredSignal == 'bearish' ? ' bi-cloud-rain-fill' : ' bi-cloud-fill')))}"></i>
                                 </span>
                             </div>
                             <div class="featured-support">
                                 <span class="fw-medium"
-                                      th:text="${featuredForecast != null ? #messages.msg('forecast.generatedAt') : (featuredNews.source ?: '-')}">Source</span>
+                                      th:text="${featuredSummary != null ? #messages.msg('news.featured.marketSummary.sources', featuredSummary.sourceCount) : (featuredForecast != null ? #messages.msg('forecast.generatedAt') : (featuredNews.source ?: '-'))}">Source</span>
                                 <span class="featured-support-dot">&middot;</span>
-                                <span th:text="${featuredForecast != null ? featuredForecast.generatedAt : (featuredNews.publishedAt ?: '-')}">Published At</span>
+                                <span th:text="${featuredSummary != null ? #messages.msg('news.featured.marketSummary.window', featuredSummary.windowHours) : (featuredForecast != null ? featuredForecast.generatedAt : (featuredNews.publishedAt ?: '-'))}">Published At</span>
+                                <th:block th:if="${featuredSummary != null}">
+                                    <span class="featured-support-dot">&middot;</span>
+                                    <span th:text="${featuredSummary.generatedAt ?: '-'}">Generated</span>
+                                </th:block>
                             </div>
                         </div>
                         <h2 class="h3 fw-bold lh-sm featured-heading"
-                            th:with="localizedTitle=${featuredForecast != null ? (#locale.language == 'ko' and featuredForecast.headlineKo != null and !#strings.isEmpty(featuredForecast.headlineKo) ? featuredForecast.headlineKo : (featuredForecast.headlineEn != null and !#strings.isEmpty(featuredForecast.headlineEn) ? featuredForecast.headlineEn : #messages.msg('news.featured.forecast.empty'))) : (featuredNews.displayTitle != null and !#strings.isEmpty(featuredNews.displayTitle) ? featuredNews.displayTitle : (featuredNews.title ?: #messages.msg('news.untitled')))}"
+                            th:with="localizedTitle=${featuredSummary != null ? (#locale.language == 'ko' and featuredSummary.headlineKo != null and !#strings.isEmpty(featuredSummary.headlineKo) ? featuredSummary.headlineKo : (featuredSummary.headlineEn != null and !#strings.isEmpty(featuredSummary.headlineEn) ? featuredSummary.headlineEn : #messages.msg('news.featured.fallback'))) : (featuredForecast != null ? (#locale.language == 'ko' and featuredForecast.headlineKo != null and !#strings.isEmpty(featuredForecast.headlineKo) ? featuredForecast.headlineKo : (featuredForecast.headlineEn != null and !#strings.isEmpty(featuredForecast.headlineEn) ? featuredForecast.headlineEn : #messages.msg('news.featured.forecast.empty'))) : (featuredNews.displayTitle != null and !#strings.isEmpty(featuredNews.displayTitle) ? featuredNews.displayTitle : (featuredNews.title ?: #messages.msg('news.untitled'))))}"
                             th:text="${localizedTitle}">Featured News</h2>
                         <p class="mb-0 lh-sm featured-summary"
-                           th:text="${featuredForecast != null ? (#locale.language == 'ko' and featuredForecast.summaryKo != null and !#strings.isEmpty(featuredForecast.summaryKo) ? featuredForecast.summaryKo : (featuredForecast.summaryEn != null and !#strings.isEmpty(featuredForecast.summaryEn) ? featuredForecast.summaryEn : #messages.msg('news.featured.forecast.empty'))) : (featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? featuredNews.interpretationSummary : #messages.msg('news.featured.fallback'))}">AI summary</p>
-                        <div class="featured-drivers" th:if="${featuredForecast != null and featuredForecast.keyDrivers != null and !#lists.isEmpty(featuredForecast.keyDrivers)}">
+                           th:text="${featuredSummary != null ? (#locale.language == 'ko' and featuredSummary.summaryKo != null and !#strings.isEmpty(featuredSummary.summaryKo) ? featuredSummary.summaryKo : (featuredSummary.summaryEn != null and !#strings.isEmpty(featuredSummary.summaryEn) ? featuredSummary.summaryEn : #messages.msg('news.featured.fallback'))) : (featuredForecast != null ? (#locale.language == 'ko' and featuredForecast.summaryKo != null and !#strings.isEmpty(featuredForecast.summaryKo) ? featuredForecast.summaryKo : (featuredForecast.summaryEn != null and !#strings.isEmpty(featuredForecast.summaryEn) ? featuredForecast.summaryEn : #messages.msg('news.featured.forecast.empty'))) : (featuredNews.interpretationSummary != null and !#strings.isEmpty(featuredNews.interpretationSummary) ? featuredNews.interpretationSummary : #messages.msg('news.featured.fallback')))}">AI summary</p>
+                        <div class="featured-drivers" th:if="${featuredSummary != null and featuredSummary.keyDrivers != null and !#lists.isEmpty(featuredSummary.keyDrivers)}">
+                            <span class="featured-driver-chip" th:each="driver : ${featuredSummary.keyDrivers}" th:text="${driver}">Driver</span>
+                        </div>
+                        <div class="featured-drivers" th:if="${featuredSummary == null and featuredForecast != null and featuredForecast.keyDrivers != null and !#lists.isEmpty(featuredForecast.keyDrivers)}">
                             <span class="featured-driver-chip" th:each="driver : ${featuredForecast.keyDrivers}" th:text="${driver}">Driver</span>
                         </div>
                     </div>
                     <div class="featured-card-panel p-3 rounded-4">
                         <div class="small text-secondary text-uppercase featured-card-panel-label" th:text="#{news.featured.kicker}">AI Analysis</div>
                         <a class="btn btn-sm btn-primary px-3 text-nowrap shadow-sm"
-                           th:href="${featuredForecast != null ? '/market-forecast' : '/news/' + featuredNews.id}"
-                           th:text="${featuredForecast != null ? #messages.msg('news.featured.forecast.action') : #messages.msg('news.featured.action')}">View Details</a>
+                           th:href="${featuredSummary != null and featuredSummary.supportingNewsIds != null and !#lists.isEmpty(featuredSummary.supportingNewsIds) ? '/news/' + featuredSummary.supportingNewsIds[0] : (featuredForecast != null ? '/market-forecast' : '/news/' + featuredNews.id)}"
+                           th:text="${featuredSummary != null ? #messages.msg('news.featured.marketSummary.action') : (featuredForecast != null ? #messages.msg('news.featured.forecast.action') : #messages.msg('news.featured.action'))}">View Details</a>
                     </div>
                 </div>
             </div>
