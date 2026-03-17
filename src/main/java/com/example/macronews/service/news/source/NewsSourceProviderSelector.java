@@ -66,7 +66,10 @@ public class NewsSourceProviderSelector {
 
         int fetchLimit = Math.max(resolvedLimit * 2, resolvedLimit + 2);
         Map<String, RankedNewsCandidate> ranked = new LinkedHashMap<>();
-        collectCandidates(ranked, preferredProviders, preferredPriority, fetchLimit, true);
+        int preferredReturned = collectCandidates(ranked, preferredProviders, preferredPriority, fetchLimit, true);
+        if (preferredReturned == 0 && !preferredProviders.isEmpty() && !fallbackProviders.isEmpty()) {
+            log.info("[NEWS-SOURCE] preferred provider returned 0 items; falling back to secondary providers");
+        }
         collectCandidates(ranked, fallbackProviders, fallbackPriority, fetchLimit, false);
 
         return ranked.values().stream()
@@ -129,19 +132,24 @@ public class NewsSourceProviderSelector {
                 .toList();
     }
 
-    private void collectCandidates(Map<String, RankedNewsCandidate> ranked,
+    private int collectCandidates(Map<String, RankedNewsCandidate> ranked,
             List<NewsSourceProvider> selectedProviders,
             NewsFeedPriority priority,
             int fetchLimit,
             boolean preferredSource) {
+        int returnedCount = 0;
         for (NewsSourceProvider provider : selectedProviders) {
             log.info("[NEWS-SOURCE] loading provider={} priority={} preferred={} limit={}",
                     provider.sourceCode(), priority, preferredSource, fetchLimit);
-            for (ExternalNewsItem item : provider.fetchTopHeadlines(fetchLimit)) {
+            List<ExternalNewsItem> fetched = provider.fetchTopHeadlines(fetchLimit);
+            log.info("[NEWS-SOURCE] provider={} returned={}", provider.sourceCode(), fetched.size());
+            returnedCount += fetched.size();
+            for (ExternalNewsItem item : fetched) {
                 RankedNewsCandidate candidate = rank(item, provider.sourceCode(), preferredSource);
                 ranked.merge(resolveDedupKey(item), candidate, this::selectBetterCandidate);
             }
         }
+        return returnedCount;
     }
 
     private RankedNewsCandidate rank(ExternalNewsItem item, String sourceCode, boolean preferredSource) {

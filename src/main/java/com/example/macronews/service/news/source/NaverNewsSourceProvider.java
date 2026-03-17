@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -32,6 +33,16 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private static final DateTimeFormatter NAVER_PUB_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
+    private static final List<DateTimeFormatter> NAVER_PUB_DATE_FALLBACK_FORMATTERS = List.of(
+            new DateTimeFormatterBuilder()
+                    .parseCaseInsensitive()
+                    .appendPattern("EEE, dd MMM yyyy HH:mm:ss Z")
+                    .toFormatter(Locale.ENGLISH),
+            new DateTimeFormatterBuilder()
+                    .parseCaseInsensitive()
+                    .appendPattern("EEE, dd MMM yyyy HH:mm:ss z")
+                    .toFormatter(Locale.ENGLISH)
+    );
     private static final String KOREAN_BREAKING_MARKER = "\uC18D\uBCF4";
     private static final List<String> DEFAULT_QUERIES = List.of(
             "\uCF54\uC2A4\uD53C",
@@ -86,10 +97,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
         int resolvedLimit = limit > 0 ? limit : Math.max(display, 1);
         List<NaverCandidate> candidates = new ArrayList<>();
-        for (String query : resolveQueries()) {
+        List<String> queries = resolveQueries();
+        for (String query : queries) {
             candidates.addAll(fetchQuery(query, resolvedLimit));
         }
-        return deduplicateAndLimit(candidates, resolvedLimit);
+        List<ExternalNewsItem> merged = deduplicateAndLimit(candidates, resolvedLimit);
+        log.info("[NAVER] merged usableItems={} requestedLimit={} queries={}",
+                merged.size(), resolvedLimit, queries.size());
+        return merged;
     }
 
     @Override
@@ -114,6 +129,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     }
 
     private List<NaverCandidate> fetchQuery(String query, int limit) {
+        log.info("[NAVER] query start query='{}' requestedLimit={}", query, limit);
         String url = UriComponentsBuilder.fromUriString(baseUrl)
                 .path("/v1/search/news.json")
                 .queryParam("query", query)
@@ -139,11 +155,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             return List.of();
         }
 
-        return parseItems(result.body());
+        return parseItems(query, result.body());
     }
 
-    private List<NaverCandidate> parseItems(String body) {
+    private List<NaverCandidate> parseItems(String query, String body) {
         if (!StringUtils.hasText(body)) {
+            log.info("[NAVER] query='{}' rawItems=0 bodyEmpty=true", query);
             return List.of();
         }
 
@@ -151,21 +168,40 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             JsonNode root = objectMapper.readTree(body);
             JsonNode items = root.path("items");
             if (!items.isArray()) {
+                log.info("[NAVER] query='{}' rawItems=0 itemsArray=false", query);
                 return List.of();
             }
 
+            int rawItemCount = items.size();
+            int invalidPubDateCount = 0;
+            int nullPublishedAtCount = 0;
+            int missingUrlCount = 0;
+            int emptyTitleCount = 0;
             List<NaverCandidate> mapped = new ArrayList<>();
             for (JsonNode item : items) {
                 String cleanedTitle = cleanHtml(item.path("title").asText(""));
                 String cleanedDescription = cleanHtml(item.path("description").asText(""));
                 String originalLink = item.path("originallink").asText("");
                 String fallbackLink = item.path("link").asText("");
-                Instant publishedAt = parsePubDate(item.path("pubDate").asText(""));
+                String rawPubDate = item.path("pubDate").asText("");
+                Instant publishedAt = parsePubDate(rawPubDate);
                 String resolvedUrl = StringUtils.hasText(originalLink) ? originalLink : fallbackLink;
                 String dedupTitle = normalizeTitle(cleanedTitle);
+                if (StringUtils.hasText(rawPubDate) && publishedAt == null) {
+                    invalidPubDateCount++;
+                }
+                if (publishedAt == null) {
+                    nullPublishedAtCount++;
+                }
+                if (!StringUtils.hasText(resolvedUrl)) {
+                    missingUrlCount++;
+                }
+                if (!StringUtils.hasText(cleanedTitle)) {
+                    emptyTitleCount++;
+                }
 
                 ExternalNewsItem mappedItem = new ExternalNewsItem(
-                        StringUtils.hasText(resolvedUrl) ? resolvedUrl : dedupTitle,
+                        resolveExternalId(resolvedUrl, dedupTitle, rawPubDate),
                         "NAVER",
                         defaultText(cleanedTitle, "Untitled"),
                         defaultText(cleanedDescription, ""),
@@ -174,9 +210,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 );
                 mapped.add(new NaverCandidate(mappedItem, originalLink, fallbackLink, dedupTitle));
             }
+            log.info("[NAVER] query='{}' rawItems={}", query, rawItemCount);
+            log.info("[NAVER] query='{}' parsedItems={} nullPublishedAt={} invalidPubDate={} missingUsableLink={} emptyTitle={}",
+                    query, mapped.size(), nullPublishedAtCount, invalidPubDateCount, missingUrlCount, emptyTitleCount);
             return mapped;
         } catch (Exception ex) {
-            log.warn("[NAVER] failed to parse response", ex);
+            log.warn("[NAVER] failed to parse response query='{}'", query, ex);
             return List.of();
         }
     }
@@ -200,7 +239,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         if (StringUtils.hasText(candidate.fallbackLink())) {
             return candidate.fallbackLink();
         }
-        return candidate.normalizedTitle();
+        if (StringUtils.hasText(candidate.normalizedTitle())) {
+            return candidate.normalizedTitle();
+        }
+        return candidate.item().externalId();
     }
 
     private String cleanHtml(String value) {
@@ -215,11 +257,19 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         if (!StringUtils.hasText(value)) {
             return null;
         }
+        String trimmed = value.trim();
         try {
-            return ZonedDateTime.parse(value.trim(), NAVER_PUB_DATE_FORMATTER).toInstant();
+            return ZonedDateTime.parse(trimmed, NAVER_PUB_DATE_FORMATTER).toInstant();
         } catch (Exception ex) {
-            return null;
         }
+        for (DateTimeFormatter formatter : NAVER_PUB_DATE_FALLBACK_FORMATTERS) {
+            try {
+                return ZonedDateTime.parse(trimmed, formatter).toInstant();
+            } catch (Exception ex) {
+                // Continue to the next safe fallback formatter.
+            }
+        }
+        return null;
     }
 
     private int resolveDisplay(int requestedLimit) {
@@ -246,6 +296,15 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private String resolveExternalId(String resolvedUrl, String normalizedTitle, String rawPubDate) {
+        if (StringUtils.hasText(resolvedUrl)) {
+            return resolvedUrl;
+        }
+        String titleSeed = StringUtils.hasText(normalizedTitle) ? normalizedTitle : "untitled";
+        String dateSeed = StringUtils.hasText(rawPubDate) ? rawPubDate.trim() : "unknown-pubdate";
+        return "naver:" + titleSeed + "|" + dateSeed;
     }
 
     private record NaverCandidate(
