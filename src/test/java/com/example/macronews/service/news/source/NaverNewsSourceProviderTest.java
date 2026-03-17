@@ -12,7 +12,9 @@ import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +42,9 @@ class NaverNewsSourceProviderTest {
         ReflectionTestUtils.setField(provider, "clientSecret", "client-secret");
         ReflectionTestUtils.setField(provider, "display", 10);
         ReflectionTestUtils.setField(provider, "start", 1);
+        ReflectionTestUtils.setField(provider, "maxAgeHours", 12L);
+        ReflectionTestUtils.setField(provider, "clock",
+                Clock.fixed(Instant.parse("2026-03-13T03:30:00Z"), ZoneId.of("Asia/Seoul")));
     }
 
     @Test
@@ -119,8 +124,80 @@ class NaverNewsSourceProviderTest {
     }
 
     @Test
-    @DisplayName("NAVER provider should keep items when pubDate is unparseable")
-    void fetchTopHeadlines_keepsItemsWhenPubDateIsUnparseable() {
+    @DisplayName("NAVER provider should decode percent-encoded descriptions safely")
+    void fetchTopHeadlines_decodesPercentEncodedDescription() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "bond");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "Bond market steadies",
+                      "description": "%EC%97%B0%EC%A4%80%20%EA%B8%88%EB%A6%AC%20%EC%9D%B8%ED%95%98%20%EA%B8%B0%EB%8C%80",
+                      "originallink": "https://news.example.com/bond-market",
+                      "link": "https://search.naver.com/bond-market",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).summary()).isEqualTo("연준 금리 인하 기대");
+    }
+
+    @Test
+    @DisplayName("NAVER provider should keep normal descriptions unchanged")
+    void fetchTopHeadlines_keepsNormalDescriptionUnchanged() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "kosdaq");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "Kosdaq recovers",
+                      "description": "기관 수급이 개선되고 있습니다.",
+                      "originallink": "https://news.example.com/kosdaq",
+                      "link": "https://search.naver.com/kosdaq",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).summary()).isEqualTo("기관 수급이 개선되고 있습니다.");
+    }
+
+    @Test
+    @DisplayName("NAVER provider should not use links as summary text")
+    void fetchTopHeadlines_doesNotUseLinkAsSummary() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "semiconductor");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "Chip cycle improves",
+                      "description": "https://news.example.com/chip-cycle",
+                      "originallink": "https://news.example.com/chip-cycle",
+                      "link": "https://search.naver.com/chip-cycle",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).summary()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("NAVER provider should skip items when pubDate is unparseable")
+    void fetchTopHeadlines_skipsItemsWhenPubDateIsUnparseable() {
         ReflectionTestUtils.setField(provider, "rawQueries", "oil");
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
                 {
@@ -138,9 +215,30 @@ class NaverNewsSourceProviderTest {
 
         List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
 
-        assertThat(results).hasSize(1);
-        assertThat(results.get(0).url()).isEqualTo("https://news.example.com/oil-volatility");
-        assertThat(results.get(0).publishedAt()).isNull();
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("NAVER provider should skip stale items beyond configured max age")
+    void fetchTopHeadlines_skipsStaleItems() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "fx");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "FX headline",
+                      "description": "Too old for real-time feed",
+                      "originallink": "https://news.example.com/fx-old",
+                      "link": "https://search.naver.com/fx-old",
+                      "pubDate": "Thu, 12 Mar 2026 00:00:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).isEmpty();
     }
 
     @Test

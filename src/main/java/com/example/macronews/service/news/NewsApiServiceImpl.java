@@ -66,6 +66,9 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
     @Value("${news.api.recency-hours:72}")
     private long recencyHours;
 
+    @Value("${app.news.global.max-age-hours:24}")
+    private long globalMaxAgeHours;
+
     private volatile String cachedFilterKeywordSource;
     private volatile List<String> cachedFilterKeywords = List.of();
     private final AtomicBoolean emptyFilterKeywordsWarningLogged = new AtomicBoolean(false);
@@ -144,7 +147,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
             log.warn("news.api.recent-query is blank; skipping recent NewsAPI search");
             return List.of();
         }
-        Instant cutoff = recentCutoff();
+        Instant cutoff = effectiveGlobalQueryCutoff();
         String url = UriComponentsBuilder.fromUriString(searchUrl)
                 .queryParam("q", recentQuery)
                 .queryParam("sortBy", "publishedAt")
@@ -212,8 +215,10 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
             }
 
             List<ExternalNewsItem> mapped = new ArrayList<>();
-            Instant cutoff = recentCutoff();
+            Instant cutoff = globalFreshnessCutoff();
             List<String> resolvedFilterKeywords = resolveFilterKeywords();
+            int skippedNullPublishedAt = 0;
+            int skippedStale = 0;
             for (JsonNode article : articles) {
                 String source = article.path("source").path("name").asText("");
                 String title = article.path("title").asText("");
@@ -222,7 +227,12 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                 String publishedAt = article.path("publishedAt").asText("");
                 Instant publishedInstant = parseInstant(publishedAt);
 
+                if (publishedInstant == null) {
+                    skippedNullPublishedAt++;
+                    continue;
+                }
                 if (!isFreshEnough(publishedInstant, cutoff)) {
+                    skippedStale++;
                     continue;
                 }
                 if (!matchesFilterKeywords(title, summary, resolvedFilterKeywords)) {
@@ -242,11 +252,16 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                         publishedInstant
                 ));
             }
-            return mapped.stream()
+            List<ExternalNewsItem> limited = mapped.stream()
                     .sorted(Comparator.comparing(ExternalNewsItem::publishedAt,
                             Comparator.nullsLast(Comparator.reverseOrder())))
                     .limit(limit)
                     .toList();
+            if (skippedNullPublishedAt > 0 || skippedStale > 0) {
+                log.info("[NEWSAPI] parsedItems={} skippedNullPublishedAt={} skippedStale={} limit={}",
+                        limited.size(), skippedNullPublishedAt, skippedStale, limit);
+            }
+            return limited;
         } catch (Exception ex) {
             log.warn("Failed to parse external news response", ex);
             return List.of();
@@ -256,6 +271,17 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
     private Instant recentCutoff() {
         long resolvedHours = recencyHours > 0 ? recencyHours : 72L;
         return Instant.now().minus(Duration.ofHours(resolvedHours));
+    }
+
+    private Instant globalFreshnessCutoff() {
+        long resolvedHours = globalMaxAgeHours > 0 ? globalMaxAgeHours : 24L;
+        return Instant.now().minus(Duration.ofHours(resolvedHours));
+    }
+
+    private Instant effectiveGlobalQueryCutoff() {
+        Instant queryCutoff = recentCutoff();
+        Instant freshnessCutoff = globalFreshnessCutoff();
+        return queryCutoff.isAfter(freshnessCutoff) ? queryCutoff : freshnessCutoff;
     }
 
     private List<String> resolveFilterKeywords() {

@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,12 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
 
     @Qualifier("ingestionExecutor")
     private final Executor ingestionExecutor;
+
+    @Value("${app.news.naver.max-age-hours:12}")
+    private long naverMaxAgeHours;
+
+    @Value("${app.news.global.max-age-hours:24}")
+    private long globalMaxAgeHours;
 
     @Override
     @Transactional
@@ -187,8 +194,15 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
 
     private List<ExternalNewsItem> loadScheduledHeadlineFeed(int limit) {
         List<ExternalNewsItem> selected = newsSourceProviderSelector.fetchTopHeadlines(limit);
-        log.info("[INGEST] selected sourceSummary={}", summarizeSources(selected));
-        return selected;
+        List<ExternalNewsItem> freshOnly = selected.stream()
+                .filter(this::isFreshEnoughForBatch)
+                .toList();
+        if (freshOnly.size() != selected.size()) {
+            log.info("[INGEST] final freshness gate removed={} kept={}",
+                    selected.size() - freshOnly.size(), freshOnly.size());
+        }
+        log.info("[INGEST] selected sourceSummary={}", summarizeSources(freshOnly));
+        return freshOnly;
     }
 
     private String resolveExternalId(ExternalNewsItem item) {
@@ -236,5 +250,18 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
             summary.merge(source, 1, Integer::sum);
         }
         return summary;
+    }
+
+    private boolean isFreshEnoughForBatch(ExternalNewsItem item) {
+        if (item == null || item.publishedAt() == null) {
+            return false;
+        }
+        return !item.publishedAt().isBefore(Instant.now().minus(resolveMaxAge(item)));
+    }
+
+    private java.time.Duration resolveMaxAge(ExternalNewsItem item) {
+        String source = item == null ? "" : defaultText(item.source(), "");
+        long hours = "NAVER".equalsIgnoreCase(source) ? naverMaxAgeHours : globalMaxAgeHours;
+        return java.time.Duration.ofHours(hours > 0 ? hours : ("NAVER".equalsIgnoreCase(source) ? 12L : 24L));
     }
 }

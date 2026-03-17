@@ -39,12 +39,14 @@
 # - APP_INGESTION_BREAKING_BONUS_MINUTES
 # - APP_INGESTION_PREFERRED_SOURCE_BONUS_MINUTES
 # - APP_NEWS_GLOBAL_ENABLED
+# - APP_NEWS_GLOBAL_MAX_AGE_HOURS
 # - APP_NEWS_NAVER_ENABLED
 # - NAVER_CLIENT_ID
 # - NAVER_CLIENT_SECRET
 # - APP_NEWS_NAVER_QUERIES
 # - APP_NEWS_NAVER_DISPLAY
 # - APP_NEWS_NAVER_START
+# - APP_NEWS_NAVER_MAX_AGE_HOURS
 # - APP_MARKET_FX_ENABLED
 # - EXCHANGE_RATE_API_KEY
 # - APP_MARKET_GOLD_ENABLED
@@ -170,7 +172,7 @@ news:
     key: ${NEWS_API_KEY:}
     country: us
     category: business
-    default-limit: 10
+    default-limit: 5
     # Primary foreign/global NewsAPI query. Override with NEWS_API_RECENT_QUERY.
     recent-query: ${NEWS_API_RECENT_QUERY:market OR stocks OR economy OR inflation OR fed OR tariff OR oil OR semiconductor OR korea OR kospi}
     # Macro relevance filter applied to title + description. Override with NEWS_API_FILTER_KEYWORDS.
@@ -194,8 +196,8 @@ app:
     preferred-source-bonus-minutes: ${APP_INGESTION_PREFERRED_SOURCE_BONUS_MINUTES:15}
     scheduler:
       enabled: ${APP_INGESTION_SCHEDULER_ENABLED:false}
-      cron: ${APP_INGESTION_SCHEDULER_CRON:0 0 * * * *}
-      page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:3}
+      cron: ${APP_INGESTION_SCHEDULER_CRON:0 */30 * * * *}
+      page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:5}
   keep-alive:
     # Static gate for keep-alive availability. Admin runtime toggle can only operate when this is true.
     enabled: ${APP_KEEP_ALIVE_ENABLED:false}
@@ -214,6 +216,7 @@ app:
   news:
     global:
       enabled: ${APP_NEWS_GLOBAL_ENABLED:true}
+      max-age-hours: ${APP_NEWS_GLOBAL_MAX_AGE_HOURS:24}
     naver:
       enabled: ${APP_NEWS_NAVER_ENABLED:false}
       base-url: ${APP_NEWS_NAVER_BASE_URL:https://openapi.naver.com}
@@ -221,9 +224,11 @@ app:
       client-secret: ${NAVER_CLIENT_SECRET:}
       # Override with APP_NEWS_NAVER_QUERIES. If left blank, NAVER falls back to a safe built-in
       # domestic query set: 코스피, 코스닥, 환율, 금리, 유가, 반도체, 연준.
+      # Safe fallback queries: 코스피, 코스닥, 환율, 금리, 유가, 반도체, 연준.
       queries: ${APP_NEWS_NAVER_QUERIES:}
-      display: ${APP_NEWS_NAVER_DISPLAY:10}
+      display: ${APP_NEWS_NAVER_DISPLAY:5}
       start: ${APP_NEWS_NAVER_START:1}
+      max-age-hours: ${APP_NEWS_NAVER_MAX_AGE_HOURS:12}
   market:
     fx:
       enabled: ${APP_MARKET_FX_ENABLED:false}

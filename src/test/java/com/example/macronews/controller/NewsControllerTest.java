@@ -9,6 +9,7 @@ import com.example.macronews.domain.MarketMood;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
 import com.example.macronews.dto.MarketSignalOverviewDto;
+import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.service.auth.AnonymousDetailViewGateService;
 import com.example.macronews.service.forecast.MarketForecastQueryService;
@@ -121,6 +122,8 @@ class NewsControllerTest {
 
         assertThat(viewName).isEqualTo("news/list");
         assertThat(model.getAttribute("featuredMarketSummary")).isEqualTo(summary);
+        assertThat(model.getAttribute("featuredSummaryMode")).isEqualTo(true);
+        assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("recent-summary");
         assertThat(model.getAttribute("marketForecastSnapshot")).isNull();
     }
 
@@ -160,6 +163,8 @@ class NewsControllerTest {
 
         assertThat(viewName).isEqualTo("news/list");
         assertThat(model.getAttribute("featuredAiMarketSummary")).isEqualTo(aiSummary);
+        assertThat(model.getAttribute("featuredSummaryMode")).isEqualTo(true);
+        assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("ai-summary");
         assertThat(model.getAttribute("featuredMarketSummary")).isNull();
     }
 
@@ -198,5 +203,45 @@ class NewsControllerTest {
 
         assertThat(viewName).isEqualTo("news/list");
         assertThat(model.getAttribute("featuredStoredMarketSummary")).isEqualTo(storedSummary);
+        assertThat(model.getAttribute("featuredSummaryMode")).isEqualTo(true);
+        assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("stored-summary");
+    }
+
+    @Test
+    @DisplayName("list should fall back to article mode only when no market summary is available")
+    void list_fallsBackToArticleModeLast() {
+        NewsListItemDto featuredNews = new NewsListItemDto(
+                "news-1",
+                "Raw market headline",
+                "Raw market headline",
+                "Reuters",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse("2026-03-17T02:35:00Z"),
+                com.example.macronews.domain.NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.POSITIVE,
+                "Headline",
+                "Interpretation",
+                10
+        );
+
+        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(featuredNews));
+        given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(new MarketSignalOverviewDto(List.of()));
+        given(marketSummarySnapshotService.getLatestValidSummary()).willReturn(Optional.empty());
+        given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.list(null, null, null, model);
+
+        assertThat(viewName).isEqualTo("news/list");
+        assertThat(model.getAttribute("featuredNews")).isEqualTo(featuredNews);
+        assertThat(model.getAttribute("featuredSummaryMode")).isEqualTo(false);
+        assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("article");
     }
 }
