@@ -11,11 +11,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,8 +60,15 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
     @Value("${news.api.recent-query:market OR stocks OR economy OR inflation OR fed OR tariff OR oil OR semiconductor OR korea OR kospi}")
     private String recentQuery;
 
+    @Value("${news.api.filter-keywords:korea,kospi,kosdaq,volatility,oil,usd,interest rate,inflation,gold,semiconductor,tariff,fed}")
+    private String filterKeywords;
+
     @Value("${news.api.recency-hours:72}")
     private long recencyHours;
+
+    private volatile String cachedFilterKeywordSource;
+    private volatile List<String> cachedFilterKeywords = List.of();
+    private final AtomicBoolean emptyFilterKeywordsWarningLogged = new AtomicBoolean(false);
 
     @Override
     public List<ExternalNewsItem> fetchTopHeadlines(int limit) {
@@ -101,14 +111,16 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         }
 
         int resolvedLimit = limit > 0 ? limit : defaultLimit;
-        List<ExternalNewsItem> headlines = fetchFromUrl(buildTopHeadlinesUrl(resolvedLimit), resolvedLimit,
-                "top-headlines");
-        if (headlines.size() >= resolvedLimit) {
-            return headlines;
+        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit);
+        if (freshest.size() >= resolvedLimit) {
+            return freshest;
         }
 
-        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit);
-        return mergeAndLimit(headlines, freshest, resolvedLimit);
+        log.info("Recent foreign NewsAPI results returned {} of {} items; supplementing with top-headlines",
+                freshest.size(), resolvedLimit);
+        List<ExternalNewsItem> headlines = fetchFromUrl(buildTopHeadlinesUrl(resolvedLimit), resolvedLimit,
+                "top-headlines");
+        return mergeAndLimit(freshest, headlines, resolvedLimit);
     }
 
     @Override
@@ -129,6 +141,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
     private List<ExternalNewsItem> fetchRecentEverything(int limit) {
         if (!StringUtils.hasText(recentQuery)) {
+            log.warn("news.api.recent-query is blank; skipping recent NewsAPI search");
             return List.of();
         }
         Instant cutoff = recentCutoff();
@@ -200,6 +213,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
             List<ExternalNewsItem> mapped = new ArrayList<>();
             Instant cutoff = recentCutoff();
+            List<String> resolvedFilterKeywords = resolveFilterKeywords();
             for (JsonNode article : articles) {
                 String source = article.path("source").path("name").asText("");
                 String title = article.path("title").asText("");
@@ -209,6 +223,9 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                 Instant publishedInstant = parseInstant(publishedAt);
 
                 if (!isFreshEnough(publishedInstant, cutoff)) {
+                    continue;
+                }
+                if (!matchesFilterKeywords(title, summary, resolvedFilterKeywords)) {
                     continue;
                 }
 
@@ -241,8 +258,51 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         return Instant.now().minus(Duration.ofHours(resolvedHours));
     }
 
+    private List<String> resolveFilterKeywords() {
+        String rawKeywords = defaultText(filterKeywords, "");
+        if (rawKeywords.equals(cachedFilterKeywordSource)) {
+            return cachedFilterKeywords;
+        }
+
+        synchronized (this) {
+            if (rawKeywords.equals(cachedFilterKeywordSource)) {
+                return cachedFilterKeywords;
+            }
+
+            List<String> resolvedKeywords = Arrays.stream(rawKeywords.split(","))
+                    .map(String::trim)
+                    .filter(StringUtils::hasText)
+                    .map(keyword -> keyword.toLowerCase(Locale.ROOT))
+                    .distinct()
+                    .toList();
+
+            cachedFilterKeywordSource = rawKeywords;
+            cachedFilterKeywords = resolvedKeywords;
+
+            if (resolvedKeywords.isEmpty()) {
+                if (emptyFilterKeywordsWarningLogged.compareAndSet(false, true)) {
+                    log.warn("news.api.filter-keywords is empty; macro relevance filtering will fail open");
+                }
+            } else {
+                emptyFilterKeywordsWarningLogged.set(false);
+            }
+
+            return cachedFilterKeywords;
+        }
+    }
+
     private boolean isFreshEnough(Instant publishedAt, Instant cutoff) {
         return publishedAt != null && (cutoff == null || !publishedAt.isBefore(cutoff));
+    }
+
+    private boolean matchesFilterKeywords(String title, String summary, List<String> resolvedFilterKeywords) {
+        if (resolvedFilterKeywords.isEmpty()) {
+            return true;
+        }
+
+        String combinedText = (defaultText(title, "") + " " + defaultText(summary, ""))
+                .toLowerCase(Locale.ROOT);
+        return resolvedFilterKeywords.stream().anyMatch(combinedText::contains);
     }
 
     private String dedupKey(ExternalNewsItem item) {

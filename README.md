@@ -34,6 +34,9 @@
 - Scheduled ingestion is disabled by default and can be enabled with: `APP_INGESTION_SCHEDULER_ENABLED`, `APP_INGESTION_SCHEDULER_CRON`, `APP_INGESTION_SCHEDULER_PAGE_SIZE`
 - Automatic headline ingestion switches between the domestic and foreign feed priority windows using: `APP_INGESTION_DOMESTIC_START_HOUR`, `APP_INGESTION_DOMESTIC_END_HOUR` (defaults: `5` to `22`, Asia/Seoul)
 - News source providers can be toggled independently: `APP_NEWS_GLOBAL_ENABLED`, `APP_NEWS_NAVER_ENABLED`, with NAVER credentials/config from `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET`, `APP_NEWS_NAVER_QUERIES`, `APP_NEWS_NAVER_DISPLAY`, `APP_NEWS_NAVER_START`
+- Foreign/global NewsAPI ingestion now prefers the recent keyword search first and uses `top-headlines` only as fallback when recent results are insufficient
+- Tune the recent foreign/global NewsAPI query with `NEWS_API_RECENT_QUERY` (`news.api.recent-query`)
+- Tune macro relevance filtering with `NEWS_API_FILTER_KEYWORDS` (`news.api.filter-keywords`), which matches configured keywords against article title + description before items are accepted
 - Optional market-data providers are scaffolded behind feature flags: `APP_MARKET_FX_ENABLED` + `EXCHANGE_RATE_API_KEY`, `APP_MARKET_GOLD_ENABLED` + `METALPRICE_API_KEY`, `APP_MARKET_OIL_ENABLED` + `OILPRICE_API_KEY`, and future index config via `APP_MARKET_INDEX_PROVIDER`, `APP_MARKET_INDEX_ENABLED`, `TWELVEDATA_API_KEY`
 - Local and production environments should provide these explicitly instead of relying on repository-stored values
 - Default admin seeding is intended only for `dev` and `test` profiles
