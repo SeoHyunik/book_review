@@ -9,7 +9,9 @@ import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.OpenAiUsageFeatureType;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
+import com.example.macronews.dto.forecast.MarketForecastSummaryHandoffDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.service.forecast.MarketForecastQueryService;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
@@ -50,6 +52,7 @@ public class AiMarketSummaryService {
     private static final int MAX_KEY_DRIVERS = 5;
 
     private final RecentMarketSummaryService recentMarketSummaryService;
+    private final MarketForecastQueryService marketForecastQueryService;
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
     private final OpenAiUsageLoggingService openAiUsageLoggingService;
@@ -123,7 +126,9 @@ public class AiMarketSummaryService {
         }
 
         try {
-            String payload = buildPayload(recentItems);
+            Optional<MarketForecastSummaryHandoffDto> forecastHandoff = marketForecastQueryService.getCurrentSummaryHandoff();
+            log.debug("[MARKET_SUMMARY] secondary-forecast-handoff available={}", forecastHandoff.isPresent());
+            String payload = buildPayload(recentItems, forecastHandoff.orElse(null));
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(openAiApiKey);
@@ -151,7 +156,7 @@ public class AiMarketSummaryService {
         }
     }
 
-    String buildPayload(List<NewsEvent> recentItems) {
+    String buildPayload(List<NewsEvent> recentItems, MarketForecastSummaryHandoffDto forecastHandoff) {
         try {
             JsonNode promptRoot = loadPromptTemplate();
             JsonNode promptMessages = promptRoot.path("messages");
@@ -160,6 +165,7 @@ public class AiMarketSummaryService {
             }
 
             String newsItemsJson = buildNewsItemsJson(recentItems);
+            String forecastSummaryHandoffJson = buildForecastSummaryHandoffJson(forecastHandoff);
             List<Map<String, Object>> messages = new ArrayList<>();
             for (JsonNode node : promptMessages) {
                 String role = node.path("role").asText("");
@@ -168,7 +174,9 @@ public class AiMarketSummaryService {
                 }
                 String content = node.has("content")
                         ? node.path("content").asText("")
-                        : node.path("template").asText("").replace("{{newsItemsJson}}", newsItemsJson);
+                        : node.path("template").asText("")
+                                .replace("{{newsItemsJson}}", newsItemsJson)
+                                .replace("{{forecastSummaryHandoffJson}}", forecastSummaryHandoffJson);
                 if (!StringUtils.hasText(content)) {
                     continue;
                 }
@@ -185,6 +193,21 @@ public class AiMarketSummaryService {
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to build featured market summary payload", ex);
         }
+    }
+
+    private String buildForecastSummaryHandoffJson(MarketForecastSummaryHandoffDto forecastHandoff) throws JsonProcessingException {
+        if (forecastHandoff == null) {
+            return "{}";
+        }
+
+        Map<String, Object> handoff = new LinkedHashMap<>();
+        handoff.put("mood", forecastHandoff.mood() == null ? "" : forecastHandoff.mood().name());
+        handoff.put("macroDirections", forecastHandoff.macroDirections() == null ? Map.of() : forecastHandoff.macroDirections());
+        handoff.put("keyDrivers", forecastHandoff.keyDrivers() == null ? List.of() : forecastHandoff.keyDrivers());
+        handoff.put("relatedNewsIds", forecastHandoff.relatedNewsIds() == null ? List.of() : forecastHandoff.relatedNewsIds());
+        handoff.put("analyzedNewsCount", forecastHandoff.analyzedNewsCount());
+        handoff.put("generatedAt", defaultText(forecastHandoff.generatedAt()));
+        return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(handoff);
     }
 
     FeaturedMarketSummaryDto parseSummary(String responseBody, List<NewsEvent> sourceNews) {
