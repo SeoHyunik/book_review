@@ -70,6 +70,15 @@ main section {
     background-color: rgba(59, 130, 246, 0.14);
 }
 
+.ui-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    line-height: 1.2;
+    vertical-align: middle;
+}
+
 .alert-icon {
     font-size: 1.1rem;
 }

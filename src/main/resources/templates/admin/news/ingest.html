@@ -92,7 +92,7 @@
                             <td th:text="${item.source ?: '-'}"></td>
                             <td th:text="${item.publishedAt ?: '-'}"></td>
                             <td>
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${item.status != null and item.status.name() == 'ANALYZED' ? ' bg-success' : (item.status != null and item.status.name() == 'FAILED' ? ' bg-danger' : ' bg-secondary')}"
                                       th:text="${item.status ?: 'UNKNOWN'}"></span>
                             </td>
