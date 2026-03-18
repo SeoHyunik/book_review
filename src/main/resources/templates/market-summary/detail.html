@@ -185,7 +185,8 @@
         <a class="btn btn-sm btn-outline-primary text-nowrap" th:href="@{/news}" th:text="#{news.detail.back}">Back to List</a>
     </section>
 
-    <section class="card border-0 summary-surface summary-hero mb-4" th:if="${marketSummaryDetail != null}">
+    <section class="card border-0 summary-surface summary-hero mb-4" th:if="${marketSummaryDetail != null}"
+             th:with="localizedHeadline=${#locale.language == 'ko' and marketSummaryDetail.headlineKo != null and !#strings.isEmpty(marketSummaryDetail.headlineKo) ? marketSummaryDetail.headlineKo : (marketSummaryDetail.headlineEn != null and !#strings.isEmpty(marketSummaryDetail.headlineEn) ? marketSummaryDetail.headlineEn : '-') }">
         <div class="card-body p-4 p-lg-5 d-flex flex-column gap-3">
             <div class="summary-meta">
                 <span class="badge ui-pill rounded-pill bg-dark-subtle text-dark-emphasis"
@@ -194,68 +195,38 @@
                 <span class="summary-meta-chip ui-pill" th:text="#{news.featured.marketSummary.sources(${marketSummaryDetail.sourceCount})}">Sources</span>
                 <span class="summary-meta-chip ui-pill" th:text="#{news.featured.marketSummary.window(${marketSummaryDetail.windowHours})}">Window</span>
             </div>
-            <div class="summary-language-grid">
-                <div class="summary-language-block">
-                    <div class="summary-language-label">KO</div>
-                    <h2 class="summary-heading"
-                        th:text="${marketSummaryDetail.headlineKo != null and !#strings.isEmpty(marketSummaryDetail.headlineKo) ? marketSummaryDetail.headlineKo : '-'}">
-                        Headline KO
-                    </h2>
-                </div>
-                <div class="summary-language-block">
-                    <div class="summary-language-label">EN</div>
-                    <h2 class="summary-heading"
-                        th:text="${marketSummaryDetail.headlineEn != null and !#strings.isEmpty(marketSummaryDetail.headlineEn) ? marketSummaryDetail.headlineEn : '-'}">
-                        Headline EN
-                    </h2>
-                </div>
+            <div class="summary-language-block">
+                <h2 class="summary-heading"
+                    th:text="${localizedHeadline}">
+                    Headline
+                </h2>
             </div>
         </div>
     </section>
 
-    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
+    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}"
+             th:with="localizedSummary=${marketSummaryDetail.summaryKo != null and !#strings.isEmpty(marketSummaryDetail.summaryKo) and #locale.language == 'ko' ? marketSummaryDetail.summaryKo : (marketSummaryDetail.summaryEn != null and !#strings.isEmpty(marketSummaryDetail.summaryEn) ? marketSummaryDetail.summaryEn : (marketSummaryDetail.summaryKo != null and !#strings.isEmpty(marketSummaryDetail.summaryKo) ? marketSummaryDetail.summaryKo : '-'))}">
         <div class="card-body p-4">
-            <div class="summary-section-kicker" th:text="#{news.detail.summary}">Summary</div>
             <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{news.detail.summary}">Summary</h2>
-            <div class="summary-language-grid">
-                <div class="summary-language-block">
-                    <div class="summary-language-label">KO</div>
-                    <p class="summary-copy"
-                       th:text="${marketSummaryDetail.summaryKo != null and !#strings.isEmpty(marketSummaryDetail.summaryKo) ? marketSummaryDetail.summaryKo : '-'}">
-                        Summary KO
-                    </p>
-                </div>
-                <div class="summary-language-block">
-                    <div class="summary-language-label">EN</div>
-                    <p class="summary-copy"
-                       th:text="${marketSummaryDetail.summaryEn != null and !#strings.isEmpty(marketSummaryDetail.summaryEn) ? marketSummaryDetail.summaryEn : '-'}">
-                        Summary EN
-                    </p>
-                </div>
+            <div class="summary-language-block">
+                <p class="summary-copy"
+                   th:text="${localizedSummary}">
+                    Summary
+                </p>
             </div>
         </div>
     </section>
 
     <section class="summary-section card border-0 summary-surface summary-section-card"
-             th:if="${marketSummaryDetail != null and ((marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo)) or (marketSummaryDetail.marketViewEn != null and !#strings.isEmpty(marketSummaryDetail.marketViewEn)))}">
+             th:if="${marketSummaryDetail != null and ((marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo)) or (marketSummaryDetail.marketViewEn != null and !#strings.isEmpty(marketSummaryDetail.marketViewEn)))}"
+             th:with="localizedMarketView=${marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo) and #locale.language == 'ko' ? marketSummaryDetail.marketViewKo : (marketSummaryDetail.marketViewEn != null and !#strings.isEmpty(marketSummaryDetail.marketViewEn) ? marketSummaryDetail.marketViewEn : (marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo) ? marketSummaryDetail.marketViewKo : '-'))}">
         <div class="card-body p-4">
-            <div class="summary-section-kicker" th:text="#{market.summary.detail.marketView}">Market View</div>
             <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.marketViewTitle}">Market View</h2>
-            <div class="summary-language-grid">
-                <div class="summary-language-block">
-                    <div class="summary-language-label">KO</div>
-                    <p class="summary-copy"
-                       th:text="${marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo) ? marketSummaryDetail.marketViewKo : '-'}">
-                        Market View KO
-                    </p>
-                </div>
-                <div class="summary-language-block">
-                    <div class="summary-language-label">EN</div>
-                    <p class="summary-copy"
-                       th:text="${marketSummaryDetail.marketViewEn != null and !#strings.isEmpty(marketSummaryDetail.marketViewEn) ? marketSummaryDetail.marketViewEn : '-'}">
-                        Market View EN
-                    </p>
-                </div>
+            <div class="summary-language-block">
+                <p class="summary-copy"
+                   th:text="${localizedMarketView}">
+                    Market View
+                </p>
             </div>
         </div>
     </section>
@@ -281,7 +252,6 @@
 
     <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
         <div class="card-body p-4">
-            <div class="summary-section-kicker" th:text="#{forecast.keyDrivers}">Key Drivers</div>
             <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.driversTitle}">Key Drivers</h2>
             <div class="summary-driver-list" th:if="${marketSummaryDetail.keyDrivers != null and !#lists.isEmpty(marketSummaryDetail.keyDrivers)}">
                 <span class="summary-driver-chip ui-pill" th:each="driver : ${marketSummaryDetail.keyDrivers}" th:text="${driver}">Driver</span>
@@ -293,7 +263,6 @@
 
     <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
         <div class="card-body p-4">
-            <div class="summary-section-kicker" th:text="#{market.summary.detail.supportingNews}">Supporting News</div>
             <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.supportingNewsTitle}">Supporting News</h2>
             <div class="list-group list-group-flush summary-support-list"
                  th:if="${marketSummaryDetail.supportingNews != null and !#lists.isEmpty(marketSummaryDetail.supportingNews)}">
