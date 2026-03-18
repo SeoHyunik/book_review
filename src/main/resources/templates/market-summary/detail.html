@@ -115,6 +115,19 @@
             gap: 0.55rem;
         }
 
+        .summary-evidence-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .summary-evidence-label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--surface-strong);
+            margin-bottom: 0.7rem;
+        }
+
         .summary-sentiment-chip--positive {
             color: var(--tone-positive-fg);
             background: var(--tone-positive-bg);
@@ -186,7 +199,8 @@
         }
 
         [data-bs-theme="dark"] .summary-heading,
-        [data-bs-theme="dark"] .summary-section-title {
+        [data-bs-theme="dark"] .summary-section-title,
+        [data-bs-theme="dark"] .summary-evidence-label {
             color: #f8fafc;
         }
 
@@ -238,6 +252,10 @@
 
         @media (min-width: 992px) {
             .summary-language-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .summary-evidence-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
@@ -329,7 +347,31 @@
 
     <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
         <div class="card-body p-4">
-            <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.supportingNewsTitle}">Supporting News</h2>
+            <h2 class="h6 fw-bold summary-section-title mb-2" th:text="#{market.summary.detail.evidenceTitle}">Evidence</h2>
+            <p class="text-secondary small mb-3" th:text="#{market.summary.detail.evidenceDescription}">Signals and articles that most influenced this market summary.</p>
+            <div class="summary-evidence-grid mb-4">
+                <div class="summary-language-block">
+                    <span class="summary-evidence-label" th:text="#{market.summary.detail.evidenceDriversTitle}">Key Signals</span>
+                    <div class="summary-driver-list" th:if="${marketSummaryDetail.keyDrivers != null and !#lists.isEmpty(marketSummaryDetail.keyDrivers)}">
+                        <span class="summary-driver-chip ui-pill" th:each="driver : ${marketSummaryDetail.keyDrivers}" th:text="${driver}">Driver</span>
+                    </div>
+                    <div class="text-secondary small" th:if="${marketSummaryDetail.keyDrivers == null or #lists.isEmpty(marketSummaryDetail.keyDrivers)}"
+                         th:text="#{market.summary.detail.driversEmpty}">No key drivers.</div>
+                </div>
+                <div class="summary-language-block">
+                    <span class="summary-evidence-label" th:text="#{market.summary.detail.evidenceConfidenceTitle}">Confidence</span>
+                    <p class="summary-copy" th:if="${marketSummaryDetail.confidence != null}"
+                       th:text="#{market.summary.detail.evidenceConfidenceBody(${#numbers.formatDecimal(marketSummaryDetail.confidence * 100, 1, 1) + '%'})}">
+                        Confidence note
+                    </p>
+                    <p class="summary-copy" th:if="${marketSummaryDetail.confidence == null}"
+                       th:text="#{market.summary.detail.evidenceConfidenceEmpty}">
+                        Confidence unavailable
+                    </p>
+                </div>
+            </div>
+            <h3 class="h6 fw-bold summary-section-title mb-2" th:text="#{market.summary.detail.evidenceArticlesTitle}">Evidence Articles</h3>
+            <p class="text-secondary small mb-3" th:text="#{market.summary.detail.evidenceArticlesDescription}">These are the articles directly used as the basis for the current market summary.</p>
             <div class="list-group list-group-flush summary-support-list"
                  th:if="${marketSummaryDetail.supportingNews != null and !#lists.isEmpty(marketSummaryDetail.supportingNews)}">
                 <a class="list-group-item list-group-item-action px-0"
