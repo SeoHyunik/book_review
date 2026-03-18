@@ -10,9 +10,9 @@
             --tone-negative-fg: #2158b5;
             --tone-negative-border: rgba(96, 165, 250, 0.28);
             --tone-negative-bg: rgba(230, 241, 255, 0.94);
-            --tone-neutral-fg: #8a5a00;
-            --tone-neutral-border: rgba(245, 158, 11, 0.24);
-            --tone-neutral-bg: rgba(255, 247, 214, 0.94);
+            --tone-neutral-fg: #4b5563;
+            --tone-neutral-border: rgba(148, 163, 184, 0.28);
+            --tone-neutral-bg: rgba(243, 244, 246, 0.94);
             --surface-strong: #162033;
             --surface-muted: #526077;
         }
@@ -53,11 +53,14 @@
         .summary-sentiment-chip {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 0.35rem;
             border-radius: 999px;
+            min-height: 22px;
             padding: 0.45rem 0.75rem;
             border: 1px solid rgba(148, 163, 184, 0.18);
             background: rgba(255, 255, 255, 0.8);
+            line-height: 1.2;
         }
 
         .summary-section + .summary-section {
@@ -185,10 +188,10 @@
     <section class="card border-0 summary-surface summary-hero mb-4" th:if="${marketSummaryDetail != null}">
         <div class="card-body p-4 p-lg-5 d-flex flex-column gap-3">
             <div class="summary-meta">
-                <span class="badge rounded-pill bg-dark-subtle text-dark-emphasis" th:text="#{news.featured.marketSummary.snapshotLabel}">AI Market Snapshot</span>
-                <span class="summary-meta-chip" th:text="${#messages.msg('forecast.generatedAt') + ' / ' + marketSummaryDetail.generatedAt}">Generated</span>
-                <span class="summary-meta-chip" th:text="#{news.featured.marketSummary.sources(${marketSummaryDetail.sourceCount})}">Sources</span>
-                <span class="summary-meta-chip" th:text="#{news.featured.marketSummary.window(${marketSummaryDetail.windowHours})}">Window</span>
+                <span class="badge ui-pill rounded-pill bg-dark-subtle text-dark-emphasis" th:text="#{news.featured.marketSummary.snapshotLabel}">AI Market Snapshot</span>
+                <span class="summary-meta-chip ui-pill" th:text="${#messages.msg('forecast.generatedAt') + ' / ' + marketSummaryDetail.generatedAt}">Generated</span>
+                <span class="summary-meta-chip ui-pill" th:text="#{news.featured.marketSummary.sources(${marketSummaryDetail.sourceCount})}">Sources</span>
+                <span class="summary-meta-chip ui-pill" th:text="#{news.featured.marketSummary.window(${marketSummaryDetail.windowHours})}">Window</span>
             </div>
             <div class="summary-language-grid">
                 <div class="summary-language-block">
@@ -261,12 +264,12 @@
             <div class="summary-section-kicker" th:text="#{market.summary.detail.signal}">Signal</div>
             <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.signalTitle}">Dominant Sentiment</h2>
             <div class="d-flex flex-wrap gap-2 align-items-center">
-                <span class="summary-sentiment-chip"
+                <span class="summary-sentiment-chip ui-pill"
                       th:classappend="${sentiment == 'POSITIVE' ? ' summary-sentiment-chip--positive' : (sentiment == 'NEGATIVE' ? ' summary-sentiment-chip--negative' : ' summary-sentiment-chip--neutral')}"
                       th:text="${sentiment == 'POSITIVE' ? #messages.msg('news.overview.sentiment.positive') : (sentiment == 'NEGATIVE' ? #messages.msg('news.overview.sentiment.negative') : #messages.msg('news.overview.sentiment.neutral'))}">
                     Sentiment
                 </span>
-                <span class="summary-meta-chip" th:if="${marketSummaryDetail.confidence != null}"
+                <span class="summary-meta-chip ui-pill" th:if="${marketSummaryDetail.confidence != null}"
                       th:text="#{market.summary.detail.confidence(${#numbers.formatDecimal(marketSummaryDetail.confidence * 100, 1, 1) + '%'})}">
                     Confidence
                 </span>
@@ -279,7 +282,7 @@
             <div class="summary-section-kicker" th:text="#{forecast.keyDrivers}">Key Drivers</div>
             <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.driversTitle}">Key Drivers</h2>
             <div class="summary-driver-list" th:if="${marketSummaryDetail.keyDrivers != null and !#lists.isEmpty(marketSummaryDetail.keyDrivers)}">
-                <span class="summary-driver-chip" th:each="driver : ${marketSummaryDetail.keyDrivers}" th:text="${driver}">Driver</span>
+                <span class="summary-driver-chip ui-pill" th:each="driver : ${marketSummaryDetail.keyDrivers}" th:text="${driver}">Driver</span>
             </div>
             <div class="text-secondary small" th:if="${marketSummaryDetail.keyDrivers == null or #lists.isEmpty(marketSummaryDetail.keyDrivers)}"
                  th:text="#{market.summary.detail.driversEmpty}">No key drivers.</div>

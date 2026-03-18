@@ -45,7 +45,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h2 class="h5 fw-bold mb-0" th:text="#{admin.openai.recent.heading}">Recent Usage Records</h2>
-                    <span class="badge text-bg-light border" th:text="#{admin.openai.recent.count(${#lists.size(usageDashboard.recentRecords)})}">Records 0</span>
+                    <span class="badge ui-pill text-bg-light border" th:text="#{admin.openai.recent.count(${#lists.size(usageDashboard.recentRecords)})}">Records 0</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">

@@ -11,12 +11,12 @@
                     <p class="text-secondary mb-0 small" th:text="#{admin.auto.snapshot.subheading}">Current status view for the most recent automatic ingestion batch.</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2 small">
-                    <span class="badge text-bg-light border" th:text="#{admin.auto.snapshot.requested(${autoBatchStatus.requestedCount})}">Requested 0</span>
-                    <span class="badge text-bg-light border" th:text="#{admin.auto.snapshot.returned(${autoBatchStatus.returnedCount})}">Returned 0</span>
-                    <span class="badge text-bg-light border" th:text="#{admin.auto.snapshot.ingested(${autoBatchStatus.ingestedCount})}">INGESTED 0</span>
-                    <span class="badge text-bg-light border" th:text="#{admin.auto.snapshot.analyzed(${autoBatchStatus.analyzedCount})}">ANALYZED 0</span>
-                    <span class="badge text-bg-light border" th:text="#{admin.auto.snapshot.pending(${autoBatchStatus.pendingCount})}">PENDING 0</span>
-                    <span class="badge text-bg-light border" th:text="#{admin.auto.snapshot.failed(${autoBatchStatus.failedCount})}">FAILED 0</span>
+                    <span class="badge ui-pill text-bg-light border" th:text="#{admin.auto.snapshot.requested(${autoBatchStatus.requestedCount})}">Requested 0</span>
+                    <span class="badge ui-pill text-bg-light border" th:text="#{admin.auto.snapshot.returned(${autoBatchStatus.returnedCount})}">Returned 0</span>
+                    <span class="badge ui-pill text-bg-light border" th:text="#{admin.auto.snapshot.ingested(${autoBatchStatus.ingestedCount})}">INGESTED 0</span>
+                    <span class="badge ui-pill text-bg-light border" th:text="#{admin.auto.snapshot.analyzed(${autoBatchStatus.analyzedCount})}">ANALYZED 0</span>
+                    <span class="badge ui-pill text-bg-light border" th:text="#{admin.auto.snapshot.pending(${autoBatchStatus.pendingCount})}">PENDING 0</span>
+                    <span class="badge ui-pill text-bg-light border" th:text="#{admin.auto.snapshot.failed(${autoBatchStatus.failedCount})}">FAILED 0</span>
                 </div>
             </div>
             <div class="text-secondary small d-flex flex-column gap-1">
@@ -43,10 +43,10 @@
                             <div class="text-secondary small" th:if="${item.priorityScore > 0}" th:text="#{news.priority(${item.priorityScore})}">Priority 0</div>
                         </td>
                         <td class="text-nowrap" th:switch="${item.status != null ? item.status.name() : 'UNKNOWN'}">
-                            <span th:case="'ANALYZED'" class="badge bg-success" th:text="#{status.analyzed}">Analyzed</span>
-                            <span th:case="'FAILED'" class="badge bg-danger" th:text="#{status.failed}">Failed</span>
-                            <span th:case="'INGESTED'" class="badge bg-secondary" th:text="#{status.ingested}">Ingested</span>
-                            <span th:case="*" class="badge bg-secondary" th:text="#{status.unknown}">Unknown</span>
+                            <span th:case="'ANALYZED'" class="badge ui-pill bg-success" th:text="#{status.analyzed}">Analyzed</span>
+                            <span th:case="'FAILED'" class="badge ui-pill bg-danger" th:text="#{status.failed}">Failed</span>
+                            <span th:case="'INGESTED'" class="badge ui-pill bg-secondary" th:text="#{status.ingested}">Ingested</span>
+                            <span th:case="*" class="badge ui-pill bg-secondary" th:text="#{status.unknown}">Unknown</span>
                         </td>
                     </tr>
                     </tbody>

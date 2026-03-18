@@ -29,21 +29,21 @@
                         <p class="text-secondary mb-0 small" th:text="#{admin.news.auto.control.subheading}">Start or stop scheduled automatic ingestion safely.</p>
                     </div>
                     <div class="d-flex flex-wrap gap-2 small">
-                        <span class="badge"
+                        <span class="badge ui-pill"
                               th:classappend="${autoIngestionControlStatus.schedulerEnabled} ? ' text-bg-success' : ' text-bg-secondary'"
                               th:text="${autoIngestionControlStatus.schedulerEnabled} ? #{admin.news.auto.status.enabled} : #{admin.news.auto.status.disabled}">
                             Enabled
                         </span>
-                        <span class="badge"
+                        <span class="badge ui-pill"
                               th:classappend="${autoIngestionControlStatus.runInProgress} ? ' text-bg-warning' : ' text-bg-light border'"
                               th:text="${autoIngestionControlStatus.runInProgress} ? #{admin.news.auto.status.running} : #{admin.news.auto.status.idle}">
                             Idle
                         </span>
-                        <span class="badge text-bg-light border"
+                        <span class="badge ui-pill text-bg-light border"
                               th:text="${keepAliveStatus.effectivelyEnabled} ? #{admin.news.auto.keepAlive.enabled} : #{admin.news.auto.keepAlive.disabled}">
                             Keep-alive Off
                         </span>
-                        <span class="badge text-bg-light border"
+                        <span class="badge ui-pill text-bg-light border"
                               th:text="${emailNotificationStatus.effectivelyEnabled} ? #{admin.news.auto.email.enabled} : #{admin.news.auto.email.disabled}">
                             Email Off
                         </span>
@@ -100,24 +100,24 @@
                                         Control runtime keep-alive pings without changing deployment config.
                                     </p>
                                 </div>
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${keepAliveStatus.effectivelyEnabled} ? ' text-bg-success' : ' text-bg-secondary'"
                                       th:text="${keepAliveStatus.effectivelyEnabled} ? #{admin.news.auto.ops.effective.enabled} : #{admin.news.auto.ops.effective.disabled}">
                                     Effective Off
                                 </span>
                             </div>
                             <div class="small d-flex flex-wrap gap-2">
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${keepAliveStatus.configEnabled} ? ' text-bg-light border' : ' text-bg-secondary'"
                                       th:text="${keepAliveStatus.configEnabled} ? #{admin.news.auto.ops.config.enabled} : #{admin.news.auto.ops.config.disabled}">
                                     Config Disabled
                                 </span>
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${keepAliveStatus.runtimeEnabled} ? ' text-bg-light border' : ' text-bg-secondary'"
                                       th:text="${keepAliveStatus.runtimeEnabled} ? #{admin.news.auto.ops.runtime.enabled} : #{admin.news.auto.ops.runtime.disabled}">
                                     Runtime Disabled
                                 </span>
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${keepAliveStatus.detailConfigured} ? ' text-bg-light border' : ' text-bg-secondary'"
                                       th:text="${keepAliveStatus.detailConfigured} ? #{admin.news.auto.keepAlive.target.present} : #{admin.news.auto.keepAlive.target.missing}">
                                     Target Missing
@@ -175,29 +175,29 @@
                                         Control runtime completion emails without changing deployment config.
                                     </p>
                                 </div>
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${emailNotificationStatus.effectivelyEnabled} ? ' text-bg-success' : ' text-bg-secondary'"
                                       th:text="${emailNotificationStatus.effectivelyEnabled} ? #{admin.news.auto.ops.effective.enabled} : #{admin.news.auto.ops.effective.disabled}">
                                     Effective Off
                                 </span>
                             </div>
                             <div class="small d-flex flex-wrap gap-2">
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${emailNotificationStatus.configEnabled} ? ' text-bg-light border' : ' text-bg-secondary'"
                                       th:text="${emailNotificationStatus.configEnabled} ? #{admin.news.auto.ops.config.enabled} : #{admin.news.auto.ops.config.disabled}">
                                     Config Disabled
                                 </span>
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${emailNotificationStatus.runtimeEnabled} ? ' text-bg-light border' : ' text-bg-secondary'"
                                       th:text="${emailNotificationStatus.runtimeEnabled} ? #{admin.news.auto.ops.runtime.enabled} : #{admin.news.auto.ops.runtime.disabled}">
                                     Runtime Disabled
                                 </span>
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${emailNotificationStatus.detailConfigured} ? ' text-bg-light border' : ' text-bg-secondary'"
                                       th:text="${emailNotificationStatus.detailConfigured} ? #{admin.news.auto.email.recipient.present} : #{admin.news.auto.email.recipient.missing}">
                                     Recipient Missing
                                 </span>
-                                <span class="badge"
+                                <span class="badge ui-pill"
                                       th:classappend="${emailNotificationStatus.mailSenderAvailable} ? ' text-bg-light border' : ' text-bg-secondary'"
                                       th:text="${emailNotificationStatus.mailSenderAvailable} ? #{admin.news.auto.email.sender.present} : #{admin.news.auto.email.sender.missing}">
                                     Mail Sender Missing

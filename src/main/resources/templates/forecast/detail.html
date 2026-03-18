@@ -53,10 +53,15 @@
         }
 
         .forecast-driver-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 22px;
             border-radius: 999px;
             padding: 0.45rem 0.75rem;
             background: rgba(255, 255, 255, 0.72);
             border: 1px solid rgba(255, 255, 255, 0.54);
+            line-height: 1.2;
         }
 
         .forecast-stat-card {
@@ -71,8 +76,8 @@
             <div class="card-body p-4 p-lg-5">
                 <div class="d-flex flex-column gap-3">
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <span class="badge rounded-pill bg-dark-subtle text-dark-emphasis" th:text="#{news.featured.forecast.label}">Market Forecast</span>
-                        <span class="badge rounded-pill bg-light text-dark border"
+                        <span class="badge ui-pill rounded-pill bg-dark-subtle text-dark-emphasis" th:text="#{news.featured.forecast.label}">Market Forecast</span>
+                        <span class="badge ui-pill rounded-pill bg-light text-dark border"
                               th:text="${snapshot.mood.name() == 'SUN' ? #messages.msg('forecast.mood.sun') : (snapshot.mood.name() == 'RAIN' ? #messages.msg('forecast.mood.rain') : #messages.msg('forecast.mood.cloud'))}">CLOUD</span>
                         <span class="forecast-weather">
                             <i class="bi"
@@ -96,7 +101,7 @@
                     <div class="card-body p-4">
                         <h2 class="h6 fw-bold mb-3" th:text="#{forecast.keyDrivers}">Key Drivers</h2>
                         <div class="forecast-driver-list" th:if="${snapshot.keyDrivers != null and !#lists.isEmpty(snapshot.keyDrivers)}">
-                            <span class="forecast-driver-chip" th:each="driver : ${snapshot.keyDrivers}" th:text="${driver}">Driver</span>
+                            <span class="forecast-driver-chip ui-pill" th:each="driver : ${snapshot.keyDrivers}" th:text="${driver}">Driver</span>
                         </div>
                     </div>
                 </div>

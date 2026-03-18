@@ -10,9 +10,9 @@
             --tone-negative-fg: #2158b5;
             --tone-negative-border: rgba(96, 165, 250, 0.28);
             --tone-negative-bg: rgba(230, 241, 255, 0.94);
-            --tone-neutral-fg: #8a5a00;
-            --tone-neutral-border: rgba(245, 158, 11, 0.24);
-            --tone-neutral-bg: rgba(255, 247, 214, 0.94);
+            --tone-neutral-fg: #4b5563;
+            --tone-neutral-border: rgba(148, 163, 184, 0.28);
+            --tone-neutral-bg: rgba(243, 244, 246, 0.94);
             --surface-strong: #162033;
             --surface-muted: #526077;
         }
@@ -84,7 +84,9 @@
         .detail-meta-chip {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 0.4rem;
+            min-height: 22px;
             padding: 0.5rem 0.75rem;
             border-radius: 999px;
             background: rgba(255, 255, 255, 0.78);
@@ -187,9 +189,14 @@
         }
 
         .detail-status-badges .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 22px;
             padding: 0.5rem 0.8rem;
             border-radius: 999px;
             font-weight: 600;
+            line-height: 1.2;
         }
 
         .detail-callout {
@@ -285,11 +292,13 @@
             align-items: center;
             justify-content: center;
             min-width: 6.35rem;
+            min-height: 22px;
             padding: 0.5rem 0.9rem;
             border-radius: 999px;
             border: 1px solid transparent;
             font-weight: 700;
             font-size: 0.84rem;
+            line-height: 1.2;
         }
 
         .detail-direction-cell {
@@ -524,10 +533,10 @@
                 <span class="detail-meta-chip">
                     <span class="detail-meta-label" th:text="#{news.detail.status}">Status</span>
                     <span th:switch="${newsDetail.status != null ? newsDetail.status.name() : 'UNKNOWN'}">
-                        <span th:case="'ANALYZED'" class="badge bg-success" th:text="#{status.analyzed}">Analyzed</span>
-                        <span th:case="'FAILED'" class="badge bg-danger" th:text="#{status.failed}">Failed</span>
-                        <span th:case="'INGESTED'" class="badge bg-secondary" th:text="#{status.ingested}">Ingested</span>
-                        <span th:case="*" class="badge bg-secondary" th:text="#{status.unknown}">Unknown</span>
+                        <span th:case="'ANALYZED'" class="badge ui-pill bg-success" th:text="#{status.analyzed}">Analyzed</span>
+                        <span th:case="'FAILED'" class="badge ui-pill bg-danger" th:text="#{status.failed}">Failed</span>
+                        <span th:case="'INGESTED'" class="badge ui-pill bg-secondary" th:text="#{status.ingested}">Ingested</span>
+                        <span th:case="*" class="badge ui-pill bg-secondary" th:text="#{status.unknown}">Unknown</span>
                     </span>
                 </span>
                 <span class="detail-meta-chip"
@@ -553,12 +562,12 @@
                     <p class="detail-ai-support" th:text="#{news.detail.interpretationSupport}">The key market read distilled from the article context and AI interpretation.</p>
                 </div>
                 <div class="detail-status-badges">
-                    <span class="badge text-bg-primary" th:text="#{news.detail.interpretationBadge}">AI Market Take</span>
+                    <span class="badge ui-pill text-bg-primary" th:text="#{news.detail.interpretationBadge}">AI Market Take</span>
                     <span th:switch="${newsDetail.status != null ? newsDetail.status.name() : 'UNKNOWN'}">
-                        <span th:case="'ANALYZED'" class="badge bg-success" th:text="#{status.analyzed}">Analyzed</span>
-                        <span th:case="'FAILED'" class="badge bg-danger" th:text="#{status.failed}">Failed</span>
-                        <span th:case="'INGESTED'" class="badge bg-secondary" th:text="#{status.ingested}">Ingested</span>
-                        <span th:case="*" class="badge bg-secondary" th:text="#{status.unknown}">Unknown</span>
+                        <span th:case="'ANALYZED'" class="badge ui-pill bg-success" th:text="#{status.analyzed}">Analyzed</span>
+                        <span th:case="'FAILED'" class="badge ui-pill bg-danger" th:text="#{status.failed}">Failed</span>
+                        <span th:case="'INGESTED'" class="badge ui-pill bg-secondary" th:text="#{status.ingested}">Ingested</span>
+                        <span th:case="*" class="badge ui-pill bg-secondary" th:text="#{status.unknown}">Unknown</span>
                     </span>
                 </div>
             </div>
