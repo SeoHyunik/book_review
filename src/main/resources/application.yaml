@@ -4,6 +4,13 @@
 # - OPENAI_MODEL
 # - OPENAI_MAX_TOKENS
 # - OPENAI_TEMPERATURE
+# - OPENAI_INTERPRETATION_MODEL
+# - OPENAI_PRICING_INTERPRETATION_MODEL
+# - OPENAI_PRICING_INTERPRETATION_MODEL_PROMPT_PER_1K_USD
+# - OPENAI_PRICING_INTERPRETATION_MODEL_COMPLETION_PER_1K_USD
+# - OPENAI_PRICING_SUMMARY_MODEL
+# - OPENAI_PRICING_SUMMARY_MODEL_PROMPT_PER_1K_USD
+# - OPENAI_PRICING_SUMMARY_MODEL_COMPLETION_PER_1K_USD
 # - OPENAI_PRICING_PRIMARY_MODEL
 # - OPENAI_PRICING_PRIMARY_MODEL_PROMPT_PER_1K_USD
 # - OPENAI_PRICING_PRIMARY_MODEL_COMPLETION_PER_1K_USD
@@ -150,13 +157,23 @@ openai:
   api-key: ${OPENAI_API_KEY:}
   api-url: ${OPENAI_API_URL:https://api.openai.com/v1/chat/completions}
   models-url: https://api.openai.com/v1/models
-  model: ${OPENAI_MODEL:gpt-4o}
+  # Cost-sensitive default for article interpretation and similar base analysis flows.
+  model: ${OPENAI_MODEL:gpt-4o-mini}
+  interpretation-model: ${OPENAI_INTERPRETATION_MODEL:${OPENAI_MODEL:gpt-4o-mini}}
   max-tokens: ${OPENAI_MAX_TOKENS:800}
   temperature: ${OPENAI_TEMPERATURE:0.2}
   macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
   forecast-prompt-file: classpath:ai/prompts/market_forecast_aggregation_prompt.json
   featured-market-summary-prompt-file: classpath:ai/prompts/featured_market_summary_prompt.json
   pricing:
+    interpretation-model-name: ${OPENAI_PRICING_INTERPRETATION_MODEL:${OPENAI_INTERPRETATION_MODEL:${OPENAI_MODEL:gpt-4o-mini}}}
+    interpretation-model:
+      prompt-per-1k-usd: ${OPENAI_PRICING_INTERPRETATION_MODEL_PROMPT_PER_1K_USD:0.00015}
+      completion-per-1k-usd: ${OPENAI_PRICING_INTERPRETATION_MODEL_COMPLETION_PER_1K_USD:0.0006}
+    summary-model-name: ${OPENAI_PRICING_SUMMARY_MODEL:${APP_FEATURED_MARKET_SUMMARY_AI_MODEL:gpt-5}}
+    summary-model:
+      prompt-per-1k-usd: ${OPENAI_PRICING_SUMMARY_MODEL_PROMPT_PER_1K_USD:0.00125}
+      completion-per-1k-usd: ${OPENAI_PRICING_SUMMARY_MODEL_COMPLETION_PER_1K_USD:0.01}
     primary-model-name: ${OPENAI_PRICING_PRIMARY_MODEL:${OPENAI_MODEL:gpt-4o}}
     primary-model:
       prompt-per-1k-usd: ${OPENAI_PRICING_PRIMARY_MODEL_PROMPT_PER_1K_USD:0.005}
@@ -287,7 +304,8 @@ app:
       max-items: ${APP_FEATURED_MARKET_SUMMARY_MAX_ITEMS:10}
       min-items: ${APP_FEATURED_MARKET_SUMMARY_MIN_ITEMS:3}
       ai-enabled: ${APP_FEATURED_MARKET_SUMMARY_AI_ENABLED:true}
-      ai-model: ${APP_FEATURED_MARKET_SUMMARY_AI_MODEL:${OPENAI_MODEL:gpt-4o}}
+      # Dedicated stronger model for current/featured market summary generation.
+      ai-model: ${APP_FEATURED_MARKET_SUMMARY_AI_MODEL:gpt-5}
       ai-window-hours: ${APP_FEATURED_MARKET_SUMMARY_AI_WINDOW_HOURS:3}
       ai-max-items: ${APP_FEATURED_MARKET_SUMMARY_AI_MAX_ITEMS:10}
       ai-min-items: ${APP_FEATURED_MARKET_SUMMARY_AI_MIN_ITEMS:3}

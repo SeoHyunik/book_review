@@ -56,8 +56,8 @@ public class MacroAiServiceImpl implements MacroAiService {
     @Value("${openai.api-url:}")
     private String openAiUrl;
 
-    @Value("${openai.model:gpt-4o}")
-    private String openAiModel;
+    @Value("${openai.interpretation-model:${openai.model:gpt-4o-mini}}")
+    private String interpretationModel;
 
     @Value("${openai.max-tokens:800}")
     private int openAiMaxTokens;
@@ -98,7 +98,7 @@ public class MacroAiServiceImpl implements MacroAiService {
         }
         openAiUsageLoggingService.recordUsage(
                 OpenAiUsageFeatureType.MACRO_INTERPRETATION,
-                openAiModel,
+                interpretationModel,
                 apiResult.body());
 
         AnalysisResult result = parseAnalysisResult(apiResult.body());
@@ -153,8 +153,8 @@ public class MacroAiServiceImpl implements MacroAiService {
         if (!StringUtils.hasText(openAiUrl)) {
             throw new IllegalStateException("openai.api-url is not configured");
         }
-        if (!StringUtils.hasText(openAiModel)) {
-            throw new IllegalStateException("openai.model is not configured");
+        if (!StringUtils.hasText(interpretationModel)) {
+            throw new IllegalStateException("openai.interpretation-model is not configured");
         }
     }
 
@@ -187,7 +187,7 @@ public class MacroAiServiceImpl implements MacroAiService {
             }
 
             java.util.Map<String, Object> root = new java.util.LinkedHashMap<>();
-            root.put("model", openAiModel);
+            root.put("model", interpretationModel);
             root.put("messages", messages);
             root.put("max_tokens", openAiMaxTokens);
             root.put("temperature", openAiTemperature);
@@ -238,7 +238,7 @@ public class MacroAiServiceImpl implements MacroAiService {
             List<MarketImpact> marketImpacts = parseMarketImpacts(marketImpactsNode);
 
             return new AnalysisResult(
-                    openAiModel,
+                    interpretationModel,
                     Instant.now(),
                     readOptionalText(node, "headlineKo"),
                     readOptionalText(node, "headlineEn"),

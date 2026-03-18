@@ -59,7 +59,7 @@ public class AiMarketSummaryService {
     @Value("${app.featured.market-summary.ai-enabled:true}")
     private boolean aiEnabled;
 
-    @Value("${app.featured.market-summary.ai-model:${openai.model:gpt-4o}}")
+    @Value("${app.featured.market-summary.ai-model:gpt-5}")
     private String aiModel;
 
     @Value("${app.featured.market-summary.ai-window-hours:3}")
