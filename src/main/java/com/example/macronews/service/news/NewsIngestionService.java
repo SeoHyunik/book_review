@@ -14,4 +14,6 @@ public interface NewsIngestionService {
     NewsEvent ingestManual(AdminIngestionRequest request);
 
     boolean deleteById(String id);
+
+    int deleteByIds(List<String> ids);
 }
