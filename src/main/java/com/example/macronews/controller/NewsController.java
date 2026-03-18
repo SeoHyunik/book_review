@@ -62,25 +62,13 @@ public class NewsController {
         MarketSignalOverviewDto marketSignalOverview =
                 newsQueryService.getMarketSignalOverview(selectedStatus, selectedSort);
         MarketForecastSnapshotDto marketForecastSnapshot = marketForecastQueryService.getCurrentSnapshot().orElse(null);
-        FeaturedMarketSummaryDto featuredStoredMarketSummary = marketSummarySnapshotService.getLatestValidSummary().orElse(null);
-        FeaturedMarketSummaryDto featuredAiMarketSummary = featuredStoredMarketSummary == null
-                ? aiMarketSummaryService.getCurrentSummary().orElse(null)
-                : null;
-        FeaturedMarketSummaryDto featuredMarketSummary = featuredStoredMarketSummary == null
-                && featuredAiMarketSummary == null
-                ? recentMarketSummaryService.getCurrentSummary().orElse(null)
-                : null;
+        FeaturedSummarySelection featuredSummarySelection = resolveFeaturedSummarySelection();
+        FeaturedMarketSummaryDto featuredStoredMarketSummary = featuredSummarySelection.storedSummary();
+        FeaturedMarketSummaryDto featuredAiMarketSummary = featuredSummarySelection.aiSummary();
+        FeaturedMarketSummaryDto featuredMarketSummary = featuredSummarySelection.recentSummary();
         NewsListItemDto featuredNews = allNewsItems.isEmpty() ? null : allNewsItems.get(0);
-        String featuredPrimaryMode = featuredStoredMarketSummary != null
-                ? "stored-summary"
-                : (featuredAiMarketSummary != null
-                ? "ai-summary"
-                : (featuredMarketSummary != null
-                ? "recent-summary"
-                : "article"));
-        boolean featuredSummaryMode = featuredStoredMarketSummary != null
-                || featuredAiMarketSummary != null
-                || featuredMarketSummary != null;
+        String featuredPrimaryMode = featuredSummarySelection.primaryMode();
+        boolean featuredSummaryMode = featuredSummarySelection.summaryMode();
         model.addAttribute("newsItems", newsItems);
         model.addAttribute("featuredNews", featuredNews);
         model.addAttribute("featuredStoredMarketSummary", featuredStoredMarketSummary);
@@ -101,9 +89,32 @@ public class NewsController {
         model.addAttribute("pageDescriptionKey", "page.news.list.description");
         model.addAttribute("ogTitleKey", "page.news.list.title");
         model.addAttribute("ogDescriptionKey", "page.news.list.description");
-        log.debug("Rendering news list page with {} entries statusFilter={} sort={}",
-                newsItems.size(), selectedStatus, selectedSort);
+        log.info("Rendering news list page entries={} statusFilter={} sort={} featuredMode={}",
+                newsItems.size(), selectedStatus, selectedSort, featuredPrimaryMode);
         return "news/list";
+    }
+
+    private FeaturedSummarySelection resolveFeaturedSummarySelection() {
+        FeaturedMarketSummaryDto storedSummary = marketSummarySnapshotService.getLatestValidSummary().orElse(null);
+        if (storedSummary != null) {
+            log.debug("Featured summary mode resolved to stored snapshot id={}", storedSummary.snapshotId());
+            return new FeaturedSummarySelection(storedSummary, null, null, "stored-summary", true);
+        }
+
+        FeaturedMarketSummaryDto aiSummary = aiMarketSummaryService.getCurrentSummary().orElse(null);
+        if (aiSummary != null) {
+            log.debug("Featured summary mode resolved to current AI summary generatedAt={}", aiSummary.generatedAt());
+            return new FeaturedSummarySelection(null, aiSummary, null, "ai-summary", true);
+        }
+
+        FeaturedMarketSummaryDto recentSummary = recentMarketSummaryService.getCurrentSummary().orElse(null);
+        if (recentSummary != null) {
+            log.debug("Featured summary mode resolved to recent summary generatedAt={}", recentSummary.generatedAt());
+            return new FeaturedSummarySelection(null, null, recentSummary, "recent-summary", true);
+        }
+
+        log.debug("Featured summary mode resolved to article fallback");
+        return new FeaturedSummarySelection(null, null, null, "article", false);
     }
 
     @GetMapping("/{id}")
@@ -270,5 +281,14 @@ public class NewsController {
             }
         }
         return boundary;
+    }
+
+    private record FeaturedSummarySelection(
+            FeaturedMarketSummaryDto storedSummary,
+            FeaturedMarketSummaryDto aiSummary,
+            FeaturedMarketSummaryDto recentSummary,
+            String primaryMode,
+            boolean summaryMode
+    ) {
     }
 }

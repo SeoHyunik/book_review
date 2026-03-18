@@ -852,7 +852,8 @@
 
     <section class="mb-4" th:if="${featuredStoredSummary != null or featuredAiSummary != null or featuredSummary != null or featuredNews != null}"
              th:with="activeFeaturedSummary=${featuredStoredSummary != null ? featuredStoredSummary : (featuredAiSummary != null ? featuredAiSummary : featuredSummary)},
-                      featuredSignal=${activeFeaturedSummary != null ? (activeFeaturedSummary.dominantSentiment != null and activeFeaturedSummary.dominantSentiment.name() == 'POSITIVE' ? 'bullish' : (activeFeaturedSummary.dominantSentiment != null and activeFeaturedSummary.dominantSentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed')) : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'POSITIVE' ? 'bullish' : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed'))}">
+                      featuredSignal=${activeFeaturedSummary != null ? (activeFeaturedSummary.dominantSentiment != null and activeFeaturedSummary.dominantSentiment.name() == 'POSITIVE' ? 'bullish' : (activeFeaturedSummary.dominantSentiment != null and activeFeaturedSummary.dominantSentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed')) : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'POSITIVE' ? 'bullish' : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed'))},
+                      featuredDetailHref=${featuredStoredSummary != null and featuredStoredSummary.snapshotId != null and !#strings.isEmpty(featuredStoredSummary.snapshotId) ? '/market-summary/' + featuredStoredSummary.snapshotId : (activeFeaturedSummary != null ? '/market-summary/current' : '/news/' + featuredNews.id)}">
         <div class="card border-0 overflow-hidden news-surface featured-card"
              th:classappend="${featuredSignal == 'bullish' ? ' featured-card--bullish' : (featuredSignal == 'bearish' ? ' featured-card--bearish' : ' featured-card--mixed')}">
             <div class="card-body p-4">
@@ -902,7 +903,7 @@
                         <div class="small text-secondary text-uppercase featured-card-panel-label"
                              th:text="${featuredSummaryMode ? #messages.msg('news.featured.marketSummary.kicker') : #messages.msg('news.featured.kicker')}">AI Analysis</div>
                         <a class="btn btn-sm btn-primary px-3 text-nowrap shadow-sm"
-                           th:href="${featuredStoredSummary != null and featuredStoredSummary.snapshotId != null and !#strings.isEmpty(featuredStoredSummary.snapshotId) ? '/market-summary/' + featuredStoredSummary.snapshotId : (activeFeaturedSummary != null and activeFeaturedSummary.supportingNewsIds != null and !#lists.isEmpty(activeFeaturedSummary.supportingNewsIds) ? '/news/' + activeFeaturedSummary.supportingNewsIds[0] : '/news/' + featuredNews.id)}"
+                           th:href="${featuredDetailHref}"
                            th:text="${featuredStoredSummary != null ? #messages.msg('news.featured.marketSummary.snapshotAction') : (featuredAiSummary != null ? #messages.msg('news.featured.marketSummary.aiAction') : (featuredSummary != null ? #messages.msg('news.featured.marketSummary.action') : #messages.msg('news.featured.action')))}">View Details</a>
                     </div>
                 </div>
