@@ -3,6 +3,7 @@ package com.example.macronews.service.news;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.AdminIngestionRequest;
+import java.time.Instant;
 import java.util.List;
 
 public interface NewsIngestionService {
@@ -16,4 +17,6 @@ public interface NewsIngestionService {
     boolean deleteById(String id);
 
     int deleteByIds(List<String> ids);
+
+    int deleteExpiredBefore(Instant cutoff);
 }

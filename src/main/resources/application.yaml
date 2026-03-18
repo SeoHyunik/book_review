@@ -243,6 +243,8 @@ app:
       # Spring mail sender configuration is also required; runtime toggle state resets on restart or redeploy.
       from: ${APP_NOTIFICATION_EMAIL_FROM:}
   news:
+    cleanup:
+      cron: ${APP_NEWS_CLEANUP_CRON:0 0 * * * *}
     global:
       enabled: ${APP_NEWS_GLOBAL_ENABLED:true}
       max-age-hours: ${APP_NEWS_GLOBAL_MAX_AGE_HOURS:24}
@@ -321,7 +323,6 @@ app:
     free-detail-views: 3
   auth:
     google-login-enabled: false
-
 
 
 

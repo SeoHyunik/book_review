@@ -182,6 +182,31 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         return existingIds.size();
     }
 
+    @Override
+    @Transactional
+    public int deleteExpiredBefore(Instant cutoff) {
+        if (cutoff == null) {
+            log.info("[CLEANUP] expired delete skipped reason=no-cutoff");
+            return 0;
+        }
+
+        List<String> expiredIds = newsEventRepository.findByIngestedAtBefore(cutoff).stream()
+                .map(NewsEvent::id)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+
+        if (expiredIds.isEmpty()) {
+            log.debug("[CLEANUP] expired delete skipped reason=no-expired-news cutoff={}", cutoff);
+            return 0;
+        }
+
+        int deletedCount = deleteByIds(expiredIds);
+        log.info("[CLEANUP] expired delete completed cutoff={} requested={} deleted={}",
+                cutoff, expiredIds.size(), deletedCount);
+        return deletedCount;
+    }
+
     private void submitAsyncInterpretations(List<String> eventIds) {
         if (eventIds.isEmpty()) {
             return;
