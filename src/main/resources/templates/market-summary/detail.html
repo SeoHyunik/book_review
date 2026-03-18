@@ -188,7 +188,8 @@
     <section class="card border-0 summary-surface summary-hero mb-4" th:if="${marketSummaryDetail != null}">
         <div class="card-body p-4 p-lg-5 d-flex flex-column gap-3">
             <div class="summary-meta">
-                <span class="badge ui-pill rounded-pill bg-dark-subtle text-dark-emphasis" th:text="#{news.featured.marketSummary.snapshotLabel}">AI Market Snapshot</span>
+                <span class="badge ui-pill rounded-pill bg-dark-subtle text-dark-emphasis"
+                      th:text="${marketSummarySourceMode == 'stored' ? #messages.msg('news.featured.marketSummary.snapshotLabel') : (marketSummarySourceMode == 'ai' ? #messages.msg('news.featured.marketSummary.aiLabel') : #messages.msg('news.featured.marketSummary.label'))}">AI Market Snapshot</span>
                 <span class="summary-meta-chip ui-pill" th:text="${#messages.msg('forecast.generatedAt') + ' / ' + marketSummaryDetail.generatedAt}">Generated</span>
                 <span class="summary-meta-chip ui-pill" th:text="#{news.featured.marketSummary.sources(${marketSummaryDetail.sourceCount})}">Sources</span>
                 <span class="summary-meta-chip ui-pill" th:text="#{news.featured.marketSummary.window(${marketSummaryDetail.windowHours})}">Window</span>
@@ -235,7 +236,8 @@
         </div>
     </section>
 
-    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
+    <section class="summary-section card border-0 summary-surface summary-section-card"
+             th:if="${marketSummaryDetail != null and ((marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo)) or (marketSummaryDetail.marketViewEn != null and !#strings.isEmpty(marketSummaryDetail.marketViewEn)))}">
         <div class="card-body p-4">
             <div class="summary-section-kicker" th:text="#{market.summary.detail.marketView}">Market View</div>
             <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.marketViewTitle}">Market View</h2>

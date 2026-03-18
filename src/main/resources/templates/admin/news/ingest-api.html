@@ -123,16 +123,29 @@
                                     Target Missing
                                 </span>
                             </div>
-                            <div class="small text-secondary d-flex flex-column gap-1">
-                                <span th:if="${!keepAliveStatus.configEnabled}"
+                            <div class="small d-flex flex-column gap-1">
+                                <span class="fw-semibold"
+                                      th:if="${!keepAliveStatus.configEnabled}"
                                       th:text="#{admin.news.auto.keepAlive.configHint.disabled}">
                                     Keep-alive is globally disabled in configuration.
                                 </span>
-                                <span th:if="${keepAliveStatus.configEnabled and !keepAliveStatus.detailConfigured}"
+                                <span class="fw-semibold"
+                                      th:if="${keepAliveStatus.configEnabled and !keepAliveStatus.detailConfigured}"
                                       th:text="#{admin.news.auto.keepAlive.configHint.targetMissing}">
                                     Configure a keep-alive target URL to make runtime start effective.
                                 </span>
-                                <span th:if="${keepAliveStatus.configEnabled}"
+                                <span class="fw-semibold"
+                                      th:if="${keepAliveStatus.configEnabled and keepAliveStatus.detailConfigured and !keepAliveStatus.runtimeEnabled}"
+                                      th:text="#{admin.news.auto.keepAlive.configHint.runtimeDisabled}">
+                                    Runtime keep-alive is currently turned off by admin setting.
+                                </span>
+                                <span class="text-secondary"
+                                      th:if="${keepAliveStatus.configEnabled and keepAliveStatus.detailConfigured}"
+                                      th:text="#{admin.news.auto.keepAlive.configHint.externalPing}">
+                                    On sleeping free-tier hosting, an outside periodic request may still be needed.
+                                </span>
+                                <span class="text-secondary"
+                                      th:if="${keepAliveStatus.configEnabled}"
                                       th:text="#{admin.news.auto.ops.runtimeReset}">
                                     Runtime state resets on restart or redeploy.
                                 </span>
@@ -162,6 +175,11 @@
                                       th:if="${!keepAliveStatus.configEnabled}"
                                       th:text="#{admin.news.auto.keepAlive.control.disabled}">
                                     Enable keep-alive in static configuration to use runtime controls.
+                                </span>
+                                <span class="small text-secondary"
+                                      th:if="${keepAliveStatus.configEnabled and !keepAliveStatus.detailConfigured}"
+                                      th:text="#{admin.news.auto.keepAlive.control.targetMissing}">
+                                    Set a target URL before using runtime controls.
                                 </span>
                             </div>
                         </div>
@@ -203,20 +221,29 @@
                                     Mail Sender Missing
                                 </span>
                             </div>
-                            <div class="small text-secondary d-flex flex-column gap-1">
-                                <span th:if="${!emailNotificationStatus.configEnabled}"
+                            <div class="small d-flex flex-column gap-1">
+                                <span class="fw-semibold"
+                                      th:if="${!emailNotificationStatus.configEnabled}"
                                       th:text="#{admin.news.auto.email.configHint.disabled}">
                                     Email notification is globally disabled in configuration.
                                 </span>
-                                <span th:if="${emailNotificationStatus.configEnabled and !emailNotificationStatus.detailConfigured}"
+                                <span class="fw-semibold"
+                                      th:if="${emailNotificationStatus.configEnabled and !emailNotificationStatus.detailConfigured}"
                                       th:text="#{admin.news.auto.email.configHint.recipientMissing}">
                                     Configure an email recipient to make runtime start effective.
                                 </span>
-                                <span th:if="${emailNotificationStatus.configEnabled and !emailNotificationStatus.mailSenderAvailable}"
+                                <span class="fw-semibold"
+                                      th:if="${emailNotificationStatus.configEnabled and emailNotificationStatus.detailConfigured and !emailNotificationStatus.mailSenderAvailable}"
                                       th:text="#{admin.news.auto.email.configHint.senderMissing}">
                                     Configure Spring mail settings to make runtime start effective.
                                 </span>
-                                <span th:if="${emailNotificationStatus.configEnabled}"
+                                <span class="fw-semibold"
+                                      th:if="${emailNotificationStatus.configEnabled and emailNotificationStatus.detailConfigured and emailNotificationStatus.mailSenderAvailable and !emailNotificationStatus.runtimeEnabled}"
+                                      th:text="#{admin.news.auto.email.configHint.runtimeDisabled}">
+                                    Runtime email notification is currently turned off by admin setting.
+                                </span>
+                                <span class="text-secondary"
+                                      th:if="${emailNotificationStatus.configEnabled}"
                                       th:text="#{admin.news.auto.ops.runtimeReset}">
                                     Runtime state resets on restart or redeploy.
                                 </span>
@@ -246,6 +273,16 @@
                                       th:if="${!emailNotificationStatus.configEnabled}"
                                       th:text="#{admin.news.auto.email.control.disabled}">
                                     Enable email notification in static configuration to use runtime controls.
+                                </span>
+                                <span class="small text-secondary"
+                                      th:if="${emailNotificationStatus.configEnabled and !emailNotificationStatus.detailConfigured}"
+                                      th:text="#{admin.news.auto.email.control.recipientMissing}">
+                                    Set a recipient before using runtime controls.
+                                </span>
+                                <span class="small text-secondary"
+                                      th:if="${emailNotificationStatus.configEnabled and emailNotificationStatus.detailConfigured and !emailNotificationStatus.mailSenderAvailable}"
+                                      th:text="#{admin.news.auto.email.control.senderMissing}">
+                                    Configure mail sending before using runtime controls.
                                 </span>
                             </div>
                         </div>

@@ -3,6 +3,7 @@ package com.example.macronews.service.forecast;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastDetailDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
+import com.example.macronews.dto.forecast.MarketForecastSummaryHandoffDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.dto.market.GoldSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
@@ -25,6 +26,10 @@ public class MarketForecastQueryService {
         return newsAggregationService.getCurrentSnapshot();
     }
 
+    public Optional<MarketForecastSummaryHandoffDto> getCurrentSummaryHandoff() {
+        return getCurrentSnapshot().map(this::toSummaryHandoff);
+    }
+
     public Optional<MarketForecastDetailDto> getCurrentForecastDetail() {
         return getCurrentSnapshot().map(snapshot -> {
             List<NewsListItemDto> relatedNewsItems = newsQueryService.getNewsItemsByIds(snapshot.relatedNewsIds());
@@ -33,5 +38,16 @@ public class MarketForecastQueryService {
             OilSnapshotDto oilSnapshot = marketDataFacade.getOil().orElse(null);
             return new MarketForecastDetailDto(snapshot, relatedNewsItems, fxSnapshot, goldSnapshot, oilSnapshot);
         });
+    }
+
+    private MarketForecastSummaryHandoffDto toSummaryHandoff(MarketForecastSnapshotDto snapshot) {
+        return new MarketForecastSummaryHandoffDto(
+                snapshot.mood(),
+                snapshot.macroDirections(),
+                snapshot.keyDrivers(),
+                snapshot.relatedNewsIds(),
+                snapshot.analyzedNewsCount(),
+                snapshot.generatedAt()
+        );
     }
 }

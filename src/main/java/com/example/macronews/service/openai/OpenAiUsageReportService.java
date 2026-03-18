@@ -35,14 +35,32 @@ public class OpenAiUsageReportService {
     private final OpenAiUsageRecordRepository openAiUsageRecordRepository;
     private final MarketDataFacade marketDataFacade;
 
-    @Value("${openai.pricing.primary-model-name:${openai.model:gpt-4o}}")
-    private String primaryModel;
+    @Value("${openai.pricing.interpretation-model-name:${openai.interpretation-model:${openai.model:gpt-4o-mini}}}")
+    private String interpretationModel;
+
+    @Value("${openai.pricing.interpretation-model.prompt-per-1k-usd:0.00015}")
+    private BigDecimal interpretationPromptPer1kUsd;
+
+    @Value("${openai.pricing.interpretation-model.completion-per-1k-usd:0.0006}")
+    private BigDecimal interpretationCompletionPer1kUsd;
+
+    @Value("${openai.pricing.summary-model-name:${app.featured.market-summary.ai-model:gpt-5}}")
+    private String summaryModel;
+
+    @Value("${openai.pricing.summary-model.prompt-per-1k-usd:0.00125}")
+    private BigDecimal summaryPromptPer1kUsd;
+
+    @Value("${openai.pricing.summary-model.completion-per-1k-usd:0.01}")
+    private BigDecimal summaryCompletionPer1kUsd;
+
+    @Value("${openai.pricing.primary-model-name:}")
+    private String legacyPrimaryModel;
 
     @Value("${openai.pricing.primary-model.prompt-per-1k-usd:0.005}")
-    private BigDecimal primaryPromptPer1kUsd;
+    private BigDecimal legacyPrimaryPromptPer1kUsd;
 
     @Value("${openai.pricing.primary-model.completion-per-1k-usd:0.015}")
-    private BigDecimal primaryCompletionPer1kUsd;
+    private BigDecimal legacyPrimaryCompletionPer1kUsd;
 
     @Value("${openai.pricing.default.prompt-per-1k-usd:0.005}")
     private BigDecimal defaultPromptPer1kUsd;
@@ -181,8 +199,14 @@ public class OpenAiUsageReportService {
     }
 
     private Pricing resolvePricing(String model) {
-        if (model != null && model.equalsIgnoreCase(primaryModel)) {
-            return new Pricing(primaryPromptPer1kUsd, primaryCompletionPer1kUsd);
+        if (model != null && model.equalsIgnoreCase(summaryModel)) {
+            return new Pricing(summaryPromptPer1kUsd, summaryCompletionPer1kUsd);
+        }
+        if (model != null && model.equalsIgnoreCase(interpretationModel)) {
+            return new Pricing(interpretationPromptPer1kUsd, interpretationCompletionPer1kUsd);
+        }
+        if (model != null && model.equalsIgnoreCase(legacyPrimaryModel)) {
+            return new Pricing(legacyPrimaryPromptPer1kUsd, legacyPrimaryCompletionPer1kUsd);
         }
         return new Pricing(defaultPromptPer1kUsd, defaultCompletionPer1kUsd);
     }
