@@ -22,10 +22,45 @@
             box-shadow: 0 1rem 2.4rem rgba(15, 23, 42, 0.06);
         }
 
+        .summary-surface--positive {
+            border-color: rgba(255, 133, 94, 0.24);
+            box-shadow: 0 1rem 2.4rem rgba(185, 56, 45, 0.08);
+        }
+
+        .summary-surface--negative {
+            border-color: rgba(96, 165, 250, 0.26);
+            box-shadow: 0 1rem 2.4rem rgba(33, 88, 181, 0.08);
+        }
+
+        .summary-surface--neutral {
+            border-color: rgba(148, 163, 184, 0.24);
+        }
+
         .summary-hero {
             background:
                 radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 34%),
                 linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
+        }
+
+        .summary-hero--positive {
+            background:
+                radial-gradient(circle at top right, rgba(255, 133, 94, 0.18), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(248, 113, 113, 0.12), transparent 40%),
+                linear-gradient(180deg, rgba(255, 250, 249, 0.98), rgba(254, 242, 242, 0.98));
+        }
+
+        .summary-hero--negative {
+            background:
+                radial-gradient(circle at top right, rgba(96, 165, 250, 0.18), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.12), transparent 40%),
+                linear-gradient(180deg, rgba(248, 251, 255, 0.98), rgba(239, 246, 255, 0.98));
+        }
+
+        .summary-hero--neutral {
+            background:
+                radial-gradient(circle at top right, rgba(148, 163, 184, 0.16), transparent 34%),
+                radial-gradient(circle at bottom left, rgba(203, 213, 225, 0.14), transparent 40%),
+                linear-gradient(180deg, rgba(250, 251, 252, 0.98), rgba(243, 244, 246, 0.98));
         }
 
         .summary-heading {
@@ -69,6 +104,21 @@
 
         .summary-section-card {
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+        }
+
+        .summary-section-card--positive {
+            background:
+                linear-gradient(180deg, rgba(255, 252, 251, 0.98), rgba(255, 245, 243, 0.96));
+        }
+
+        .summary-section-card--negative {
+            background:
+                linear-gradient(180deg, rgba(249, 252, 255, 0.98), rgba(239, 246, 255, 0.96));
+        }
+
+        .summary-section-card--neutral {
+            background:
+                linear-gradient(180deg, rgba(250, 251, 252, 0.98), rgba(243, 244, 246, 0.96));
         }
 
         .summary-section-kicker {
@@ -188,14 +238,61 @@
             box-shadow: 0 1.2rem 2.8rem rgba(0, 0, 0, 0.32);
         }
 
+        [data-bs-theme="dark"] .summary-surface--positive {
+            border-color: rgba(251, 146, 60, 0.22);
+            box-shadow: 0 1.2rem 2.8rem rgba(127, 29, 29, 0.28);
+        }
+
+        [data-bs-theme="dark"] .summary-surface--negative {
+            border-color: rgba(96, 165, 250, 0.24);
+            box-shadow: 0 1.2rem 2.8rem rgba(30, 64, 175, 0.28);
+        }
+
+        [data-bs-theme="dark"] .summary-surface--neutral {
+            border-color: rgba(148, 163, 184, 0.18);
+        }
+
         [data-bs-theme="dark"] .summary-hero {
             background:
                 radial-gradient(circle at top right, rgba(96, 165, 250, 0.18), transparent 38%),
                 linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(17, 24, 39, 0.96));
         }
 
+        [data-bs-theme="dark"] .summary-hero--positive {
+            background:
+                radial-gradient(circle at top right, rgba(248, 113, 113, 0.18), transparent 38%),
+                radial-gradient(circle at bottom left, rgba(251, 146, 60, 0.14), transparent 44%),
+                linear-gradient(180deg, rgba(39, 16, 19, 0.98), rgba(49, 18, 22, 0.96));
+        }
+
+        [data-bs-theme="dark"] .summary-hero--negative {
+            background:
+                radial-gradient(circle at top right, rgba(96, 165, 250, 0.2), transparent 38%),
+                radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.14), transparent 44%),
+                linear-gradient(180deg, rgba(12, 24, 44, 0.98), rgba(14, 30, 56, 0.96));
+        }
+
+        [data-bs-theme="dark"] .summary-hero--neutral {
+            background:
+                radial-gradient(circle at top right, rgba(148, 163, 184, 0.18), transparent 38%),
+                radial-gradient(circle at bottom left, rgba(100, 116, 139, 0.14), transparent 44%),
+                linear-gradient(180deg, rgba(17, 24, 39, 0.98), rgba(24, 31, 45, 0.96));
+        }
+
         [data-bs-theme="dark"] .summary-section-card {
             background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(17, 24, 39, 0.96));
+        }
+
+        [data-bs-theme="dark"] .summary-section-card--positive {
+            background: linear-gradient(180deg, rgba(35, 16, 20, 0.98), rgba(44, 17, 22, 0.96));
+        }
+
+        [data-bs-theme="dark"] .summary-section-card--negative {
+            background: linear-gradient(180deg, rgba(14, 24, 44, 0.98), rgba(16, 29, 56, 0.96));
+        }
+
+        [data-bs-theme="dark"] .summary-section-card--neutral {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(24, 31, 45, 0.96));
         }
 
         [data-bs-theme="dark"] .summary-heading,
@@ -270,7 +367,9 @@
     </section>
 
     <section class="card border-0 summary-surface summary-hero mb-4" th:if="${marketSummaryDetail != null}"
-             th:with="localizedHeadline=${#locale.language == 'ko' and marketSummaryDetail.headlineKo != null and !#strings.isEmpty(marketSummaryDetail.headlineKo) ? marketSummaryDetail.headlineKo : (marketSummaryDetail.headlineEn != null and !#strings.isEmpty(marketSummaryDetail.headlineEn) ? marketSummaryDetail.headlineEn : '-') }">
+             th:with="localizedHeadline=${#locale.language == 'ko' and marketSummaryDetail.headlineKo != null and !#strings.isEmpty(marketSummaryDetail.headlineKo) ? marketSummaryDetail.headlineKo : (marketSummaryDetail.headlineEn != null and !#strings.isEmpty(marketSummaryDetail.headlineEn) ? marketSummaryDetail.headlineEn : '-') },
+                      sentiment=${marketSummaryDetail.dominantSentiment != null ? marketSummaryDetail.dominantSentiment.name() : 'NEUTRAL'}"
+             th:classappend="${sentiment == 'POSITIVE' ? ' summary-surface--positive summary-hero--positive' : (sentiment == 'NEGATIVE' ? ' summary-surface--negative summary-hero--negative' : ' summary-surface--neutral summary-hero--neutral')}">
         <div class="card-body p-4 p-lg-5 d-flex flex-column gap-3">
             <div class="summary-meta">
                 <span class="badge ui-pill rounded-pill bg-dark-subtle text-dark-emphasis"
@@ -289,6 +388,7 @@
     </section>
 
     <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}"
+             th:classappend="${marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'POSITIVE' ? ' summary-surface--positive summary-section-card--positive' : (marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'NEGATIVE' ? ' summary-surface--negative summary-section-card--negative' : ' summary-surface--neutral summary-section-card--neutral')}"
              th:with="localizedSummary=${marketSummaryDetail.summaryKo != null and !#strings.isEmpty(marketSummaryDetail.summaryKo) and #locale.language == 'ko' ? marketSummaryDetail.summaryKo : (marketSummaryDetail.summaryEn != null and !#strings.isEmpty(marketSummaryDetail.summaryEn) ? marketSummaryDetail.summaryEn : (marketSummaryDetail.summaryKo != null and !#strings.isEmpty(marketSummaryDetail.summaryKo) ? marketSummaryDetail.summaryKo : '-'))}">
         <div class="card-body p-4">
             <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{news.detail.summary}">Summary</h2>
@@ -302,6 +402,7 @@
     </section>
 
     <section class="summary-section card border-0 summary-surface summary-section-card"
+             th:classappend="${marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'POSITIVE' ? ' summary-surface--positive summary-section-card--positive' : (marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'NEGATIVE' ? ' summary-surface--negative summary-section-card--negative' : ' summary-surface--neutral summary-section-card--neutral')}"
              th:if="${marketSummaryDetail != null and ((marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo)) or (marketSummaryDetail.marketViewEn != null and !#strings.isEmpty(marketSummaryDetail.marketViewEn)))}"
              th:with="localizedMarketView=${marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo) and #locale.language == 'ko' ? marketSummaryDetail.marketViewKo : (marketSummaryDetail.marketViewEn != null and !#strings.isEmpty(marketSummaryDetail.marketViewEn) ? marketSummaryDetail.marketViewEn : (marketSummaryDetail.marketViewKo != null and !#strings.isEmpty(marketSummaryDetail.marketViewKo) ? marketSummaryDetail.marketViewKo : '-'))}">
         <div class="card-body p-4">
@@ -316,6 +417,7 @@
     </section>
 
     <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}"
+             th:classappend="${marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'POSITIVE' ? ' summary-surface--positive summary-section-card--positive' : (marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'NEGATIVE' ? ' summary-surface--negative summary-section-card--negative' : ' summary-surface--neutral summary-section-card--neutral')}"
              th:with="sentiment=${marketSummaryDetail.dominantSentiment != null ? marketSummaryDetail.dominantSentiment.name() : 'NEUTRAL'}">
         <div class="card-body p-4">
             <div class="summary-section-kicker" th:text="#{market.summary.detail.signal}">Signal</div>
@@ -334,7 +436,8 @@
         </div>
     </section>
 
-    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
+    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}"
+             th:classappend="${marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'POSITIVE' ? ' summary-surface--positive summary-section-card--positive' : (marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'NEGATIVE' ? ' summary-surface--negative summary-section-card--negative' : ' summary-surface--neutral summary-section-card--neutral')}">
         <div class="card-body p-4">
             <h2 class="h6 fw-bold summary-section-title mb-3" th:text="#{market.summary.detail.driversTitle}">Key Drivers</h2>
             <div class="summary-driver-list" th:if="${marketSummaryDetail.keyDrivers != null and !#lists.isEmpty(marketSummaryDetail.keyDrivers)}">
@@ -345,7 +448,8 @@
         </div>
     </section>
 
-    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}">
+    <section class="summary-section card border-0 summary-surface summary-section-card" th:if="${marketSummaryDetail != null}"
+             th:classappend="${marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'POSITIVE' ? ' summary-surface--positive summary-section-card--positive' : (marketSummaryDetail.dominantSentiment != null and marketSummaryDetail.dominantSentiment.name() == 'NEGATIVE' ? ' summary-surface--negative summary-section-card--negative' : ' summary-surface--neutral summary-section-card--neutral')}">
         <div class="card-body p-4">
             <h2 class="h6 fw-bold summary-section-title mb-2" th:text="#{market.summary.detail.evidenceTitle}">Evidence</h2>
             <p class="text-secondary small mb-3" th:text="#{market.summary.detail.evidenceDescription}">Signals and articles that most influenced this market summary.</p>
