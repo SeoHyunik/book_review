@@ -802,35 +802,33 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-width: 1.5rem;
-            line-height: 1;
-        }
-
-        .forecast-direction-up,
-        .forecast-direction-down,
-        .forecast-direction-neutral {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 1.5rem;
+            min-width: 4.2rem;
+            padding: 0.34rem 0.75rem;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            font-size: 0.82rem;
+            font-weight: 700;
+            line-height: 1.2;
+            letter-spacing: -0.01em;
+            vertical-align: middle;
         }
 
         .forecast-sentiment-positive {
             color: var(--tone-positive-fg);
-            font-size: 22px;
-            font-weight: bold;
+            background: var(--tone-positive-bg);
+            border-color: var(--tone-positive-border);
         }
 
         .forecast-sentiment-negative {
             color: var(--tone-negative-fg);
-            font-size: 22px;
-            font-weight: bold;
+            background: var(--tone-negative-bg);
+            border-color: var(--tone-negative-border);
         }
 
         .forecast-sentiment-neutral {
             color: var(--tone-neutral-fg);
-            font-size: 20px;
-            font-weight: 600;
+            background: var(--tone-neutral-bg);
+            border-color: var(--tone-neutral-border);
         }
     </style>
 
@@ -1021,9 +1019,8 @@
                             th:with="direction=${news.primaryDirection != null ? news.primaryDirection.name() : T(com.example.macronews.domain.ImpactDirection).NEUTRAL.name()},
                                      sentiment=${news.primarySentiment != null ? news.primarySentiment.name() : T(com.example.macronews.domain.SignalSentiment).NEUTRAL.name()}">
                             <span class="forecast-indicator"
-                                  th:classappend="${(direction == T(com.example.macronews.domain.ImpactDirection).UP.name() ? ' forecast-direction-up' : (direction == T(com.example.macronews.domain.ImpactDirection).DOWN.name() ? ' forecast-direction-down' : ' forecast-direction-neutral')) +
-                                      (sentiment == T(com.example.macronews.domain.SignalSentiment).POSITIVE.name() ? ' forecast-sentiment-positive' : (sentiment == T(com.example.macronews.domain.SignalSentiment).NEGATIVE.name() ? ' forecast-sentiment-negative' : ' forecast-sentiment-neutral'))}"
-                                  th:text="${direction == T(com.example.macronews.domain.ImpactDirection).UP.name() ? '↑' : (direction == T(com.example.macronews.domain.ImpactDirection).DOWN.name() ? '↓' : '•')}">↑</span>
+                                  th:classappend="${sentiment == T(com.example.macronews.domain.SignalSentiment).POSITIVE.name() ? ' forecast-sentiment-positive' : (sentiment == T(com.example.macronews.domain.SignalSentiment).NEGATIVE.name() ? ' forecast-sentiment-negative' : ' forecast-sentiment-neutral')}"
+                                  th:text="${direction == T(com.example.macronews.domain.ImpactDirection).UP.name() ? #messages.msg('news.signal.bullishShort') : (direction == T(com.example.macronews.domain.ImpactDirection).DOWN.name() ? #messages.msg('news.signal.bearishShort') : #messages.msg('news.signal.mixedShort'))}">상승</span>
                         </td>
                         <td class="news-col-actions text-nowrap py-3 news-actions-cell">
                             <div class="d-inline-flex flex-wrap justify-content-center gap-1 align-items-center news-action-stack">
