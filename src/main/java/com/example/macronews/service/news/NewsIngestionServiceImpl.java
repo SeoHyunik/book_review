@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.stream.StreamSupport;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -144,6 +145,66 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         newsEventRepository.deleteById(id);
         log.info("[ADMIN] delete completed id={}", id);
         return true;
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(cacheNames = "newsDetail", allEntries = true, beforeInvocation = true)
+    public int deleteByIds(List<String> ids) {
+        List<String> requestedIds = ids == null ? List.of() : ids;
+        List<String> sanitizedIds = requestedIds.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+
+        if (sanitizedIds.isEmpty()) {
+            log.info("[ADMIN] bulk delete skipped reason=no-valid-ids requested={}", requestedIds.size());
+            return 0;
+        }
+
+        List<String> existingIds = StreamSupport.stream(newsEventRepository.findAllById(sanitizedIds).spliterator(), false)
+                .map(NewsEvent::id)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+
+        if (existingIds.isEmpty()) {
+            log.info("[ADMIN] bulk delete skipped reason=no-existing-ids requested={} sanitized={}",
+                    requestedIds.size(), sanitizedIds.size());
+            return 0;
+        }
+
+        newsEventRepository.deleteAllById(existingIds);
+        log.info("[ADMIN] bulk delete completed requested={} sanitized={} deleted={}",
+                requestedIds.size(), sanitizedIds.size(), existingIds.size());
+        return existingIds.size();
+    }
+
+    @Override
+    @Transactional
+    public int deleteExpiredBefore(Instant cutoff) {
+        if (cutoff == null) {
+            log.info("[CLEANUP] expired delete skipped reason=no-cutoff");
+            return 0;
+        }
+
+        List<String> expiredIds = newsEventRepository.findByIngestedAtBefore(cutoff).stream()
+                .map(NewsEvent::id)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+
+        if (expiredIds.isEmpty()) {
+            log.debug("[CLEANUP] expired delete skipped reason=no-expired-news cutoff={}", cutoff);
+            return 0;
+        }
+
+        int deletedCount = deleteByIds(expiredIds);
+        log.info("[CLEANUP] expired delete completed cutoff={} requested={} deleted={}",
+                cutoff, expiredIds.size(), deletedCount);
+        return deletedCount;
     }
 
     private void submitAsyncInterpretations(List<String> eventIds) {

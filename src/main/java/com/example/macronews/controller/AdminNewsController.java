@@ -260,6 +260,23 @@ public class AdminNewsController {
         return "redirect:" + resolveAdminRedirect(returnTo, status, sort, page);
     }
 
+    @PostMapping("/bulk-delete")
+    public String bulkDelete(@RequestParam(name = "ids", required = false) List<String> ids,
+            @RequestParam(name = "returnTo", required = false) String returnTo,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "sort", required = false) String sort,
+            @RequestParam(name = "page", required = false) Integer page,
+            RedirectAttributes redirectAttributes) {
+        int deletedCount = newsIngestionService.deleteByIds(ids);
+        if (deletedCount > 0) {
+            redirectAttributes.addFlashAttribute("successMessage",
+                    "Deleted " + deletedCount + " news item" + (deletedCount == 1 ? "" : "s") + " from the current page.");
+        } else {
+            redirectAttributes.addFlashAttribute("warningMessage", "No news items were deleted.");
+        }
+        return "redirect:" + resolveAdminRedirect(returnTo, status, sort, page);
+    }
+
     @PostMapping("/ingest-api")
     public String ingestFromApi(@RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
             RedirectAttributes redirectAttributes) {
