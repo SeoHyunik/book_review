@@ -170,6 +170,72 @@
             font-weight: 700;
         }
 
+        [data-bs-theme="dark"] .summary-surface {
+            border-color: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 1.2rem 2.8rem rgba(0, 0, 0, 0.32);
+        }
+
+        [data-bs-theme="dark"] .summary-hero {
+            background:
+                radial-gradient(circle at top right, rgba(96, 165, 250, 0.18), transparent 38%),
+                linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(17, 24, 39, 0.96));
+        }
+
+        [data-bs-theme="dark"] .summary-section-card {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(17, 24, 39, 0.96));
+        }
+
+        [data-bs-theme="dark"] .summary-heading,
+        [data-bs-theme="dark"] .summary-section-title {
+            color: #f8fafc;
+        }
+
+        [data-bs-theme="dark"] .summary-copy {
+            color: rgba(226, 232, 240, 0.94);
+        }
+
+        [data-bs-theme="dark"] .summary-section-kicker,
+        [data-bs-theme="dark"] .summary-support-meta,
+        [data-bs-theme="dark"] .summary-language-label {
+            color: rgba(191, 219, 254, 0.88);
+        }
+
+        [data-bs-theme="dark"] .summary-language-block {
+            border-color: rgba(148, 163, 184, 0.22);
+            background: rgba(15, 23, 42, 0.48);
+        }
+
+        [data-bs-theme="dark"] .summary-language-label {
+            background: rgba(148, 163, 184, 0.14);
+        }
+
+        [data-bs-theme="dark"] .summary-meta-chip,
+        [data-bs-theme="dark"] .summary-driver-chip {
+            color: rgba(226, 232, 240, 0.92);
+            border-color: rgba(148, 163, 184, 0.26);
+            background: rgba(30, 41, 59, 0.78);
+        }
+
+        [data-bs-theme="dark"] .summary-support-list .list-group-item {
+            border-color: rgba(148, 163, 184, 0.18);
+        }
+
+        [data-bs-theme="dark"] .summary-support-list .list-group-item a {
+            color: #f8fafc;
+        }
+
+        [data-bs-theme="dark"] .summary-support-list .list-group-item a:hover {
+            color: #dbeafe;
+        }
+
+        [data-bs-theme="dark"] .summary-support-dot {
+            opacity: 0.58;
+        }
+
+        [data-bs-theme="dark"] .text-secondary {
+            color: rgba(203, 213, 225, 0.82) !important;
+        }
+
         @media (min-width: 992px) {
             .summary-language-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
