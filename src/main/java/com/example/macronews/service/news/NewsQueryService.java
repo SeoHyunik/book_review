@@ -16,6 +16,7 @@ import com.example.macronews.repository.NewsEventRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.net.URI;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -66,6 +67,14 @@ public class NewsQueryService {
                     "celebrity", "star", "romance", "wedding", "fashion", "beauty", "viral", "buzz"),
             new KeywordWeightRule(3, 2, 0,
                     "hot issue", "shocking", "surprising", "what happened", "you need to know", "attention")
+    );
+    private static final List<String> TRUSTED_SOURCE_MARKERS = List.of(
+            "reuters", "bloomberg", "yonhap", "financial times", "wall street journal", "wsj",
+            "associated press", "nikkei", "cnbc"
+    );
+    private static final List<String> TRUSTED_DOMAIN_MARKERS = List.of(
+            "reuters.com", "bloomberg.com", "yonhapnews.co.kr", "ft.com", "wsj.com", "apnews.com",
+            "nikkei.com", "cnbc.com"
     );
 
     private final NewsEventRepository newsEventRepository;
@@ -403,6 +412,7 @@ public class NewsQueryService {
         String summary = normalize(event.summary());
         String source = normalize(event.source());
         String combined = combineText(title, summary);
+        String domain = normalize(extractDomain(event.url()));
 
         int score = 0;
         for (KeywordWeightRule rule : PRIORITY_WEIGHT_RULES) {
@@ -441,8 +451,20 @@ public class NewsQueryService {
             score += 4;
         }
 
+        score += calculateSourceReliabilityWeight(source, domain);
         score -= calculateNoiseDemotion(title, summary, source, combined, score);
         return score;
+    }
+
+    private int calculateSourceReliabilityWeight(String source, String domain) {
+        int weight = 0;
+        if (containsAnyKeyword(source, TRUSTED_SOURCE_MARKERS.toArray(String[]::new))) {
+            weight += 3;
+        }
+        if (containsAnyKeyword(domain, TRUSTED_DOMAIN_MARKERS.toArray(String[]::new))) {
+            weight += 2;
+        }
+        return Math.min(weight, 4);
     }
 
     private int calculateNoiseDemotion(String title, String summary, String source, String combined, int currentScore) {
@@ -503,6 +525,18 @@ public class NewsQueryService {
         return Arrays.stream(values)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.joining(" "));
+    }
+
+    private String extractDomain(String url) {
+        if (!StringUtils.hasText(url)) {
+            return "";
+        }
+        try {
+            URI uri = URI.create(url.trim());
+            return uri.getHost() == null ? "" : uri.getHost();
+        } catch (IllegalArgumentException ex) {
+            return "";
+        }
     }
 
     private int countByStatus(List<NewsListItemDto> items, NewsStatus status) {

@@ -119,6 +119,99 @@ class NewsQueryServiceTest {
     }
 
     @Test
+    @DisplayName("Trusted source should provide a modest edge for otherwise similar articles")
+    void getRecentNews_prioritizesTrustedSourceWhenContentIsSimilar() {
+        NewsEvent trusted = newsEvent(
+                "trusted",
+                "Treasury yields rise after inflation update",
+                "Market participants reacted to the latest CPI figures.",
+                "Reuters",
+                "https://www.reuters.com/markets/trusted",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent neutral = newsEvent(
+                "neutral",
+                "Treasury yields rise after inflation update",
+                "Market participants reacted to the latest CPI figures.",
+                "MarketWatcher",
+                "https://example.com/markets/neutral",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:06:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(neutral, trusted));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("trusted", "neutral");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Missing source should remain neutral and safe")
+    void getRecentNews_handlesMissingSourceNeutrally() {
+        NewsEvent missingSource = newsEvent(
+                "missing-source",
+                "Treasury yields rise after inflation update",
+                "Market participants reacted to the latest CPI figures.",
+                null,
+                "https://example.com/markets/missing-source",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(missingSource));
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(items).singleElement().satisfies(item -> {
+            assertThat(item.id()).isEqualTo("missing-source");
+            assertThat(item.priorityScore()).isGreaterThanOrEqualTo(0);
+        });
+    }
+
+    @Test
+    @DisplayName("Strong market content should outrank source advantage alone")
+    void getRecentNews_keepsContentAsPrimarySignalOverSourceWeight() {
+        NewsEvent strongContentNeutralSource = newsEvent(
+                "strong-neutral-source",
+                "Fed rate decision lifts Treasury yields after hotter CPI report",
+                "FOMC officials signaled a tighter policy path as inflation stayed elevated.",
+                "MarketPulse",
+                "https://example.com/strong-neutral-source",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent weakerTrustedSource = newsEvent(
+                "weaker-trusted-source",
+                "Company shares move after executive comments",
+                "Traders watched a routine management update.",
+                "Bloomberg",
+                "https://www.bloomberg.com/weaker-trusted-source",
+                "2026-03-10T10:00:00Z",
+                "2026-03-10T10:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(weakerTrustedSource, strongContentNeutralSource));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("strong-neutral-source", "weaker-trusted-source");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
     @DisplayName("Priority sort should demote generic low signal articles below market relevant ones")
     void getRecentNews_demotesGenericLowSignalArticle() {
         NewsEvent marketRelevant = newsEvent(
