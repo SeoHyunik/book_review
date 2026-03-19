@@ -874,10 +874,10 @@
                                 <span class="fw-medium"
                                       th:text="${activeFeaturedSummary != null ? #messages.msg('news.featured.marketSummary.sources', activeFeaturedSummary.sourceCount) : (featuredNews.source ?: '-')}">Source</span>
                                 <span class="featured-support-dot">&middot;</span>
-                                <span th:text="${activeFeaturedSummary != null ? #messages.msg('news.featured.marketSummary.window', activeFeaturedSummary.windowHours) : (featuredNews.publishedAt ?: '-')}">Published At</span>
+                                <span th:text="${activeFeaturedSummary != null ? #messages.msg('news.featured.marketSummary.window', activeFeaturedSummary.windowHours) : @uiDateTimeFormatter.formatKst(featuredNews.publishedAt)}">Published At</span>
                                 <th:block th:if="${activeFeaturedSummary != null}">
                                     <span class="featured-support-dot">&middot;</span>
-                                    <span th:text="${activeFeaturedSummary.generatedAt ?: '-'}">Generated</span>
+                                    <span th:text="${@uiDateTimeFormatter.formatKst(activeFeaturedSummary.generatedAt)}">Generated</span>
                                 </th:block>
                             </div>
                         </div>
@@ -1034,7 +1034,7 @@
                             <div class="small fw-medium news-priority" th:if="${news.priorityScore > 0}" th:text="#{news.priority(${news.priorityScore})}">Priority 0</div>
                         </td>
                         <td class="news-col-meta text-nowrap text-truncate py-3 fw-medium news-secondary" style="max-width: 10rem;" th:text="${news.source ?: '-'}"></td>
-                        <td class="news-col-meta text-nowrap py-3 news-secondary" th:text="${news.publishedAt ?: '-'}"></td>
+                        <td class="news-col-meta text-nowrap py-3 news-secondary" th:text="${@uiDateTimeFormatter.formatKst(news.publishedAt)}"></td>
                         <td class="news-col-status py-3 news-status-cell" th:switch="${news.status != null ? news.status.name() : 'UNKNOWN'}">
                             <span th:case="'ANALYZED'" class="badge ui-pill rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle" th:text="#{status.analyzed}">Analyzed</span>
                             <span th:case="'FAILED'" class="badge ui-pill rounded-pill bg-danger-subtle text-danger-emphasis border border-danger-subtle" th:text="#{status.failed}">Failed</span>

@@ -66,7 +66,7 @@
                             <td colspan="8" class="text-secondary" th:text="#{admin.openai.empty}">No usage records yet.</td>
                         </tr>
                         <tr th:each="record : ${usageDashboard.recentRecords}">
-                            <td class="text-nowrap" th:text="${#temporals.format(record.timestamp, 'yyyy-MM-dd HH:mm')}">2026-03-16 09:00</td>
+                            <td class="text-nowrap" th:text="${@uiDateTimeFormatter.formatKst(record.timestamp)}">2026-03-16 09:00</td>
                             <td th:text="${#messages.msg(record.featureMessageKey)}">Macro Interpretation</td>
                             <td th:text="${record.model}">gpt-4o</td>
                             <td class="text-end" th:text="${#numbers.formatInteger(record.promptTokens, 1, 'COMMA')}">0</td>
@@ -146,4 +146,3 @@
     </section>
 </th:block>
 </html>
-

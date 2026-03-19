@@ -14,6 +14,7 @@ import com.example.macronews.domain.MarketImpact;
 import com.example.macronews.domain.MarketType;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.SignalSentiment;
+import com.example.macronews.service.forecast.MarketForecastQueryService;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
@@ -43,6 +44,9 @@ class AiMarketSummaryServiceTest {
     private ExternalApiUtils externalApiUtils;
 
     @Mock
+    private MarketForecastQueryService marketForecastQueryService;
+
+    @Mock
     private OpenAiUsageLoggingService openAiUsageLoggingService;
 
     private AiMarketSummaryService aiMarketSummaryService;
@@ -51,6 +55,7 @@ class AiMarketSummaryServiceTest {
     void setUp() {
         aiMarketSummaryService = new AiMarketSummaryService(
                 recentMarketSummaryService,
+                marketForecastQueryService,
                 externalApiUtils,
                 new ObjectMapper(),
                 openAiUsageLoggingService

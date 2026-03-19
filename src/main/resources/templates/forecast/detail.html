@@ -90,7 +90,7 @@
                         <p class="text-secondary mb-0"
                            th:text="${#locale.language == 'ko' and snapshot.summaryKo != null and !#strings.isEmpty(snapshot.summaryKo) ? snapshot.summaryKo : snapshot.summaryEn}">Forecast summary</p>
                     </div>
-                    <div class="small text-secondary" th:text="${#messages.msg('forecast.generatedAt') + ' / ' + snapshot.generatedAt}">Generated</div>
+                    <div class="small text-secondary" th:text="${#messages.msg('forecast.generatedAt') + ' / ' + @uiDateTimeFormatter.formatKst(snapshot.generatedAt)}">Generated</div>
                 </div>
             </div>
         </div>
@@ -129,7 +129,7 @@
                        th:each="news : ${forecastDetail.relatedNewsItems}"
                        th:href="@{'/news/' + ${news.id}}">
                         <div class="fw-semibold mb-1" th:text="${news.title}">News title</div>
-                        <div class="small text-secondary" th:text="${news.source} + ' / ' + ${news.publishedAt}">Meta</div>
+                        <div class="small text-secondary" th:text="${news.source} + ' / ' + @uiDateTimeFormatter.formatKst(news.publishedAt)}">Meta</div>
                     </a>
                 </div>
             </div>

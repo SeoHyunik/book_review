@@ -528,7 +528,7 @@
                 </span>
                 <span class="detail-meta-chip">
                     <span class="detail-meta-label" th:text="#{news.detail.publishedAt}">Published At</span>
-                    <span th:text="${newsDetail.publishedAt ?: '-'}">Published</span>
+                    <span th:text="${@uiDateTimeFormatter.formatKst(newsDetail.publishedAt)}">Published</span>
                 </span>
                 <span class="detail-meta-chip">
                     <span class="detail-meta-label" th:text="#{news.detail.status}">Status</span>
