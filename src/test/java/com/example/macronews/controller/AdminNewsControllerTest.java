@@ -2,18 +2,24 @@ package com.example.macronews.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.dto.AutoIngestionControlStatusDto;
+import com.example.macronews.dto.AutoIngestionBatchStatusDto;
 import com.example.macronews.dto.AutoIngestionRunOutcome;
+import com.example.macronews.dto.request.AdminIngestionRequest;
 import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.news.AutoIngestionControlService;
+import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
 import com.example.macronews.service.news.NewsQueryService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
 import com.example.macronews.service.ops.OpsFeatureToggleService;
 import com.example.macronews.service.ops.RenderKeepAliveService;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
@@ -24,6 +30,64 @@ import org.springframework.context.support.StaticMessageSource;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 class AdminNewsControllerTest {
+
+    @Test
+    @DisplayName("manual external ingestion should keep the user requested count unchanged")
+    void ingest_keepsManualRequestedCountBelowScheduledMinimum() {
+        NewsIngestionService newsIngestionService = mock(NewsIngestionService.class);
+        AdminNewsController controller = new AdminNewsController(
+                newsIngestionService,
+                mock(NewsSourceProviderSelector.class),
+                mock(MacroAiService.class),
+                mock(NewsQueryService.class),
+                mock(AutoIngestionControlService.class),
+                new OpsFeatureToggleService(false, false),
+                mock(RenderKeepAliveService.class),
+                mock(AutoIngestionEmailNotificationService.class),
+                messageSource());
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        AdminIngestionRequest request = new AdminIngestionRequest(null, null, null, null, null, null, 3);
+
+        when(newsIngestionService.ingestTopHeadlines(3)).thenReturn(List.of());
+
+        String redirect = controller.ingest(request, redirectAttributes);
+
+        assertThat(redirect).isEqualTo("redirect:/admin/news/manual");
+        verify(newsIngestionService).ingestTopHeadlines(3);
+    }
+
+    @Test
+    @DisplayName("user triggered auto ingestion should keep the user requested count unchanged")
+    void ingestFromApi_keepsUserRequestedCountBelowScheduledMinimum() {
+        NewsIngestionService newsIngestionService = mock(NewsIngestionService.class);
+        NewsQueryService newsQueryService = mock(NewsQueryService.class);
+        AutoIngestionControlService autoIngestionControlService = mock(AutoIngestionControlService.class);
+        NewsSourceProviderSelector newsSourceProviderSelector = mock(NewsSourceProviderSelector.class);
+        AdminNewsController controller = new AdminNewsController(
+                newsIngestionService,
+                newsSourceProviderSelector,
+                mock(MacroAiService.class),
+                newsQueryService,
+                autoIngestionControlService,
+                new OpsFeatureToggleService(false, false),
+                mock(RenderKeepAliveService.class),
+                mock(AutoIngestionEmailNotificationService.class),
+                messageSource());
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        List<NewsEvent> ingested = List.of(sampleNewsEvent("event-1"));
+        AutoIngestionBatchStatusDto batchStatus = new AutoIngestionBatchStatusDto(3, 1, 1, 0, 0, 1, false, List.of());
+
+        when(newsSourceProviderSelector.isConfigured()).thenReturn(true);
+        when(autoIngestionControlService.beginManualRun(3)).thenReturn(AutoIngestionRunCommandResult.STARTED);
+        when(newsIngestionService.ingestTopHeadlines(3)).thenReturn(ingested);
+        when(newsQueryService.getAutoIngestionBatchStatus(3, 1, List.of("event-1"))).thenReturn(batchStatus);
+
+        String redirect = controller.ingestFromApi(3, redirectAttributes);
+
+        assertThat(redirect).isEqualTo("redirect:/admin/news/auto");
+        verify(autoIngestionControlService).beginManualRun(3);
+        verify(newsIngestionService).ingestTopHeadlines(3);
+    }
 
     @Test
     @DisplayName("keep-alive runtime endpoints should toggle state and redirect to the admin auto page")
@@ -189,5 +253,20 @@ class AdminNewsControllerTest {
         messageSource.addMessage("admin.news.auto.email.alreadyStopped", java.util.Locale.ENGLISH,
                 "Email notification runtime toggle is already disabled.");
         return messageSource;
+    }
+
+    private NewsEvent sampleNewsEvent(String id) {
+        return new NewsEvent(
+                id,
+                "external-" + id,
+                "Title " + id,
+                "Summary",
+                "Reuters",
+                "https://example.com/" + id,
+                Instant.parse("2026-03-13T00:00:00Z"),
+                Instant.parse("2026-03-13T00:01:00Z"),
+                null,
+                null
+        );
     }
 }
