@@ -42,7 +42,7 @@ class MacroAiServiceImplTest {
         macroAiService = new MacroAiServiceImpl(externalApiUtils, new ObjectMapper(), newsEventRepository, openAiUsageLoggingService);
         ReflectionTestUtils.setField(macroAiService, "openAiApiKey", "test-key");
         ReflectionTestUtils.setField(macroAiService, "openAiUrl", "https://example.com/openai");
-        ReflectionTestUtils.setField(macroAiService, "openAiModel", "gpt-test");
+        ReflectionTestUtils.setField(macroAiService, "interpretationModel", "gpt-test");
         ReflectionTestUtils.setField(macroAiService, "macroPromptFile", new ByteArrayResource((
                 "{\"messages\":[{\"role\":\"system\",\"content\":\"Return JSON\"},{\"role\":\"user\",\"template\":\"Title: {{title}}\"}]}")
                 .getBytes(StandardCharsets.UTF_8)));

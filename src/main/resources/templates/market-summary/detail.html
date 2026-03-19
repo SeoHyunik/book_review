@@ -374,7 +374,7 @@
             <div class="summary-meta">
                 <span class="badge ui-pill rounded-pill bg-dark-subtle text-dark-emphasis"
                       th:text="${marketSummarySourceMode == 'stored' ? #messages.msg('news.featured.marketSummary.snapshotLabel') : (marketSummarySourceMode == 'ai' ? #messages.msg('news.featured.marketSummary.aiLabel') : #messages.msg('news.featured.marketSummary.label'))}">AI Market Snapshot</span>
-                <span class="summary-meta-chip ui-pill" th:text="${#messages.msg('forecast.generatedAt') + ' / ' + marketSummaryDetail.generatedAt}">Generated</span>
+                <span class="summary-meta-chip ui-pill" th:text="${#messages.msg('forecast.generatedAt') + ' / ' + @uiDateTimeFormatter.formatKst(marketSummaryDetail.generatedAt)}">Generated</span>
                 <span class="summary-meta-chip ui-pill" th:text="#{news.featured.marketSummary.sources(${marketSummaryDetail.sourceCount})}">Sources</span>
                 <span class="summary-meta-chip ui-pill" th:text="#{news.featured.marketSummary.window(${marketSummaryDetail.windowHours})}">Window</span>
             </div>
@@ -487,7 +487,7 @@
                     <div class="summary-support-meta">
                         <span th:text="${news.source ?: '-'}">Source</span>
                         <span class="summary-support-dot">&middot;</span>
-                        <span th:text="${news.publishedAt ?: '-'}">Published</span>
+                        <span th:text="${@uiDateTimeFormatter.formatKst(news.publishedAt)}">Published</span>
                         <span class="summary-support-dot">&middot;</span>
                         <span class="summary-news-indicator"
                               th:classappend="${sentiment == 'POSITIVE' ? ' summary-news-sentiment--positive' : (sentiment == 'NEGATIVE' ? ' summary-news-sentiment--negative' : ' summary-news-sentiment--neutral')}"

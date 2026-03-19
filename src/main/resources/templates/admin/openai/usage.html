@@ -40,6 +40,12 @@
         </div>
     </section>
 
+    <section class="mb-4" th:if="${usageDashboard.hasUnpricedRecords}">
+        <div class="alert alert-warning mb-0" role="alert" th:text="#{admin.openai.pricing.partial}">
+            Some usage records use model slugs that cannot be priced confidently, so estimated cost totals exclude them.
+        </div>
+    </section>
+
     <section class="mb-4">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
@@ -66,14 +72,14 @@
                             <td colspan="8" class="text-secondary" th:text="#{admin.openai.empty}">No usage records yet.</td>
                         </tr>
                         <tr th:each="record : ${usageDashboard.recentRecords}">
-                            <td class="text-nowrap" th:text="${#temporals.format(record.timestamp, 'yyyy-MM-dd HH:mm')}">2026-03-16 09:00</td>
+                            <td class="text-nowrap" th:text="${@uiDateTimeFormatter.formatKst(record.timestamp)}">2026-03-16 09:00</td>
                             <td th:text="${#messages.msg(record.featureMessageKey)}">Macro Interpretation</td>
                             <td th:text="${record.model}">gpt-4o</td>
                             <td class="text-end" th:text="${#numbers.formatInteger(record.promptTokens, 1, 'COMMA')}">0</td>
                             <td class="text-end" th:text="${#numbers.formatInteger(record.completionTokens, 1, 'COMMA')}">0</td>
                             <td class="text-end" th:text="${#numbers.formatInteger(record.totalTokens, 1, 'COMMA')}">0</td>
-                            <td class="text-end" th:text="${'$' + #numbers.formatDecimal(record.estimatedUsdCost, 1, 4)}">$0.0000</td>
-                            <td class="text-end" th:text="${#numbers.formatDecimal(record.estimatedKrwCost, 1, 0) + ' KRW'}">0 KRW</td>
+                            <td class="text-end" th:text="${record.estimatedCostAvailable ? '$' + #numbers.formatDecimal(record.estimatedUsdCost, 1, 4) : '-'}">$0.0000</td>
+                            <td class="text-end" th:text="${record.estimatedCostAvailable ? #numbers.formatDecimal(record.estimatedKrwCost, 1, 0) + ' KRW' : '-'}">0 KRW</td>
                         </tr>
                         </tbody>
                     </table>
@@ -146,4 +152,3 @@
     </section>
 </th:block>
 </html>
-

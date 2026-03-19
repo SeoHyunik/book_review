@@ -9,7 +9,7 @@ on:
       - "master"
 
 jobs:
-  build:
+  compile:
     runs-on: ubuntu-latest
 
     steps:
@@ -26,5 +26,5 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build and compile test classes
-        run: ./gradlew bootJar testClasses --no-configuration-cache
+      - name: Validate compilation
+        run: ./gradlew compileJava testClasses --no-daemon --no-configuration-cache

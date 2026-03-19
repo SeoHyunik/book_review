@@ -51,37 +51,327 @@ class NewsQueryServiceTest {
     }
 
     @Test
-    @DisplayName("Priority sort should rank Korea semiconductor news above generic US market news")
-    void getRecentNews_prioritizesKoreaSemiconductorOverGenericUsMarket() {
-        NewsEvent koreaSemiconductor = newsEvent(
-                "korea-semiconductor",
-                "South Korea semiconductor exports rise as Samsung memory demand jumps",
-                "Korea chip and memory producers benefit from export recovery.",
-                "Yonhap",
-                "https://example.com/korea-semiconductor",
+    @DisplayName("Priority sort should rank market moving macro news above generic finance coverage")
+    void getRecentNews_prioritizesMarketMovingMacroNews() {
+        NewsEvent highImpactMacro = newsEvent(
+                "high-impact-macro",
+                "Fed rate decision lifts Treasury yields after hotter CPI report",
+                "FOMC officials signaled a tighter policy path as inflation stayed elevated.",
+                "Reuters",
+                "https://example.com/high-impact-macro",
                 "2026-03-10T09:00:00Z",
                 "2026-03-10T09:10:00Z",
                 NewsStatus.INGESTED,
                 null);
-        NewsEvent genericUsMarket = newsEvent(
-                "generic-us-market",
-                "US stocks close mixed ahead of earnings",
-                "Wall Street indices were mixed in regular trading.",
+        NewsEvent genericFinance = newsEvent(
+                "generic-finance",
+                "Bank shares advance after earnings update",
+                "Financial stocks moved higher in routine trading.",
                 "Reuters",
-                "https://example.com/generic-us-market",
+                "https://example.com/generic-finance",
                 "2026-03-10T10:00:00Z",
                 "2026-03-10T10:10:00Z",
                 NewsStatus.INGESTED,
                 null);
 
         given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
-                .willReturn(List.of(genericUsMarket, koreaSemiconductor));
+                .willReturn(List.of(genericFinance, highImpactMacro));
 
-        List<String> orderedIds = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY).stream()
-                .map(item -> item.id())
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("high-impact-macro", "generic-finance");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Priority score should deterministically boost high impact market keywords")
+    void getRecentNews_boostsHighImpactMarketKeywordsDeterministically() {
+        NewsEvent boosted = newsEvent(
+                "boosted",
+                "BOJ signals rate decision shift as yen and bond yields jump",
+                "Foreign exchange markets reacted after central bank guidance.",
+                "Bloomberg",
+                "https://example.com/boosted",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent baseline = newsEvent(
+                "baseline",
+                "Corporate strategy update draws investor attention",
+                "Executives outlined a medium-term business plan.",
+                "Bloomberg",
+                "https://example.com/baseline",
+                "2026-03-10T09:20:00Z",
+                "2026-03-10T09:25:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(boosted, baseline));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("boosted", "baseline");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Trusted source should provide a modest edge for otherwise similar articles")
+    void getRecentNews_prioritizesTrustedSourceWhenContentIsSimilar() {
+        NewsEvent trusted = newsEvent(
+                "trusted",
+                "Treasury yields rise after inflation update",
+                "Market participants reacted to the latest CPI figures.",
+                "Reuters",
+                "https://www.reuters.com/markets/trusted",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent neutral = newsEvent(
+                "neutral",
+                "Treasury yields rise after inflation update",
+                "Market participants reacted to the latest CPI figures.",
+                "MarketWatcher",
+                "https://example.com/markets/neutral",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:06:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(neutral, trusted));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("trusted", "neutral");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Missing source should remain neutral and safe")
+    void getRecentNews_handlesMissingSourceNeutrally() {
+        NewsEvent missingSource = newsEvent(
+                "missing-source",
+                "Treasury yields rise after inflation update",
+                "Market participants reacted to the latest CPI figures.",
+                null,
+                "https://example.com/markets/missing-source",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(missingSource));
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(items).singleElement().satisfies(item -> {
+            assertThat(item.id()).isEqualTo("missing-source");
+            assertThat(item.priorityScore()).isGreaterThanOrEqualTo(0);
+        });
+    }
+
+    @Test
+    @DisplayName("Strong market content should outrank source advantage alone")
+    void getRecentNews_keepsContentAsPrimarySignalOverSourceWeight() {
+        NewsEvent strongContentNeutralSource = newsEvent(
+                "strong-neutral-source",
+                "Fed rate decision lifts Treasury yields after hotter CPI report",
+                "FOMC officials signaled a tighter policy path as inflation stayed elevated.",
+                "MarketPulse",
+                "https://example.com/strong-neutral-source",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent weakerTrustedSource = newsEvent(
+                "weaker-trusted-source",
+                "Company shares move after executive comments",
+                "Traders watched a routine management update.",
+                "Bloomberg",
+                "https://www.bloomberg.com/weaker-trusted-source",
+                "2026-03-10T10:00:00Z",
+                "2026-03-10T10:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(weakerTrustedSource, strongContentNeutralSource));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("strong-neutral-source", "weaker-trusted-source");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Priority sort should demote generic low signal articles below market relevant ones")
+    void getRecentNews_demotesGenericLowSignalArticle() {
+        NewsEvent marketRelevant = newsEvent(
+                "market-relevant",
+                "ECB rate decision pushes euro and bond yields higher",
+                "Inflation data and central bank guidance moved markets.",
+                "Reuters",
+                "https://example.com/market-relevant",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent lowSignal = newsEvent(
+                "low-signal",
+                "Best way to enjoy a spring festival event this weekend",
+                "Lifestyle tips and a giveaway guide for visitors.",
+                "Example Life",
+                "https://example.com/low-signal",
+                "2026-03-10T10:00:00Z",
+                "2026-03-10T10:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(lowSignal, marketRelevant));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("market-relevant", "low-signal");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Priority score should deterministically demote noisy phrases")
+    void getRecentNews_demotesNoisyPhraseDeterministically() {
+        NewsEvent noisy = newsEvent(
+                "noisy",
+                "Shocking celebrity buzz draws attention at opening event",
+                "A giveaway and fashion promotion became a hot issue online.",
+                "Example Buzz",
+                "https://example.com/noisy",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:35:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent baseline = newsEvent(
+                "baseline",
+                "Corporate strategy update draws investor attention",
+                "Executives outlined a medium-term business plan.",
+                "Bloomberg",
+                "https://example.com/baseline",
+                "2026-03-10T09:20:00Z",
+                "2026-03-10T09:25:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(noisy, baseline));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("baseline", "noisy");
+        assertThat(orderedItems.get(1).priorityScore()).isLessThan(orderedItems.get(0).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Strong market signals should outweigh weak noisy phrases")
+    void getRecentNews_doesNotOverDemoteStrongMarketSignals() {
+        NewsEvent strongButNoisy = newsEvent(
+                "strong-but-noisy",
+                "Fed rate decision becomes hot issue as Treasury yields surge",
+                "CPI and central bank guidance drew broad attention across markets.",
+                "Reuters",
+                "https://example.com/strong-but-noisy",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:35:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent mildMarket = newsEvent(
+                "mild-market",
+                "Corporate bond market update",
+                "Traders discussed routine financing conditions.",
+                "Reuters",
+                "https://example.com/mild-market",
+                "2026-03-10T09:20:00Z",
+                "2026-03-10T09:25:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(mildMarket, strongButNoisy));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("strong-but-noisy", "mild-market");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Published sort should remain driven by recency instead of priority score")
+    void getRecentNews_publishedSortRemainsUnchanged() {
+        NewsEvent olderHighPriority = newsEvent(
+                "older-high-priority",
+                "Fed rate decision shakes Treasury market",
+                "CPI and yields moved sharply after the FOMC update.",
+                "Reuters",
+                "https://example.com/older-high-priority",
+                "2026-03-10T08:00:00Z",
+                "2026-03-10T08:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent newerGeneric = newsEvent(
+                "newer-generic",
+                "Company management comments on outlook",
+                "A routine corporate update was released.",
+                "Reuters",
+                "https://example.com/newer-generic",
+                "2026-03-10T11:00:00Z",
+                "2026-03-10T11:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(newerGeneric, olderHighPriority));
+
+        List<String> orderedIds = newsQueryService.getRecentNews(null, NewsListSort.PUBLISHED_DESC).stream()
+                .map(NewsListItemDto::id)
                 .toList();
 
-        assertThat(orderedIds).containsExactly("korea-semiconductor", "generic-us-market");
+        assertThat(orderedIds).containsExactly("newer-generic", "older-high-priority");
+    }
+
+    @Test
+    @DisplayName("Priority score should handle null and empty text safely")
+    void getRecentNews_handlesNullAndEmptyTextSafely() {
+        NewsEvent sparse = new NewsEvent(
+                "sparse",
+                null,
+                null,
+                "",
+                null,
+                "https://example.com/sparse",
+                Instant.parse("2026-03-10T09:00:00Z"),
+                Instant.parse("2026-03-10T09:05:00Z"),
+                NewsStatus.INGESTED,
+                null
+        );
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(sparse));
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(items).singleElement().satisfies(item -> {
+            assertThat(item.id()).isEqualTo("sparse");
+            assertThat(item.priorityScore()).isZero();
+        });
     }
 
     @Test

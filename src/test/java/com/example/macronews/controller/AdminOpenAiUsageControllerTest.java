@@ -35,7 +35,8 @@ class AdminOpenAiUsageControllerTest {
                 BigDecimal.ZERO,
                 BigDecimal.valueOf(1350d),
                 "admin.openai.exchange.fallback",
-                true
+                true,
+                false
         );
         given(openAiUsageReportService.getDashboard()).willReturn(dashboard);
 

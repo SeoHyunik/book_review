@@ -12,6 +12,8 @@ import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -422,6 +424,38 @@ class NaverNewsSourceProviderTest {
     }
 
     @Test
+    @DisplayName("NAVER provider should deduplicate fallback link variants by normalized title when original links are missing")
+    void fetchTopHeadlines_deduplicatesFallbackLinkVariantsByNormalizedTitle() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "[속보] 코스피 급등",
+                      "description": "Earlier version",
+                      "originallink": "",
+                      "link": "https://search.naver.com/read?oid=1",
+                      "pubDate": "Fri, 13 Mar 2026 09:00:00 +0900"
+                    },
+                    {
+                      "title": "코스피 급등",
+                      "description": "Later version",
+                      "originallink": "",
+                      "link": "https://search.naver.com/read?oid=2",
+                      "pubDate": "Fri, 13 Mar 2026 09:10:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).summary()).isEqualTo("Later version");
+        assertThat(results.get(0).url()).isEqualTo("https://search.naver.com/read?oid=2");
+    }
+
+    @Test
     @DisplayName("NAVER provider should use configured queries as-is when present")
     void fetchTopHeadlines_usesConfiguredQueriesWhenPresent() {
         ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C,\uD658\uC728");
@@ -440,6 +474,7 @@ class NaverNewsSourceProviderTest {
                 .hasSize(2)
                 .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%ED%94%BC"))
                 .anySatisfy(url -> assertThat(url).contains("query=%ED%99%98%EC%9C%A8"))
+                .allSatisfy(url -> assertThat(url).contains("sort=date"))
                 .allSatisfy(url -> assertThat(url)
                         .doesNotContain("query=%EC%BD%94%EC%8A%A4%EB%8B%A5")
                         .doesNotContain("query=%EA%B8%88%EB%A6%AC")
@@ -460,19 +495,22 @@ class NaverNewsSourceProviderTest {
 
         provider.fetchTopHeadlines(5);
 
-        assertThat(capturedRequestUrls()).hasSize(12)
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%ED%94%BC"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%EB%8B%A5"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%9B%90%EB%8B%AC%EB%9F%AC%20%ED%99%98%EC%9C%A8"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EA%B8%B0%EC%A4%80%EA%B8%88%EB%A6%AC"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EA%B5%AD%EC%A0%9C%EC%9C%A0%EA%B0%80"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EB%B0%98%EB%8F%84%EC%B2%B4"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%97%B0%EC%A4%80"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EB%AF%B8%EA%B5%AD%EA%B8%88%EB%A6%AC"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%A6%9D%EC%8B%9C%20%EC%86%8D%EB%B3%B4"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%9E%A5%EC%A4%91"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EB%A7%88%EA%B0%90"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EB%B0%9C%ED%91%9C"));
+        assertThat(decodedRequestUrls()).hasSize(13)
+                .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uD53C"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uB2E5"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uC6D0\uB2EC\uB7EC \uD658\uC728"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uAE30\uC900\uAE08\uB9AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D\uCC44 \uAE08\uB9AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uCC44\uAD8C \uAE08\uB9AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uAD6D\uC81C\uC720\uAC00"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uBC18\uB3C4\uCCB4"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uC5F0\uC900"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D\uAE08\uB9AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uBB3C\uAC00 \uBC1C\uD45C"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uACE0\uC6A9 \uBC1C\uD45C"))
+                .allSatisfy(url -> assertThat(url)
+                        .doesNotContain("query=\uC7A5\uC911")
+                        .doesNotContain("query=\uB9C8\uAC10"));
     }
 
     @Test
@@ -487,9 +525,64 @@ class NaverNewsSourceProviderTest {
 
         provider.fetchTopHeadlines(5);
 
-        assertThat(capturedRequestUrls()).hasSize(12)
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%BD%94%EC%8A%A4%ED%94%BC"))
-                .anySatisfy(url -> assertThat(url).contains("query=%EC%97%B0%EC%A4%80"));
+        assertThat(decodedRequestUrls()).hasSize(13)
+                .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uD53C"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uC5F0\uC900"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uACE0\uC6A9 \uBC1C\uD45C"));
+    }
+
+    @Test
+    @DisplayName("NAVER provider should cap display safely at one hundred")
+    void fetchTopHeadlines_capsDisplayAtOneHundred() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C");
+        ReflectionTestUtils.setField(provider, "display", 150);
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": []
+                }
+                """));
+
+        provider.fetchTopHeadlines(200);
+
+        assertThat(capturedRequestUrls()).singleElement()
+                .satisfies(url -> assertThat(url).contains("display=100"));
+    }
+
+    @Test
+    @DisplayName("NAVER provider should cap configured start safely at one thousand")
+    void fetchTopHeadlines_capsConfiguredStartAtOneThousand() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C");
+        ReflectionTestUtils.setField(provider, "start", 2005);
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": []
+                }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        assertThat(capturedRequestUrls()).singleElement()
+                .satisfies(url -> assertThat(url).contains("start=1000"));
+    }
+
+    @Test
+    @DisplayName("NAVER provider should stop paging before start exceeds one thousand")
+    void fetchTopHeadlines_stopsPagingBeforeStartExceedsLimit() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C");
+        ReflectionTestUtils.setField(provider, "display", 100);
+        ReflectionTestUtils.setField(provider, "start", 950);
+        ReflectionTestUtils.setField(provider, "maxPages", 5);
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": []
+                }
+                """));
+
+        provider.fetchTopHeadlines(100);
+
+        assertThat(capturedRequestUrls()).hasSize(1)
+                .first()
+                .satisfies(url -> assertThat(url).contains("start=950"));
     }
 
     @Test
@@ -521,6 +614,12 @@ class NaverNewsSourceProviderTest {
         verify(externalApiUtils, atLeastOnce()).callAPI(requestCaptor.capture());
         return requestCaptor.getAllValues().stream()
                 .map(ExternalApiRequest::url)
+                .toList();
+    }
+
+    private List<String> decodedRequestUrls() {
+        return capturedRequestUrls().stream()
+                .map(url -> URLDecoder.decode(url, StandardCharsets.UTF_8))
                 .toList();
     }
 }

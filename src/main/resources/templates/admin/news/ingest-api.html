@@ -60,11 +60,11 @@
                         <span th:case="*" th:text="#{admin.news.auto.latest.idle}">No automatic ingestion run has been recorded yet.</span>
                     </span>
                     <span th:if="${autoIngestionControlStatus.latestStartedAt != null}"
-                          th:text="#{admin.news.auto.latest.startedAt(${#temporals.format(autoIngestionControlStatus.latestStartedAt, 'yyyy-MM-dd HH:mm')})}">
+                          th:text="#{admin.news.auto.latest.startedAt(${@uiDateTimeFormatter.formatKst(autoIngestionControlStatus.latestStartedAt)})}">
                         Latest run started at 2026-03-13 09:00
                     </span>
                     <span th:if="${autoIngestionControlStatus.latestCompletedAt != null}"
-                          th:text="#{admin.news.auto.latest.completedAt(${#temporals.format(autoIngestionControlStatus.latestCompletedAt, 'yyyy-MM-dd HH:mm')})}">
+                          th:text="#{admin.news.auto.latest.completedAt(${@uiDateTimeFormatter.formatKst(autoIngestionControlStatus.latestCompletedAt)})}">
                         Latest run completed at 2026-03-13 09:03
                     </span>
                 </div>

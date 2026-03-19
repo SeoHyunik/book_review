@@ -6,6 +6,7 @@ import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -38,6 +39,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
+    private static final int NAVER_MAX_DISPLAY = 100;
+    private static final int NAVER_MAX_START = 1000;
     private static final DateTimeFormatter NAVER_PUB_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
     private static final List<DateTimeFormatter> NAVER_PUB_DATE_FALLBACK_FORMATTERS = List.of(
             new DateTimeFormatterBuilder()
@@ -55,14 +58,15 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             "\uCF54\uC2A4\uB2E5",
             "\uC6D0\uB2EC\uB7EC \uD658\uC728",
             "\uAE30\uC900\uAE08\uB9AC",
+            "\uBBF8\uAD6D\uCC44 \uAE08\uB9AC",
+            "\uCC44\uAD8C \uAE08\uB9AC",
             "\uAD6D\uC81C\uC720\uAC00",
             "\uBC18\uB3C4\uCCB4",
             "\uC5F0\uC900",
             "\uBBF8\uAD6D\uAE08\uB9AC",
             "\uC99D\uC2DC \uC18D\uBCF4",
-            "\uC7A5\uC911",
-            "\uB9C8\uAC10",
-            "\uBC1C\uD45C"
+            "\uBB3C\uAC00 \uBC1C\uD45C",
+            "\uACE0\uC6A9 \uBC1C\uD45C"
     );
 
     private final ExternalApiUtils externalApiUtils;
@@ -164,6 +168,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         List<NaverCandidate> collected = new ArrayList<>();
         for (int pageIndex = 0; pageIndex < resolveMaxPages(); pageIndex++) {
             int pageStart = resolvePageStart(pageIndex, pageSize);
+            if (pageStart < 0) {
+                log.info("[NAVER] stopping paging query='{}' reason=start-out-of-range pageIndex={} pageSize={}",
+                        query, pageIndex, pageSize);
+                break;
+            }
             ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
                     HttpMethod.GET,
                     buildHeaders(),
@@ -293,14 +302,17 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     }
 
     private String resolveDedupKey(NaverCandidate candidate) {
-        if (StringUtils.hasText(candidate.originalLink())) {
-            return candidate.originalLink();
+        String normalizedOriginalLink = normalizeUrl(candidate.originalLink());
+        if (StringUtils.hasText(normalizedOriginalLink)) {
+            return normalizedOriginalLink;
         }
-        if (StringUtils.hasText(candidate.fallbackLink())) {
-            return candidate.fallbackLink();
+        String normalizedTitle = candidate.normalizedTitle();
+        if (StringUtils.hasText(normalizedTitle)) {
+            return normalizedTitle;
         }
-        if (StringUtils.hasText(candidate.normalizedTitle())) {
-            return candidate.normalizedTitle();
+        String normalizedFallbackLink = normalizeUrl(candidate.fallbackLink());
+        if (StringUtils.hasText(normalizedFallbackLink)) {
+            return normalizedFallbackLink;
         }
         return candidate.item().externalId();
     }
@@ -341,15 +353,23 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private int resolveDisplay(int requestedLimit) {
         int configuredDisplay = display > 0 ? display : requestedLimit;
-        return Math.max(1, Math.min(Math.max(requestedLimit, 1), configuredDisplay));
+        int resolvedDisplay = Math.max(1, Math.min(Math.max(requestedLimit, 1), configuredDisplay));
+        return Math.min(resolvedDisplay, NAVER_MAX_DISPLAY);
     }
 
     private int resolveStart() {
-        return start > 0 ? start : 1;
+        int resolvedStart = start > 0 ? start : 1;
+        return Math.min(resolvedStart, NAVER_MAX_START);
     }
 
     private int resolvePageStart(int pageIndex, int pageSize) {
-        return resolveStart() + (pageIndex * Math.max(pageSize, 1));
+        long resolvedPageSize = Math.max(pageSize, 1);
+        long resolvedStart = resolveStart();
+        long pageStart = resolvedStart + ((long) pageIndex * resolvedPageSize);
+        if (pageStart > NAVER_MAX_START) {
+            return -1;
+        }
+        return (int) pageStart;
     }
 
     private int resolveMaxPages() {
@@ -367,6 +387,31 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 .replaceAll("\\s+", " ")
                 .trim()
                 .toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeUrl(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        String trimmed = value.trim();
+        try {
+            URI uri = URI.create(trimmed);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+            String path = uri.getPath() == null ? "" : uri.getPath();
+            if (path.endsWith("/") && path.length() > 1) {
+                path = path.substring(0, path.length() - 1);
+            }
+            if (!StringUtils.hasText(host)) {
+                return trimmed;
+            }
+            if (!StringUtils.hasText(scheme)) {
+                return host + path;
+            }
+            return scheme + "://" + host + path;
+        } catch (IllegalArgumentException ex) {
+            return trimmed;
+        }
     }
 
     private String defaultText(String value, String fallback) {

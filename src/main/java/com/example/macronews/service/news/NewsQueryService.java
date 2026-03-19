@@ -16,6 +16,7 @@ import com.example.macronews.repository.NewsEventRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.net.URI;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -42,6 +43,39 @@ import org.springframework.util.StringUtils;
 public class NewsQueryService {
 
     private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
+    private static final List<KeywordWeightRule> PRIORITY_WEIGHT_RULES = List.of(
+            new KeywordWeightRule(8, 5, 3,
+                    "south korea", "korea", "kospi", "krw", "won"),
+            new KeywordWeightRule(6, 4, 2,
+                    "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
+                    "shipbuilding", "ai"),
+            new KeywordWeightRule(9, 6, 3,
+                    "fed", "fomc", "ecb", "boj", "bok", "central bank", "rate decision", "interest rate",
+                    "cpi", "inflation", "ppi", "employment", "jobs", "payroll", "gdp", "recession", "slowdown"),
+            new KeywordWeightRule(7, 5, 2,
+                    "fx", "foreign exchange", "exchange rate", "usd", "dollar", "yen", "treasury",
+                    "treasury yield", "bond yield", "oil", "crude", "brent", "wti", "commodity", "commodities"),
+            new KeywordWeightRule(6, 4, 2,
+                    "tariff", "trade", "export", "china", "sanctions", "geopolitics", "u.s.", "united states")
+    );
+    private static final List<KeywordWeightRule> NOISE_DEMOTION_RULES = List.of(
+            new KeywordWeightRule(3, 2, 0,
+                    "tips", "how to", "guide", "best way", "must try", "life hack", "checklist"),
+            new KeywordWeightRule(3, 2, 0,
+                    "festival", "event", "giveaway", "sale", "discount", "promotion", "opening"),
+            new KeywordWeightRule(4, 2, 0,
+                    "celebrity", "star", "romance", "wedding", "fashion", "beauty", "viral", "buzz"),
+            new KeywordWeightRule(3, 2, 0,
+                    "hot issue", "shocking", "surprising", "what happened", "you need to know", "attention")
+    );
+    private static final List<String> TRUSTED_SOURCE_MARKERS = List.of(
+            "reuters", "bloomberg", "yonhap", "financial times", "wall street journal", "wsj",
+            "associated press", "nikkei", "cnbc"
+    );
+    private static final List<String> TRUSTED_DOMAIN_MARKERS = List.of(
+            "reuters.com", "bloomberg.com", "yonhapnews.co.kr", "ft.com", "wsj.com", "apnews.com",
+            "nikkei.com", "cnbc.com"
+    );
 
     private final NewsEventRepository newsEventRepository;
 
@@ -377,55 +411,84 @@ public class NewsQueryService {
         String title = normalize(event.title());
         String summary = normalize(event.summary());
         String source = normalize(event.source());
+        String combined = combineText(title, summary);
+        String domain = normalize(extractDomain(event.url()));
 
         int score = 0;
-        score += scoreKeywords(title, 8,
-                "south korea", "korea", "kospi", "krw", "won");
-        score += scoreKeywords(summary, 5,
-                "south korea", "korea", "kospi", "krw", "won");
-        score += scoreKeywords(source, 3,
-                "south korea", "korea", "kospi", "krw", "won");
-
-        score += scoreKeywords(title, 6,
-                "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
-                "shipbuilding", "ai");
-        score += scoreKeywords(summary, 4,
-                "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
-                "shipbuilding", "ai");
-        score += scoreKeywords(source, 2,
-                "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
-                "shipbuilding", "ai");
-
-        score += scoreKeywords(title, 4,
-                "oil", "energy", "inflation", "cpi", "ppi", "rate", "interest rate", "fed", "usd",
-                "dollar", "fx");
-        score += scoreKeywords(summary, 3,
-                "oil", "energy", "inflation", "cpi", "ppi", "rate", "interest rate", "fed", "usd",
-                "dollar", "fx");
-        score += scoreKeywords(source, 1,
-                "oil", "energy", "inflation", "cpi", "ppi", "rate", "interest rate", "fed", "usd",
-                "dollar", "fx");
-
-        score += scoreKeywords(title, 5,
-                "tariff", "trade", "export", "china", "us", "sanctions", "defense", "geopolitics");
-        score += scoreKeywords(summary, 3,
-                "tariff", "trade", "export", "china", "us", "sanctions", "defense", "geopolitics");
-        score += scoreKeywords(source, 1,
-                "tariff", "trade", "export", "china", "us", "sanctions", "defense", "geopolitics");
+        for (KeywordWeightRule rule : PRIORITY_WEIGHT_RULES) {
+            score += scoreKeywords(title, rule.titleWeight(), rule.keywords());
+            score += scoreKeywords(summary, rule.summaryWeight(), rule.keywords());
+            score += scoreKeywords(source, rule.sourceWeight(), rule.keywords());
+        }
 
         if (containsKeyword(title, "korea")
                 && containsAnyKeyword(title, "semiconductor", "chip", "memory", "samsung", "sk hynix")) {
             score += 5;
         }
         if (containsKeyword(summary, "korea")
-                && containsAnyKeyword(summary, "trade", "export", "china", "us", "tariff")) {
+                && containsAnyKeyword(summary, "trade", "export", "china", "u.s.", "united states", "tariff")) {
             score += 4;
         }
         if (containsAnyKeyword(title, "kospi", "krw", "won")) {
             score += 6;
         }
+        if (containsAnyKeyword(combined, "fed", "fomc", "ecb", "boj", "bok", "central bank")
+                && containsAnyKeyword(combined, "interest rate", "rate decision", "cpi", "inflation", "employment",
+                "jobs", "payroll", "gdp")) {
+            score += 8;
+        }
+        if (containsAnyKeyword(combined, "treasury", "treasury yield", "bond yield", "fx", "exchange rate", "usd",
+                "dollar", "yen")
+                && containsAnyKeyword(combined, "fed", "fomc", "cpi", "inflation", "rate decision")) {
+            score += 6;
+        }
+        if (containsAnyKeyword(combined, "oil", "crude", "brent", "wti", "commodity", "commodities")
+                && containsAnyKeyword(combined, "inflation", "cpi", "ppi")) {
+            score += 5;
+        }
+        if (containsAnyKeyword(combined, "tariff", "trade", "sanctions")
+                && containsAnyKeyword(combined, "china", "u.s.", "united states", "korea")) {
+            score += 4;
+        }
 
+        score += calculateSourceReliabilityWeight(source, domain);
+        score -= calculateNoiseDemotion(title, summary, source, combined, score);
         return score;
+    }
+
+    private int calculateSourceReliabilityWeight(String source, String domain) {
+        int weight = 0;
+        if (containsAnyKeyword(source, TRUSTED_SOURCE_MARKERS.toArray(String[]::new))) {
+            weight += 3;
+        }
+        if (containsAnyKeyword(domain, TRUSTED_DOMAIN_MARKERS.toArray(String[]::new))) {
+            weight += 2;
+        }
+        return Math.min(weight, 4);
+    }
+
+    private int calculateNoiseDemotion(String title, String summary, String source, String combined, int currentScore) {
+        int demotion = 0;
+        for (KeywordWeightRule rule : NOISE_DEMOTION_RULES) {
+            demotion += scoreKeywords(title, rule.titleWeight(), rule.keywords());
+            demotion += scoreKeywords(summary, rule.summaryWeight(), rule.keywords());
+            demotion += scoreKeywords(source, rule.sourceWeight(), rule.keywords());
+        }
+
+        if (demotion == 0) {
+            return 0;
+        }
+        if (currentScore >= 20 || containsStrongMarketSignal(combined)) {
+            return Math.max(1, demotion / 2);
+        }
+        return demotion;
+    }
+
+    private boolean containsStrongMarketSignal(String text) {
+        return containsAnyKeyword(text,
+                "fed", "fomc", "ecb", "boj", "bok", "central bank", "interest rate", "rate decision", "cpi",
+                "inflation", "employment", "payroll", "gdp", "recession", "treasury", "bond yield", "fx",
+                "exchange rate", "oil", "crude", "tariff", "trade", "sanctions");
     }
 
     private int scoreKeywords(String text, int weight, String... keywords) {
@@ -456,6 +519,24 @@ public class NewsQueryService {
 
     private String normalize(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private String combineText(String... values) {
+        return Arrays.stream(values)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining(" "));
+    }
+
+    private String extractDomain(String url) {
+        if (!StringUtils.hasText(url)) {
+            return "";
+        }
+        try {
+            URI uri = URI.create(url.trim());
+            return uri.getHost() == null ? "" : uri.getHost();
+        } catch (IllegalArgumentException ex) {
+            return "";
+        }
     }
 
     private int countByStatus(List<NewsListItemDto> items, NewsStatus status) {
@@ -511,5 +592,13 @@ public class NewsQueryService {
         long fallbackHours = naver ? naverMaxAgeHours : globalMaxAgeHours;
         long resolvedHours = hours > 0 ? hours : fallbackHours;
         return Duration.ofHours(resolvedHours > 0 ? resolvedHours : (naver ? 24L : 36L));
+    }
+
+    private record KeywordWeightRule(
+            int titleWeight,
+            int summaryWeight,
+            int sourceWeight,
+            String... keywords
+    ) {
     }
 }

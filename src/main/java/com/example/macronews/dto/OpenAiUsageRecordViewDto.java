@@ -10,6 +10,7 @@ public record OpenAiUsageRecordViewDto(
         int promptTokens,
         int completionTokens,
         int totalTokens,
+        boolean estimatedCostAvailable,
         BigDecimal estimatedUsdCost,
         BigDecimal estimatedKrwCost
 ) {

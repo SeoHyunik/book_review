@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 public class ScheduledNewsIngestionJob {
 
     private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int MINIMUM_SCHEDULED_TARGET = 5;
 
     private final NewsIngestionService newsIngestionService;
     private final NewsSourceProviderSelector newsSourceProviderSelector;
@@ -39,11 +40,7 @@ public class ScheduledNewsIngestionJob {
     @Scheduled(cron = "${app.ingestion.scheduler.cron:0 0 * * * *}")
     public void ingestTopHeadlines() {
         long runId = runSequence.incrementAndGet();
-        int resolvedPageSize = pageSize > 0 ? pageSize : DEFAULT_PAGE_SIZE;
-        if (pageSize <= 0) {
-            log.warn("[SCHEDULER] runId={} invalid-page-size configured={} fallback={}", runId, pageSize,
-                    resolvedPageSize);
-        }
+        int resolvedPageSize = resolveScheduledPageSize(runId);
 
         if (!autoIngestionControlService.isSchedulerEnabled()) {
             log.info("[SCHEDULER] runId={} skipped reason=scheduler-disabled", runId);
@@ -98,5 +95,20 @@ public class ScheduledNewsIngestionJob {
         return ingested.stream()
                 .filter(event -> event != null && event.status() == status)
                 .count();
+    }
+
+    private int resolveScheduledPageSize(long runId) {
+        int requestedPageSize = pageSize;
+        int normalizedPageSize = requestedPageSize > 0 ? requestedPageSize : DEFAULT_PAGE_SIZE;
+        if (requestedPageSize <= 0) {
+            log.warn("[SCHEDULER] runId={} invalid-page-size configured={} fallback={}",
+                    runId, requestedPageSize, normalizedPageSize);
+        }
+        if (normalizedPageSize < MINIMUM_SCHEDULED_TARGET) {
+            log.info("[SCHEDULER] runId={} normalized-page-size requested={} normalized={} minimum={}",
+                    runId, normalizedPageSize, MINIMUM_SCHEDULED_TARGET, MINIMUM_SCHEDULED_TARGET);
+            return MINIMUM_SCHEDULED_TARGET;
+        }
+        return normalizedPageSize;
     }
 }

@@ -76,6 +76,23 @@ class ScheduledNewsIngestionJobTest {
     }
 
     @Test
+    @DisplayName("Scheduled ingestion should normalize configured page size below minimum to five")
+    void ingestTopHeadlines_normalizesConfiguredPageSizeBelowMinimum() {
+        ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 3);
+        given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
+        given(newsSourceProviderSelector.isConfigured()).willReturn(true);
+        given(autoIngestionControlService.beginScheduledRun(5)).willReturn(AutoIngestionRunCommandResult.STARTED);
+        given(newsIngestionService.ingestTopHeadlines(5)).willReturn(List.of());
+        given(newsQueryService.getAutoIngestionBatchStatus(5, 0, List.of()))
+                .willReturn(new AutoIngestionBatchStatusDto(5, 0, 0, 0, 0, 0, true, List.of()));
+
+        scheduledNewsIngestionJob.ingestTopHeadlines();
+
+        verify(autoIngestionControlService).beginScheduledRun(5);
+        verify(newsIngestionService).ingestTopHeadlines(5);
+    }
+
+    @Test
     @DisplayName("Scheduled ingestion should use configured page size when enabled")
     void ingestTopHeadlines_usesConfiguredPageSize() {
         ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 12);

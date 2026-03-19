@@ -90,7 +90,7 @@
                         <tr th:each="item : ${recentNewsItems}">
                             <td th:text="${item.title ?: 'Untitled'}"></td>
                             <td th:text="${item.source ?: '-'}"></td>
-                            <td th:text="${item.publishedAt ?: '-'}"></td>
+                            <td th:text="${@uiDateTimeFormatter.formatKst(item.publishedAt)}"></td>
                             <td>
                                 <span class="badge ui-pill"
                                       th:classappend="${item.status != null and item.status.name() == 'ANALYZED' ? ' bg-success' : (item.status != null and item.status.name() == 'FAILED' ? ' bg-danger' : ' bg-secondary')}"
