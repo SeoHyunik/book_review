@@ -5,11 +5,18 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.example.macronews.domain.AnalysisResult;
+import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.MarketSummarySnapshot;
+import com.example.macronews.domain.MacroImpact;
+import com.example.macronews.domain.MacroVariable;
+import com.example.macronews.domain.ImpactDirection;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.repository.MarketSummarySnapshotRepository;
+import com.example.macronews.repository.NewsEventRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -29,6 +36,9 @@ class MarketSummarySnapshotServiceTest {
 
     @Mock
     private MarketSummarySnapshotRepository marketSummarySnapshotRepository;
+
+    @Mock
+    private NewsEventRepository newsEventRepository;
 
     @Mock
     private AiMarketSummaryService aiMarketSummaryService;
@@ -94,6 +104,77 @@ class MarketSummarySnapshotServiceTest {
 
         assertThat(marketSummarySnapshotService.refreshSnapshot()).isEmpty();
         verifyNoInteractions(marketSummarySnapshotRepository);
+    }
+
+    @Test
+    @DisplayName("scheduled refresh should run when no previous valid snapshot exists")
+    void evaluateScheduledRefresh_runsWhenNoPreviousSnapshotExists() {
+        given(marketSummarySnapshotRepository.findTopByValidTrueOrderByGeneratedAtDesc()).willReturn(Optional.empty());
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED)).willReturn(List.of(analyzedNews(
+                "news-1", Instant.parse("2026-03-17T02:45:00Z"), Instant.parse("2026-03-17T02:50:00Z"))));
+
+        var result = marketSummarySnapshotService.evaluateScheduledRefresh();
+
+        assertThat(result.shouldRefresh()).isTrue();
+        assertThat(result.reason()).isEqualTo("no-previous-valid-snapshot");
+    }
+
+    @Test
+    @DisplayName("scheduled refresh should skip when no newer analyzed news exists")
+    void evaluateScheduledRefresh_skipsWhenNoNewerAnalyzedNewsExists() {
+        given(marketSummarySnapshotRepository.findTopByValidTrueOrderByGeneratedAtDesc())
+                .willReturn(Optional.of(snapshot(Instant.parse("2026-03-17T03:00:00Z"))));
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED)).willReturn(List.of(
+                analyzedNews("news-1", Instant.parse("2026-03-17T02:00:00Z"), Instant.parse("2026-03-17T02:10:00Z")),
+                analyzedNews("news-2", Instant.parse("2026-03-17T02:20:00Z"), Instant.parse("2026-03-17T02:30:00Z"))
+        ));
+
+        var result = marketSummarySnapshotService.evaluateScheduledRefresh();
+
+        assertThat(result.shouldRefresh()).isFalse();
+        assertThat(result.reason()).isEqualTo("no-new-analyzed-news-since-latest-valid-snapshot");
+    }
+
+    @Test
+    @DisplayName("scheduled refresh should run when newer analyzed news exists")
+    void evaluateScheduledRefresh_runsWhenNewerAnalyzedNewsExists() {
+        given(marketSummarySnapshotRepository.findTopByValidTrueOrderByGeneratedAtDesc())
+                .willReturn(Optional.of(snapshot(Instant.parse("2026-03-17T02:30:00Z"))));
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED)).willReturn(List.of(
+                analyzedNews("news-1", Instant.parse("2026-03-17T02:00:00Z"), Instant.parse("2026-03-17T02:10:00Z")),
+                analyzedNews("news-2", Instant.parse("2026-03-17T02:45:00Z"), Instant.parse("2026-03-17T02:50:00Z"))
+        ));
+
+        var result = marketSummarySnapshotService.evaluateScheduledRefresh();
+
+        assertThat(result.shouldRefresh()).isTrue();
+        assertThat(result.reason()).isEqualTo("new-analyzed-news-detected");
+    }
+
+    @Test
+    @DisplayName("scheduled refresh should skip safely when analyzed news basis timestamps are missing")
+    void evaluateScheduledRefresh_skipsSafelyWhenAnalyzedNewsBasisMissing() {
+        given(marketSummarySnapshotRepository.findTopByValidTrueOrderByGeneratedAtDesc())
+                .willReturn(Optional.of(snapshot(Instant.parse("2026-03-17T02:30:00Z"))));
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED)).willReturn(List.of(
+                new NewsEvent(
+                        "news-1",
+                        null,
+                        "title",
+                        "summary",
+                        "source",
+                        "https://example.com/news-1",
+                        Instant.parse("2026-03-17T02:00:00Z"),
+                        null,
+                        NewsStatus.ANALYZED,
+                        new AnalysisResult("test-model", null, null, null, null, null, List.of(), List.of())
+                )
+        ));
+
+        var result = marketSummarySnapshotService.evaluateScheduledRefresh();
+
+        assertThat(result.shouldRefresh()).isFalse();
+        assertThat(result.reason()).isEqualTo("no-analyzed-news-since-latest-valid-snapshot");
     }
 
     private FeaturedMarketSummaryDto summaryDto(Instant generatedAt) {
@@ -181,6 +262,30 @@ class MarketSummarySnapshotServiceTest {
                 true,
                 true,
                 "gpt-4o"
+        );
+    }
+
+    private NewsEvent analyzedNews(String id, Instant publishedAt, Instant analyzedAt) {
+        return new NewsEvent(
+                id,
+                null,
+                "Title " + id,
+                "Summary " + id,
+                "Source",
+                "https://example.com/" + id,
+                publishedAt,
+                analyzedAt,
+                NewsStatus.ANALYZED,
+                new AnalysisResult(
+                        "test-model",
+                        analyzedAt,
+                        "headline ko",
+                        "headline en",
+                        "summary ko",
+                        "summary en",
+                        List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.UP, 0.8d)),
+                        List.of()
+                )
         );
     }
 }

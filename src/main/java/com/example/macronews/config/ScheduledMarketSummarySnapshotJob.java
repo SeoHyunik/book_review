@@ -37,6 +37,16 @@ public class ScheduledMarketSummarySnapshotJob {
         }
 
         try {
+            var refreshDecision = marketSummarySnapshotService.evaluateScheduledRefresh();
+            if (!refreshDecision.shouldRefresh()) {
+                log.info("[MARKET_SUMMARY_SCHEDULER] runId={} skipped reason={} latestSnapshotGeneratedAt={} latestAnalyzedNewsBasis={}",
+                        runId,
+                        refreshDecision.reason(),
+                        refreshDecision.latestSnapshotGeneratedAt(),
+                        refreshDecision.latestAnalyzedNewsBasis());
+                return;
+            }
+
             var snapshot = marketSummarySnapshotService.refreshSnapshot();
             if (snapshot.isPresent()) {
                 log.info("[MARKET_SUMMARY_SCHEDULER] runId={} completed generatedAt={} sourceCount={}",

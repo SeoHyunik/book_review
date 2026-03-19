@@ -5,11 +5,16 @@ import com.example.macronews.dto.FeaturedMarketSummaryDto;
 import com.example.macronews.dto.MarketSummaryDetailDto;
 import com.example.macronews.dto.MarketSummarySupportingNewsDto;
 import com.example.macronews.dto.NewsListItemDto;
+import com.example.macronews.domain.AnalysisResult;
+import com.example.macronews.domain.NewsEvent;
+import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.repository.MarketSummarySnapshotRepository;
+import com.example.macronews.repository.NewsEventRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +30,7 @@ public class MarketSummarySnapshotService {
     private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
 
     private final MarketSummarySnapshotRepository marketSummarySnapshotRepository;
+    private final NewsEventRepository newsEventRepository;
     private final AiMarketSummaryService aiMarketSummaryService;
     private final NewsQueryService newsQueryService;
 
@@ -47,6 +53,31 @@ public class MarketSummarySnapshotService {
         return marketSummarySnapshotRepository.findTopByValidTrueOrderByGeneratedAtDesc()
                 .filter(this::isFresh)
                 .map(this::toDto);
+    }
+
+    public ScheduledRefreshDecision evaluateScheduledRefresh() {
+        Optional<MarketSummarySnapshot> latestValidSnapshot =
+                marketSummarySnapshotRepository.findTopByValidTrueOrderByGeneratedAtDesc();
+        if (latestValidSnapshot.isEmpty()) {
+            return ScheduledRefreshDecision.run("no-previous-valid-snapshot", null, resolveLatestAnalyzedNewsBasis());
+        }
+
+        Instant latestSnapshotGeneratedAt = latestValidSnapshot.get().generatedAt();
+        if (latestSnapshotGeneratedAt == null) {
+            return ScheduledRefreshDecision.run("latest-valid-snapshot-missing-generatedAt", null, resolveLatestAnalyzedNewsBasis());
+        }
+
+        Instant latestAnalyzedNewsBasis = resolveLatestAnalyzedNewsBasis();
+        if (latestAnalyzedNewsBasis == null) {
+            return ScheduledRefreshDecision.skip("no-analyzed-news-since-latest-valid-snapshot",
+                    latestSnapshotGeneratedAt, null);
+        }
+        if (!latestAnalyzedNewsBasis.isAfter(latestSnapshotGeneratedAt)) {
+            return ScheduledRefreshDecision.skip("no-new-analyzed-news-since-latest-valid-snapshot",
+                    latestSnapshotGeneratedAt, latestAnalyzedNewsBasis);
+        }
+        return ScheduledRefreshDecision.run("new-analyzed-news-detected",
+                latestSnapshotGeneratedAt, latestAnalyzedNewsBasis);
     }
 
     public Optional<MarketSummarySnapshot> refreshSnapshot() {
@@ -144,6 +175,25 @@ public class MarketSummarySnapshotService {
         return Duration.ofMinutes(snapshotMaxAgeMinutes > 0 ? snapshotMaxAgeMinutes : 180L);
     }
 
+    private Instant resolveLatestAnalyzedNewsBasis() {
+        return newsEventRepository.findByStatus(NewsStatus.ANALYZED).stream()
+                .map(this::resolveAnalyzedNewsBasis)
+                .filter(java.util.Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+    }
+
+    private Instant resolveAnalyzedNewsBasis(NewsEvent event) {
+        if (event == null || event.status() != NewsStatus.ANALYZED) {
+            return null;
+        }
+        AnalysisResult analysisResult = event.analysisResult();
+        if (analysisResult != null && analysisResult.createdAt() != null) {
+            return analysisResult.createdAt();
+        }
+        return event.ingestedAt();
+    }
+
     private List<MarketSummarySupportingNewsDto> mapSupportingNews(List<NewsListItemDto> items) {
         if (items == null || items.isEmpty()) {
             return List.of();
@@ -158,5 +208,20 @@ public class MarketSummarySnapshotService {
                         item.primarySentiment()
                 ))
                 .toList();
+    }
+
+    public record ScheduledRefreshDecision(
+            boolean shouldRefresh,
+            String reason,
+            Instant latestSnapshotGeneratedAt,
+            Instant latestAnalyzedNewsBasis
+    ) {
+        public static ScheduledRefreshDecision run(String reason, Instant latestSnapshotGeneratedAt, Instant latestAnalyzedNewsBasis) {
+            return new ScheduledRefreshDecision(true, reason, latestSnapshotGeneratedAt, latestAnalyzedNewsBasis);
+        }
+
+        public static ScheduledRefreshDecision skip(String reason, Instant latestSnapshotGeneratedAt, Instant latestAnalyzedNewsBasis) {
+            return new ScheduledRefreshDecision(false, reason, latestSnapshotGeneratedAt, latestAnalyzedNewsBasis);
+        }
     }
 }
