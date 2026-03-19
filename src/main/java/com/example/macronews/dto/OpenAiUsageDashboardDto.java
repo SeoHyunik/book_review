@@ -11,6 +11,7 @@ public record OpenAiUsageDashboardDto(
         BigDecimal recentKrwTotal,
         BigDecimal exchangeRate,
         String exchangeRateStatusMessageKey,
-        boolean exchangeRateFallback
+        boolean exchangeRateFallback,
+        boolean hasUnpricedRecords
 ) {
 }

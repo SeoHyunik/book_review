@@ -174,7 +174,7 @@ openai:
     summary-model:
       prompt-per-1k-usd: ${OPENAI_PRICING_SUMMARY_MODEL_PROMPT_PER_1K_USD:0.00125}
       completion-per-1k-usd: ${OPENAI_PRICING_SUMMARY_MODEL_COMPLETION_PER_1K_USD:0.01}
-    primary-model-name: ${OPENAI_PRICING_PRIMARY_MODEL:${OPENAI_MODEL:gpt-4o}}
+    primary-model-name: ${OPENAI_PRICING_PRIMARY_MODEL:${OPENAI_MODEL:gpt-4o-mini}}
     primary-model:
       prompt-per-1k-usd: ${OPENAI_PRICING_PRIMARY_MODEL_PROMPT_PER_1K_USD:0.005}
       completion-per-1k-usd: ${OPENAI_PRICING_PRIMARY_MODEL_COMPLETION_PER_1K_USD:0.015}
@@ -323,6 +323,5 @@ app:
     free-detail-views: 3
   auth:
     google-login-enabled: false
-
 
 

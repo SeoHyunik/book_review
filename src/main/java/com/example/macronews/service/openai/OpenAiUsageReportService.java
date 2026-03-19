@@ -20,9 +20,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +33,7 @@ public class OpenAiUsageReportService {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter DAY_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
+    private static final Pattern DATED_MODEL_PATTERN = Pattern.compile("^(.*)-\\d{4}-\\d{2}-\\d{2}$");
 
     private final OpenAiUsageRecordRepository openAiUsageRecordRepository;
     private final MarketDataFacade marketDataFacade;
@@ -78,15 +81,8 @@ public class OpenAiUsageReportService {
     private int monthlyMonths;
 
     public OpenAiUsageDashboardDto getDashboard() {
-        Optional<FxSnapshotDto> liveFxSnapshot = marketDataFacade.getUsdKrw();
-        BigDecimal exchangeRate = liveFxSnapshot
-                .map(FxSnapshotDto::rate)
-                .map(BigDecimal::valueOf)
-                .orElse(fallbackKrwRate);
-        boolean exchangeFallback = liveFxSnapshot.isEmpty();
-        String exchangeRateStatusMessageKey = exchangeFallback
-                ? "admin.openai.exchange.fallback"
-                : "admin.openai.exchange.live";
+        ExchangeRateResolution exchangeRateResolution = resolveExchangeRate();
+        BigDecimal exchangeRate = exchangeRateResolution.exchangeRate();
 
         List<OpenAiUsageRecord> recentRecords = openAiUsageRecordRepository.findTop50ByOrderByTimestampDesc();
         List<OpenAiUsageRecordViewDto> recentViews = recentRecords.stream()
@@ -104,34 +100,31 @@ public class OpenAiUsageReportService {
         List<OpenAiUsageAggregateDto> dailyAggregates = buildDailyAggregates(aggregateWindowRecords, exchangeRate);
         List<OpenAiUsageAggregateDto> monthlyAggregates = buildMonthlyAggregates(aggregateWindowRecords, exchangeRate);
 
-        BigDecimal recentUsdTotal = recentViews.stream()
-                .map(OpenAiUsageRecordViewDto::estimatedUsdCost)
+        BigDecimal rawRecentUsdTotal = recentRecords.stream()
+                .map(record -> calculateUsdCost(record, resolvePricing(record)))
+                .flatMap(Optional::stream)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal recentKrwTotal = recentViews.stream()
-                .map(OpenAiUsageRecordViewDto::estimatedKrwCost)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        boolean hasUnpricedRecords = recentViews.stream().anyMatch(record -> !record.estimatedCostAvailable())
+                || aggregateWindowRecords.stream().anyMatch(record -> resolvePricing(record).isEmpty());
 
         return new OpenAiUsageDashboardDto(
                 recentViews,
                 dailyAggregates,
                 monthlyAggregates,
-                scaleUsd(recentUsdTotal),
-                scaleKrw(recentKrwTotal),
+                scaleUsd(rawRecentUsdTotal),
+                scaleKrw(rawRecentUsdTotal.multiply(exchangeRate)),
                 exchangeRate,
-                exchangeRateStatusMessageKey,
-                exchangeFallback
+                exchangeRateResolution.messageKey(),
+                exchangeRateResolution.fallback(),
+                hasUnpricedRecords
         );
     }
 
     BigDecimal estimateUsdCost(OpenAiUsageRecord record) {
-        Pricing pricing = resolvePricing(record.model());
-        BigDecimal promptCost = BigDecimal.valueOf(record.promptTokens())
-                .multiply(pricing.promptPer1kUsd())
-                .divide(BigDecimal.valueOf(1000L), 8, RoundingMode.HALF_UP);
-        BigDecimal completionCost = BigDecimal.valueOf(record.completionTokens())
-                .multiply(pricing.completionPer1kUsd())
-                .divide(BigDecimal.valueOf(1000L), 8, RoundingMode.HALF_UP);
-        return scaleUsd(promptCost.add(completionCost));
+        Pricing pricing = resolvePricing(record)
+                .orElseThrow(() -> new IllegalStateException("Pricing unavailable for usage record model=" + record.model()));
+        return scaleUsd(calculateUsdCost(record, Optional.of(pricing))
+                .orElseThrow(() -> new IllegalStateException("Pricing unavailable for usage record model=" + record.model())));
     }
 
     private List<OpenAiUsageAggregateDto> buildDailyAggregates(List<OpenAiUsageRecord> records, BigDecimal exchangeRate) {
@@ -166,7 +159,8 @@ public class OpenAiUsageReportService {
         long completionTokens = records.stream().mapToLong(OpenAiUsageRecord::completionTokens).sum();
         long totalTokens = records.stream().mapToLong(OpenAiUsageRecord::totalTokens).sum();
         BigDecimal estimatedUsdCost = records.stream()
-                .map(this::estimateUsdCost)
+                .map(record -> calculateUsdCost(record, resolvePricing(record)))
+                .flatMap(Optional::stream)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal estimatedKrwCost = estimatedUsdCost.multiply(exchangeRate);
         return new OpenAiUsageAggregateDto(
@@ -181,7 +175,10 @@ public class OpenAiUsageReportService {
     }
 
     private OpenAiUsageRecordViewDto toRecordView(OpenAiUsageRecord record, BigDecimal exchangeRate) {
-        BigDecimal estimatedUsdCost = estimateUsdCost(record);
+        Optional<Pricing> pricing = resolvePricing(record);
+        BigDecimal estimatedUsdCost = calculateUsdCost(record, pricing)
+                .map(this::scaleUsd)
+                .orElse(BigDecimal.ZERO);
         return new OpenAiUsageRecordViewDto(
                 record.timestamp(),
                 record.model(),
@@ -189,6 +186,7 @@ public class OpenAiUsageReportService {
                 record.promptTokens(),
                 record.completionTokens(),
                 record.totalTokens(),
+                pricing.isPresent(),
                 estimatedUsdCost,
                 scaleKrw(estimatedUsdCost.multiply(exchangeRate))
         );
@@ -198,17 +196,124 @@ public class OpenAiUsageReportService {
         return "admin.openai.feature." + featureType.name().toLowerCase(Locale.ROOT);
     }
 
-    private Pricing resolvePricing(String model) {
-        if (model != null && model.equalsIgnoreCase(summaryModel)) {
-            return new Pricing(summaryPromptPer1kUsd, summaryCompletionPer1kUsd);
+    private Optional<Pricing> resolvePricing(OpenAiUsageRecord record) {
+        if (record == null) {
+            return Optional.empty();
         }
-        if (model != null && model.equalsIgnoreCase(interpretationModel)) {
-            return new Pricing(interpretationPromptPer1kUsd, interpretationCompletionPer1kUsd);
+        String normalizedModel = normalizeModel(record.model());
+
+        Optional<Pricing> featureSpecific = resolveFeatureSpecificPricing(record.featureType(), normalizedModel);
+        if (featureSpecific.isPresent()) {
+            return featureSpecific;
         }
-        if (model != null && model.equalsIgnoreCase(legacyPrimaryModel)) {
-            return new Pricing(legacyPrimaryPromptPer1kUsd, legacyPrimaryCompletionPer1kUsd);
+
+        Optional<Pricing> explicitModelMatch = resolveConfiguredModelPricing(normalizedModel);
+        if (explicitModelMatch.isPresent()) {
+            return explicitModelMatch;
         }
-        return new Pricing(defaultPromptPer1kUsd, defaultCompletionPer1kUsd);
+
+        if (!StringUtils.hasText(normalizedModel) || "unknown".equals(normalizedModel)) {
+            Optional<Pricing> featureFallback = resolveFeatureDefaultPricing(record.featureType());
+            if (featureFallback.isPresent()) {
+                return featureFallback;
+            }
+            return Optional.of(new Pricing(defaultPromptPer1kUsd, defaultCompletionPer1kUsd));
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<Pricing> resolveFeatureSpecificPricing(OpenAiUsageFeatureType featureType, String normalizedModel) {
+        if (!StringUtils.hasText(normalizedModel)) {
+            return Optional.empty();
+        }
+        return switch (featureType) {
+            case MACRO_INTERPRETATION -> matchesConfiguredModel(normalizedModel, interpretationModel)
+                    ? Optional.of(new Pricing(interpretationPromptPer1kUsd, interpretationCompletionPer1kUsd))
+                    : Optional.empty();
+            case MARKET_SUMMARY -> matchesConfiguredModel(normalizedModel, summaryModel)
+                    ? Optional.of(new Pricing(summaryPromptPer1kUsd, summaryCompletionPer1kUsd))
+                    : Optional.empty();
+            case MARKET_FORECAST -> matchesConfiguredModel(normalizedModel, legacyPrimaryModel)
+                    ? Optional.of(new Pricing(legacyPrimaryPromptPer1kUsd, legacyPrimaryCompletionPer1kUsd))
+                    : Optional.empty();
+        };
+    }
+
+    private Optional<Pricing> resolveConfiguredModelPricing(String normalizedModel) {
+        if (!StringUtils.hasText(normalizedModel)) {
+            return Optional.empty();
+        }
+        if (matchesConfiguredModel(normalizedModel, summaryModel)) {
+            return Optional.of(new Pricing(summaryPromptPer1kUsd, summaryCompletionPer1kUsd));
+        }
+        if (matchesConfiguredModel(normalizedModel, interpretationModel)) {
+            return Optional.of(new Pricing(interpretationPromptPer1kUsd, interpretationCompletionPer1kUsd));
+        }
+        if (matchesConfiguredModel(normalizedModel, legacyPrimaryModel)) {
+            return Optional.of(new Pricing(legacyPrimaryPromptPer1kUsd, legacyPrimaryCompletionPer1kUsd));
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Pricing> resolveFeatureDefaultPricing(OpenAiUsageFeatureType featureType) {
+        if (featureType == null) {
+            return Optional.empty();
+        }
+        return switch (featureType) {
+            case MACRO_INTERPRETATION -> Optional.of(new Pricing(interpretationPromptPer1kUsd, interpretationCompletionPer1kUsd));
+            case MARKET_SUMMARY -> Optional.of(new Pricing(summaryPromptPer1kUsd, summaryCompletionPer1kUsd));
+            case MARKET_FORECAST -> Optional.of(new Pricing(legacyPrimaryPromptPer1kUsd, legacyPrimaryCompletionPer1kUsd));
+        };
+    }
+
+    private Optional<BigDecimal> calculateUsdCost(OpenAiUsageRecord record, Optional<Pricing> pricing) {
+        if (record == null || pricing.isEmpty()) {
+            return Optional.empty();
+        }
+        BigDecimal promptCost = BigDecimal.valueOf(record.promptTokens())
+                .multiply(pricing.get().promptPer1kUsd())
+                .divide(BigDecimal.valueOf(1000L), 8, RoundingMode.HALF_UP);
+        BigDecimal completionCost = BigDecimal.valueOf(record.completionTokens())
+                .multiply(pricing.get().completionPer1kUsd())
+                .divide(BigDecimal.valueOf(1000L), 8, RoundingMode.HALF_UP);
+        return Optional.of(promptCost.add(completionCost));
+    }
+
+    private ExchangeRateResolution resolveExchangeRate() {
+        Optional<BigDecimal> liveRate = marketDataFacade.getUsdKrw()
+                .map(FxSnapshotDto::rate)
+                .map(BigDecimal::valueOf)
+                .filter(this::isPositive);
+        if (liveRate.isPresent()) {
+            return new ExchangeRateResolution(liveRate.get(), "admin.openai.exchange.live", false);
+        }
+
+        BigDecimal safeFallbackRate = isPositive(fallbackKrwRate) ? fallbackKrwRate : BigDecimal.ZERO;
+        return new ExchangeRateResolution(safeFallbackRate, "admin.openai.exchange.fallback", true);
+    }
+
+    private boolean matchesConfiguredModel(String normalizedRecordedModel, String configuredModel) {
+        String normalizedConfiguredModel = normalizeModel(configuredModel);
+        return StringUtils.hasText(normalizedRecordedModel)
+                && StringUtils.hasText(normalizedConfiguredModel)
+                && normalizedRecordedModel.equals(normalizedConfiguredModel);
+    }
+
+    private String normalizeModel(String model) {
+        if (!StringUtils.hasText(model)) {
+            return "";
+        }
+        String normalized = model.trim().toLowerCase(Locale.ROOT);
+        var matcher = DATED_MODEL_PATTERN.matcher(normalized);
+        if (matcher.matches()) {
+            return matcher.group(1);
+        }
+        return normalized;
+    }
+
+    private boolean isPositive(BigDecimal value) {
+        return value != null && value.signum() > 0;
     }
 
     private BigDecimal scaleUsd(BigDecimal value) {
@@ -220,5 +325,8 @@ public class OpenAiUsageReportService {
     }
 
     private record Pricing(BigDecimal promptPer1kUsd, BigDecimal completionPer1kUsd) {
+    }
+
+    private record ExchangeRateResolution(BigDecimal exchangeRate, String messageKey, boolean fallback) {
     }
 }

@@ -43,7 +43,7 @@ public class OpenAiUsageLoggingService {
             openAiUsageRecordRepository.save(new OpenAiUsageRecord(
                     null,
                     Instant.now(),
-                    StringUtils.hasText(model) ? model : "unknown",
+                    resolveRecordedModel(root, model),
                     featureType,
                     promptTokens,
                     completionTokens,
@@ -52,5 +52,16 @@ public class OpenAiUsageLoggingService {
         } catch (Exception ex) {
             log.debug("[OPENAI-USAGE] usage capture skipped", ex);
         }
+    }
+
+    private String resolveRecordedModel(JsonNode root, String configuredModel) {
+        String responseModel = root.path("model").asText("").trim();
+        if (StringUtils.hasText(responseModel)) {
+            return responseModel;
+        }
+        if (StringUtils.hasText(configuredModel)) {
+            return configuredModel.trim();
+        }
+        return "unknown";
     }
 }
