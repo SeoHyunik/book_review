@@ -57,6 +57,16 @@ public class NewsQueryService {
             new KeywordWeightRule(6, 4, 2,
                     "tariff", "trade", "export", "china", "sanctions", "geopolitics", "u.s.", "united states")
     );
+    private static final List<KeywordWeightRule> NOISE_DEMOTION_RULES = List.of(
+            new KeywordWeightRule(3, 2, 0,
+                    "tips", "how to", "guide", "best way", "must try", "life hack", "checklist"),
+            new KeywordWeightRule(3, 2, 0,
+                    "festival", "event", "giveaway", "sale", "discount", "promotion", "opening"),
+            new KeywordWeightRule(4, 2, 0,
+                    "celebrity", "star", "romance", "wedding", "fashion", "beauty", "viral", "buzz"),
+            new KeywordWeightRule(3, 2, 0,
+                    "hot issue", "shocking", "surprising", "what happened", "you need to know", "attention")
+    );
 
     private final NewsEventRepository newsEventRepository;
 
@@ -431,7 +441,32 @@ public class NewsQueryService {
             score += 4;
         }
 
+        score -= calculateNoiseDemotion(title, summary, source, combined, score);
         return score;
+    }
+
+    private int calculateNoiseDemotion(String title, String summary, String source, String combined, int currentScore) {
+        int demotion = 0;
+        for (KeywordWeightRule rule : NOISE_DEMOTION_RULES) {
+            demotion += scoreKeywords(title, rule.titleWeight(), rule.keywords());
+            demotion += scoreKeywords(summary, rule.summaryWeight(), rule.keywords());
+            demotion += scoreKeywords(source, rule.sourceWeight(), rule.keywords());
+        }
+
+        if (demotion == 0) {
+            return 0;
+        }
+        if (currentScore >= 20 || containsStrongMarketSignal(combined)) {
+            return Math.max(1, demotion / 2);
+        }
+        return demotion;
+    }
+
+    private boolean containsStrongMarketSignal(String text) {
+        return containsAnyKeyword(text,
+                "fed", "fomc", "ecb", "boj", "bok", "central bank", "interest rate", "rate decision", "cpi",
+                "inflation", "employment", "payroll", "gdp", "recession", "treasury", "bond yield", "fx",
+                "exchange rate", "oil", "crude", "tariff", "trade", "sanctions");
     }
 
     private int scoreKeywords(String text, int weight, String... keywords) {

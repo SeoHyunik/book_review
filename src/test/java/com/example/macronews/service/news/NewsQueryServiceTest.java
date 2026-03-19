@@ -119,6 +119,108 @@ class NewsQueryServiceTest {
     }
 
     @Test
+    @DisplayName("Priority sort should demote generic low signal articles below market relevant ones")
+    void getRecentNews_demotesGenericLowSignalArticle() {
+        NewsEvent marketRelevant = newsEvent(
+                "market-relevant",
+                "ECB rate decision pushes euro and bond yields higher",
+                "Inflation data and central bank guidance moved markets.",
+                "Reuters",
+                "https://example.com/market-relevant",
+                "2026-03-10T09:00:00Z",
+                "2026-03-10T09:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent lowSignal = newsEvent(
+                "low-signal",
+                "Best way to enjoy a spring festival event this weekend",
+                "Lifestyle tips and a giveaway guide for visitors.",
+                "Example Life",
+                "https://example.com/low-signal",
+                "2026-03-10T10:00:00Z",
+                "2026-03-10T10:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(lowSignal, marketRelevant));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("market-relevant", "low-signal");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Priority score should deterministically demote noisy phrases")
+    void getRecentNews_demotesNoisyPhraseDeterministically() {
+        NewsEvent noisy = newsEvent(
+                "noisy",
+                "Shocking celebrity buzz draws attention at opening event",
+                "A giveaway and fashion promotion became a hot issue online.",
+                "Example Buzz",
+                "https://example.com/noisy",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:35:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent baseline = newsEvent(
+                "baseline",
+                "Corporate strategy update draws investor attention",
+                "Executives outlined a medium-term business plan.",
+                "Bloomberg",
+                "https://example.com/baseline",
+                "2026-03-10T09:20:00Z",
+                "2026-03-10T09:25:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(noisy, baseline));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("baseline", "noisy");
+        assertThat(orderedItems.get(1).priorityScore()).isLessThan(orderedItems.get(0).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Strong market signals should outweigh weak noisy phrases")
+    void getRecentNews_doesNotOverDemoteStrongMarketSignals() {
+        NewsEvent strongButNoisy = newsEvent(
+                "strong-but-noisy",
+                "Fed rate decision becomes hot issue as Treasury yields surge",
+                "CPI and central bank guidance drew broad attention across markets.",
+                "Reuters",
+                "https://example.com/strong-but-noisy",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:35:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent mildMarket = newsEvent(
+                "mild-market",
+                "Corporate bond market update",
+                "Traders discussed routine financing conditions.",
+                "Reuters",
+                "https://example.com/mild-market",
+                "2026-03-10T09:20:00Z",
+                "2026-03-10T09:25:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(mildMarket, strongButNoisy));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("strong-but-noisy", "mild-market");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
     @DisplayName("Published sort should remain driven by recency instead of priority score")
     void getRecentNews_publishedSortRemainsUnchanged() {
         NewsEvent olderHighPriority = newsEvent(
