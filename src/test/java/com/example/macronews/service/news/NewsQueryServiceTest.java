@@ -51,37 +51,132 @@ class NewsQueryServiceTest {
     }
 
     @Test
-    @DisplayName("Priority sort should rank Korea semiconductor news above generic US market news")
-    void getRecentNews_prioritizesKoreaSemiconductorOverGenericUsMarket() {
-        NewsEvent koreaSemiconductor = newsEvent(
-                "korea-semiconductor",
-                "South Korea semiconductor exports rise as Samsung memory demand jumps",
-                "Korea chip and memory producers benefit from export recovery.",
-                "Yonhap",
-                "https://example.com/korea-semiconductor",
+    @DisplayName("Priority sort should rank market moving macro news above generic finance coverage")
+    void getRecentNews_prioritizesMarketMovingMacroNews() {
+        NewsEvent highImpactMacro = newsEvent(
+                "high-impact-macro",
+                "Fed rate decision lifts Treasury yields after hotter CPI report",
+                "FOMC officials signaled a tighter policy path as inflation stayed elevated.",
+                "Reuters",
+                "https://example.com/high-impact-macro",
                 "2026-03-10T09:00:00Z",
                 "2026-03-10T09:10:00Z",
                 NewsStatus.INGESTED,
                 null);
-        NewsEvent genericUsMarket = newsEvent(
-                "generic-us-market",
-                "US stocks close mixed ahead of earnings",
-                "Wall Street indices were mixed in regular trading.",
+        NewsEvent genericFinance = newsEvent(
+                "generic-finance",
+                "Bank shares advance after earnings update",
+                "Financial stocks moved higher in routine trading.",
                 "Reuters",
-                "https://example.com/generic-us-market",
+                "https://example.com/generic-finance",
                 "2026-03-10T10:00:00Z",
                 "2026-03-10T10:10:00Z",
                 NewsStatus.INGESTED,
                 null);
 
         given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
-                .willReturn(List.of(genericUsMarket, koreaSemiconductor));
+                .willReturn(List.of(genericFinance, highImpactMacro));
 
-        List<String> orderedIds = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY).stream()
-                .map(item -> item.id())
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("high-impact-macro", "generic-finance");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Priority score should deterministically boost high impact market keywords")
+    void getRecentNews_boostsHighImpactMarketKeywordsDeterministically() {
+        NewsEvent boosted = newsEvent(
+                "boosted",
+                "BOJ signals rate decision shift as yen and bond yields jump",
+                "Foreign exchange markets reacted after central bank guidance.",
+                "Bloomberg",
+                "https://example.com/boosted",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent baseline = newsEvent(
+                "baseline",
+                "Corporate strategy update draws investor attention",
+                "Executives outlined a medium-term business plan.",
+                "Bloomberg",
+                "https://example.com/baseline",
+                "2026-03-10T09:20:00Z",
+                "2026-03-10T09:25:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(boosted, baseline));
+
+        List<NewsListItemDto> orderedItems = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(orderedItems).extracting(NewsListItemDto::id)
+                .containsExactly("boosted", "baseline");
+        assertThat(orderedItems.get(0).priorityScore()).isGreaterThan(orderedItems.get(1).priorityScore());
+    }
+
+    @Test
+    @DisplayName("Published sort should remain driven by recency instead of priority score")
+    void getRecentNews_publishedSortRemainsUnchanged() {
+        NewsEvent olderHighPriority = newsEvent(
+                "older-high-priority",
+                "Fed rate decision shakes Treasury market",
+                "CPI and yields moved sharply after the FOMC update.",
+                "Reuters",
+                "https://example.com/older-high-priority",
+                "2026-03-10T08:00:00Z",
+                "2026-03-10T08:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent newerGeneric = newsEvent(
+                "newer-generic",
+                "Company management comments on outlook",
+                "A routine corporate update was released.",
+                "Reuters",
+                "https://example.com/newer-generic",
+                "2026-03-10T11:00:00Z",
+                "2026-03-10T11:05:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(newerGeneric, olderHighPriority));
+
+        List<String> orderedIds = newsQueryService.getRecentNews(null, NewsListSort.PUBLISHED_DESC).stream()
+                .map(NewsListItemDto::id)
                 .toList();
 
-        assertThat(orderedIds).containsExactly("korea-semiconductor", "generic-us-market");
+        assertThat(orderedIds).containsExactly("newer-generic", "older-high-priority");
+    }
+
+    @Test
+    @DisplayName("Priority score should handle null and empty text safely")
+    void getRecentNews_handlesNullAndEmptyTextSafely() {
+        NewsEvent sparse = new NewsEvent(
+                "sparse",
+                null,
+                null,
+                "",
+                null,
+                "https://example.com/sparse",
+                Instant.parse("2026-03-10T09:00:00Z"),
+                Instant.parse("2026-03-10T09:05:00Z"),
+                NewsStatus.INGESTED,
+                null
+        );
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(sparse));
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNews(null, NewsListSort.PRIORITY);
+
+        assertThat(items).singleElement().satisfies(item -> {
+            assertThat(item.id()).isEqualTo("sparse");
+            assertThat(item.priorityScore()).isZero();
+        });
     }
 
     @Test

@@ -42,6 +42,21 @@ import org.springframework.util.StringUtils;
 public class NewsQueryService {
 
     private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
+    private static final List<KeywordWeightRule> PRIORITY_WEIGHT_RULES = List.of(
+            new KeywordWeightRule(8, 5, 3,
+                    "south korea", "korea", "kospi", "krw", "won"),
+            new KeywordWeightRule(6, 4, 2,
+                    "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
+                    "shipbuilding", "ai"),
+            new KeywordWeightRule(9, 6, 3,
+                    "fed", "fomc", "ecb", "boj", "bok", "central bank", "rate decision", "interest rate",
+                    "cpi", "inflation", "ppi", "employment", "jobs", "payroll", "gdp", "recession", "slowdown"),
+            new KeywordWeightRule(7, 5, 2,
+                    "fx", "foreign exchange", "exchange rate", "usd", "dollar", "yen", "treasury",
+                    "treasury yield", "bond yield", "oil", "crude", "brent", "wti", "commodity", "commodities"),
+            new KeywordWeightRule(6, 4, 2,
+                    "tariff", "trade", "export", "china", "sanctions", "geopolitics", "u.s.", "united states")
+    );
 
     private final NewsEventRepository newsEventRepository;
 
@@ -377,52 +392,43 @@ public class NewsQueryService {
         String title = normalize(event.title());
         String summary = normalize(event.summary());
         String source = normalize(event.source());
+        String combined = combineText(title, summary);
 
         int score = 0;
-        score += scoreKeywords(title, 8,
-                "south korea", "korea", "kospi", "krw", "won");
-        score += scoreKeywords(summary, 5,
-                "south korea", "korea", "kospi", "krw", "won");
-        score += scoreKeywords(source, 3,
-                "south korea", "korea", "kospi", "krw", "won");
-
-        score += scoreKeywords(title, 6,
-                "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
-                "shipbuilding", "ai");
-        score += scoreKeywords(summary, 4,
-                "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
-                "shipbuilding", "ai");
-        score += scoreKeywords(source, 2,
-                "semiconductor", "chip", "memory", "samsung", "sk hynix", "battery", "ev", "auto",
-                "shipbuilding", "ai");
-
-        score += scoreKeywords(title, 4,
-                "oil", "energy", "inflation", "cpi", "ppi", "rate", "interest rate", "fed", "usd",
-                "dollar", "fx");
-        score += scoreKeywords(summary, 3,
-                "oil", "energy", "inflation", "cpi", "ppi", "rate", "interest rate", "fed", "usd",
-                "dollar", "fx");
-        score += scoreKeywords(source, 1,
-                "oil", "energy", "inflation", "cpi", "ppi", "rate", "interest rate", "fed", "usd",
-                "dollar", "fx");
-
-        score += scoreKeywords(title, 5,
-                "tariff", "trade", "export", "china", "us", "sanctions", "defense", "geopolitics");
-        score += scoreKeywords(summary, 3,
-                "tariff", "trade", "export", "china", "us", "sanctions", "defense", "geopolitics");
-        score += scoreKeywords(source, 1,
-                "tariff", "trade", "export", "china", "us", "sanctions", "defense", "geopolitics");
+        for (KeywordWeightRule rule : PRIORITY_WEIGHT_RULES) {
+            score += scoreKeywords(title, rule.titleWeight(), rule.keywords());
+            score += scoreKeywords(summary, rule.summaryWeight(), rule.keywords());
+            score += scoreKeywords(source, rule.sourceWeight(), rule.keywords());
+        }
 
         if (containsKeyword(title, "korea")
                 && containsAnyKeyword(title, "semiconductor", "chip", "memory", "samsung", "sk hynix")) {
             score += 5;
         }
         if (containsKeyword(summary, "korea")
-                && containsAnyKeyword(summary, "trade", "export", "china", "us", "tariff")) {
+                && containsAnyKeyword(summary, "trade", "export", "china", "u.s.", "united states", "tariff")) {
             score += 4;
         }
         if (containsAnyKeyword(title, "kospi", "krw", "won")) {
             score += 6;
+        }
+        if (containsAnyKeyword(combined, "fed", "fomc", "ecb", "boj", "bok", "central bank")
+                && containsAnyKeyword(combined, "interest rate", "rate decision", "cpi", "inflation", "employment",
+                "jobs", "payroll", "gdp")) {
+            score += 8;
+        }
+        if (containsAnyKeyword(combined, "treasury", "treasury yield", "bond yield", "fx", "exchange rate", "usd",
+                "dollar", "yen")
+                && containsAnyKeyword(combined, "fed", "fomc", "cpi", "inflation", "rate decision")) {
+            score += 6;
+        }
+        if (containsAnyKeyword(combined, "oil", "crude", "brent", "wti", "commodity", "commodities")
+                && containsAnyKeyword(combined, "inflation", "cpi", "ppi")) {
+            score += 5;
+        }
+        if (containsAnyKeyword(combined, "tariff", "trade", "sanctions")
+                && containsAnyKeyword(combined, "china", "u.s.", "united states", "korea")) {
+            score += 4;
         }
 
         return score;
@@ -456,6 +462,12 @@ public class NewsQueryService {
 
     private String normalize(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private String combineText(String... values) {
+        return Arrays.stream(values)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining(" "));
     }
 
     private int countByStatus(List<NewsListItemDto> items, NewsStatus status) {
@@ -511,5 +523,13 @@ public class NewsQueryService {
         long fallbackHours = naver ? naverMaxAgeHours : globalMaxAgeHours;
         long resolvedHours = hours > 0 ? hours : fallbackHours;
         return Duration.ofHours(resolvedHours > 0 ? resolvedHours : (naver ? 24L : 36L));
+    }
+
+    private record KeywordWeightRule(
+            int titleWeight,
+            int summaryWeight,
+            int sourceWeight,
+            String... keywords
+    ) {
     }
 }
