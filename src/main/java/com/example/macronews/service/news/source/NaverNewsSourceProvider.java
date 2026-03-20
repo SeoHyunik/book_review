@@ -41,6 +41,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
     private static final int NAVER_MAX_DISPLAY = 100;
     private static final int NAVER_MAX_START = 1000;
+    private static final int STALE_LOG_SAMPLE_LIMIT = 3;
+    private static final int STALE_LOG_TITLE_MAX_LENGTH = 80;
     private static final DateTimeFormatter NAVER_PUB_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
     private static final List<DateTimeFormatter> NAVER_PUB_DATE_FALLBACK_FORMATTERS = List.of(
             new DateTimeFormatterBuilder()
@@ -215,8 +217,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             int invalidPubDateCount = 0;
             int nullPublishedAtCount = 0;
             int staleItemCount = 0;
+            int staleLoggedCount = 0;
             int missingUrlCount = 0;
             int emptyTitleCount = 0;
+            Instant now = Instant.now(clock);
+            Instant cutoff = now.minus(Duration.ofHours(maxAgeHours));
             List<NaverCandidate> mapped = new ArrayList<>();
             for (JsonNode item : items) {
                 String cleanedTitle = cleanHtml(item.path("title").asText(""));
@@ -238,8 +243,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     nullPublishedAtCount++;
                     continue;
                 }
-                if (!isFreshEnough(publishedAt, maxAgeHours)) {
+                if (!isFreshEnough(publishedAt, cutoff)) {
                     staleItemCount++;
+                    if (staleLoggedCount < STALE_LOG_SAMPLE_LIMIT) {
+                        log.info("[NAVER] stale item sample bucket={} query='{}' pageStart={} publishedAt={} cutoff={} ageHours={} title='{}'",
+                                bucket, query, pageStart, publishedAt, cutoff, formatAgeHours(publishedAt, now),
+                                abbreviateForLog(cleanedTitle));
+                        staleLoggedCount++;
+                    }
                     continue;
                 }
                 if (!StringUtils.hasText(resolvedUrl)) {
@@ -348,7 +359,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         if (publishedAt == null) {
             return false;
         }
-        return !publishedAt.isBefore(Instant.now(clock).minus(Duration.ofHours(allowedMaxAgeHours)));
+        return isFreshEnough(publishedAt, Instant.now(clock).minus(Duration.ofHours(allowedMaxAgeHours)));
+    }
+
+    private boolean isFreshEnough(Instant publishedAt, Instant cutoff) {
+        if (publishedAt == null) {
+            return false;
+        }
+        return !publishedAt.isBefore(cutoff);
     }
 
     private int resolveDisplay(int requestedLimit) {
@@ -416,6 +434,21 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private String formatAgeHours(Instant publishedAt, Instant now) {
+        double ageHours = Duration.between(publishedAt, now).toMinutes() / 60.0;
+        return String.format(Locale.ROOT, "%.2f", ageHours);
+    }
+
+    private String abbreviateForLog(String title) {
+        if (!StringUtils.hasText(title)) {
+            return "";
+        }
+        if (title.length() <= STALE_LOG_TITLE_MAX_LENGTH) {
+            return title;
+        }
+        return title.substring(0, STALE_LOG_TITLE_MAX_LENGTH - 3) + "...";
     }
 
     private long resolveMaxAgeHours(NewsFreshnessBucket bucket) {
