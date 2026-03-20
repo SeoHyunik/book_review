@@ -56,17 +56,18 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     );
     private static final String KOREAN_BREAKING_MARKER = "\uC18D\uBCF4";
     private static final List<String> DEFAULT_QUERIES = List.of(
-            "\uCF54\uC2A4\uD53C",
-            "\uCF54\uC2A4\uB2E5",
+            "\uCF54\uC2A4\uD53C \uC99D\uC2DC",
+            "\uCF54\uC2A4\uB2E5 \uC99D\uC2DC",
             "\uC6D0\uB2EC\uB7EC \uD658\uC728",
             "\uAE30\uC900\uAE08\uB9AC",
-            "\uBBF8\uAD6D\uCC44 \uAE08\uB9AC",
-            "\uCC44\uAD8C \uAE08\uB9AC",
+            "\uBBF8\uAD6D \uAE30\uC900\uAE08\uB9AC",
+            "\uBBF8\uAD6D \uC5F0\uC900",
             "\uAD6D\uC81C\uC720\uAC00",
-            "\uBC18\uB3C4\uCCB4",
-            "\uC5F0\uC900",
-            "\uBBF8\uAD6D\uAE08\uB9AC",
-            "\uC99D\uC2DC \uC18D\uBCF4",
+            "\uBC18\uB3C4\uCCB4 \uC218\uCD9C",
+            "\uBC18\uB3C4\uCCB4 \uC5C5\uD669",
+            "\uB098\uC2A4\uB2E5",
+            "FOMC",
+            "CPI",
             "\uBB3C\uAC00 \uBC1C\uD45C",
             "\uACE0\uC6A9 \uBC1C\uD45C"
     );
@@ -101,7 +102,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     @Value("${app.news.naver.fallback-max-age-hours:24}")
     private long fallbackMaxAgeHours;
 
-    @Value("${app.news.naver.max-pages:3}")
+    @Value("${app.news.naver.max-pages:2}")
     private int maxPages;
 
     private Clock clock = DEFAULT_CLOCK;
@@ -391,7 +392,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     }
 
     private int resolveMaxPages() {
-        return maxPages > 0 ? maxPages : 3;
+        return maxPages > 0 ? maxPages : 2;
     }
 
     private String normalizeTitle(String title) {
