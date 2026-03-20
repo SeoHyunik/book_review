@@ -112,13 +112,14 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         }
 
         int resolvedLimit = limit > 0 ? limit : defaultLimit;
-        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit, bucket);
+        NewsApiCycleContext cycleContext = new NewsApiCycleContext("fetchDomesticTopHeadlines");
+        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit, bucket, cycleContext);
         if (freshest.size() >= resolvedLimit) {
             return freshest;
         }
 
         List<ExternalNewsItem> headlines = fetchFromUrl(buildTopHeadlinesUrl(resolvedLimit), resolvedLimit,
-                "top-headlines", bucket);
+                "top-headlines", bucket, cycleContext);
         return mergeAndLimit(freshest, headlines, resolvedLimit);
     }
 
@@ -134,7 +135,8 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         }
 
         int resolvedLimit = limit > 0 ? limit : defaultLimit;
-        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit, bucket);
+        NewsApiCycleContext cycleContext = new NewsApiCycleContext("fetchForeignTopHeadlines");
+        List<ExternalNewsItem> freshest = fetchRecentEverything(resolvedLimit, bucket, cycleContext);
         if (freshest.size() >= resolvedLimit) {
             return freshest;
         }
@@ -142,7 +144,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         log.info("Recent foreign NewsAPI bucket={} results returned {} of {} items; supplementing with top-headlines",
                 bucket, freshest.size(), resolvedLimit);
         List<ExternalNewsItem> headlines = fetchFromUrl(buildTopHeadlinesUrl(resolvedLimit), resolvedLimit,
-                "top-headlines", bucket);
+                "top-headlines", bucket, cycleContext);
         return mergeAndLimit(freshest, headlines, resolvedLimit);
     }
 
@@ -162,12 +164,14 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         return enabled && StringUtils.hasText(apiKey);
     }
 
-    private List<ExternalNewsItem> fetchRecentEverything(int limit, NewsFreshnessBucket bucket) {
+    private List<ExternalNewsItem> fetchRecentEverything(int limit, NewsFreshnessBucket bucket,
+            NewsApiCycleContext cycleContext) {
         if (!StringUtils.hasText(recentQuery)) {
             log.warn("news.api.recent-query is blank; skipping recent NewsAPI search");
             return List.of();
         }
-        List<ExternalNewsItem> primary = fetchRecentEverythingQuery(recentQuery, limit, "everything-primary", bucket);
+        List<ExternalNewsItem> primary = fetchRecentEverythingQuery(recentQuery, limit, "everything-primary", bucket,
+                cycleContext);
         if (primary.size() >= limit) {
             return primary;
         }
@@ -178,12 +182,13 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
         log.info("Primary recent NewsAPI bucket={} query returned {} of {} items; trying fallback recent query",
                 bucket, primary.size(), limit);
-        List<ExternalNewsItem> fallback = fetchRecentEverythingQuery(recentQueryFallback, limit, "everything-fallback", bucket);
+        List<ExternalNewsItem> fallback = fetchRecentEverythingQuery(recentQueryFallback, limit, "everything-fallback",
+                bucket, cycleContext);
         return mergeAndLimit(primary, fallback, limit);
     }
 
     private List<ExternalNewsItem> fetchRecentEverythingQuery(String query, int limit, String feedName,
-            NewsFreshnessBucket bucket) {
+            NewsFreshnessBucket bucket, NewsApiCycleContext cycleContext) {
         Instant cutoff = effectiveGlobalQueryCutoff();
         String url = UriComponentsBuilder.fromUriString(searchUrl)
                 .queryParam("q", query)
@@ -194,7 +199,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                 .build()
                 .encode()
                 .toUriString();
-        return fetchFromUrl(url, limit, feedName, bucket);
+        return fetchFromUrl(url, limit, feedName, bucket, cycleContext);
     }
 
     private String buildTopHeadlinesUrl(int limit) {
@@ -208,7 +213,15 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                 .toUriString();
     }
 
-    private List<ExternalNewsItem> fetchFromUrl(String url, int limit, String feedName, NewsFreshnessBucket bucket) {
+    private List<ExternalNewsItem> fetchFromUrl(String url, int limit, String feedName, NewsFreshnessBucket bucket,
+            NewsApiCycleContext cycleContext) {
+        String requestFamily = resolveRequestFamily(url);
+        if (cycleContext.rateLimitEncountered()) {
+            log.info("[NEWSAPI] skipping call after prior 429 cycle={} feed={} requestFamily={} bucket={}",
+                    cycleContext.entryPoint(), feedName, requestFamily, bucket);
+            return List.of();
+        }
+
         ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
                 HttpMethod.GET,
                 new HttpHeaders(),
@@ -216,6 +229,12 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                 null));
 
         if (result == null || result.statusCode() < 200 || result.statusCode() >= 300) {
+            if (result != null && result.statusCode() == 429) {
+                cycleContext.markRateLimitEncountered();
+                log.warn("[NEWSAPI] 429 received cycle={} feed={} requestFamily={} bucket={} first429InCycle=true",
+                        cycleContext.entryPoint(), feedName, requestFamily, bucket);
+                return List.of();
+            }
             log.warn("{} call failed. status={}", feedName, result == null ? -1 : result.statusCode());
             return List.of();
         }
@@ -393,5 +412,42 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private String resolveRequestFamily(String url) {
+        if (!StringUtils.hasText(url)) {
+            return "unknown";
+        }
+        try {
+            String path = UriComponentsBuilder.fromUriString(url).build().getPath();
+            if (!StringUtils.hasText(path)) {
+                return "unknown";
+            }
+            int lastSlash = path.lastIndexOf('/');
+            return lastSlash >= 0 ? path.substring(lastSlash + 1) : path;
+        } catch (Exception ex) {
+            return "unknown";
+        }
+    }
+
+    private static final class NewsApiCycleContext {
+        private final String entryPoint;
+        private boolean rateLimitEncountered;
+
+        private NewsApiCycleContext(String entryPoint) {
+            this.entryPoint = entryPoint;
+        }
+
+        private String entryPoint() {
+            return entryPoint;
+        }
+
+        private boolean rateLimitEncountered() {
+            return rateLimitEncountered;
+        }
+
+        private void markRateLimitEncountered() {
+            this.rateLimitEncountered = true;
+        }
     }
 }
