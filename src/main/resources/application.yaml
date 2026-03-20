@@ -254,8 +254,8 @@ app:
       base-url: ${APP_NEWS_NAVER_BASE_URL:https://openapi.naver.com}
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}
-      # Override with APP_NEWS_NAVER_QUERIES. If left blank, NAVER falls back to a built-in
-      # market-scoped query set and only probes the first couple of result pages by default.
+      # Override with APP_NEWS_NAVER_QUERIES. If left blank, NAVER falls back to a small
+      # high-specificity macro query set and only probes the first couple of result pages by default.
       queries: ${APP_NEWS_NAVER_QUERIES:}
       display: ${APP_NEWS_NAVER_DISPLAY:5}
       start: ${APP_NEWS_NAVER_START:1}
@@ -323,4 +323,3 @@ app:
     free-detail-views: 3
   auth:
     google-login-enabled: false
-

@@ -55,21 +55,39 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     .toFormatter(Locale.ENGLISH)
     );
     private static final String KOREAN_BREAKING_MARKER = "\uC18D\uBCF4";
+    private static final List<String> RELEVANCE_KEYWORDS = List.of(
+            "fomc",
+            "cpi",
+            "ppi",
+            "inflation",
+            "rate",
+            "fed",
+            "powell",
+            "yield",
+            "oil",
+            "wti",
+            "brent",
+            "dollar",
+            "\uAE08\uB9AC",
+            "\uBB3C\uAC00",
+            "\uC778\uD50C\uB808\uC774\uC158",
+            "\uC5F0\uC900",
+            "\uD30C\uC6D4",
+            "\uD658\uC728",
+            "\uC720\uAC00",
+            "\uB2EC\uB7EC",
+            "\uACE0\uC6A9",
+            "\uC99D\uC2DC",
+            "\uCF54\uC2A4\uD53C",
+            "\uCF54\uC2A4\uB2E5"
+    );
     private static final List<String> DEFAULT_QUERIES = List.of(
-            "\uCF54\uC2A4\uD53C \uC99D\uC2DC",
-            "\uCF54\uC2A4\uB2E5 \uC99D\uC2DC",
-            "\uC6D0\uB2EC\uB7EC \uD658\uC728",
-            "\uAE30\uC900\uAE08\uB9AC",
-            "\uBBF8\uAD6D \uAE30\uC900\uAE08\uB9AC",
-            "\uBBF8\uAD6D \uC5F0\uC900",
-            "\uAD6D\uC81C\uC720\uAC00",
-            "\uBC18\uB3C4\uCCB4 \uC218\uCD9C",
-            "\uBC18\uB3C4\uCCB4 \uC5C5\uD669",
-            "\uB098\uC2A4\uB2E5",
             "FOMC",
             "CPI",
-            "\uBB3C\uAC00 \uBC1C\uD45C",
-            "\uACE0\uC6A9 \uBC1C\uD45C"
+            "PPI",
+            "\uD30C\uC6D4",
+            "\uB2EC\uB7EC\uC778\uB371\uC2A4",
+            "\uBBF8\uAD6D \uACE0\uC6A9\uC9C0\uD45C"
     );
 
     private final ExternalApiUtils externalApiUtils;
@@ -219,6 +237,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             int nullPublishedAtCount = 0;
             int staleItemCount = 0;
             int staleLoggedCount = 0;
+            int filteredByRelevanceCount = 0;
             int missingUrlCount = 0;
             int emptyTitleCount = 0;
             Instant now = Instant.now(clock);
@@ -254,6 +273,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     }
                     continue;
                 }
+                if (!isRelevantForMacroNews(cleanedTitle, cleanedDescription)) {
+                    filteredByRelevanceCount++;
+                    continue;
+                }
                 if (!StringUtils.hasText(resolvedUrl)) {
                     missingUrlCount++;
                 }
@@ -272,9 +295,9 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 mapped.add(new NaverCandidate(mappedItem, originalLink, fallbackLink, dedupTitle));
             }
             log.info("[NAVER] bucket={} query='{}' pageStart={} rawItems={}", bucket, query, pageStart, rawItemCount);
-            log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} missingUsableLink={} emptyTitle={}",
+            log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} filteredByRelevance={} missingUsableLink={} emptyTitle={}",
                     bucket, query, pageStart, mapped.size(), nullPublishedAtCount, invalidPubDateCount, staleItemCount,
-                    missingUrlCount, emptyTitleCount);
+                    filteredByRelevanceCount, missingUrlCount, emptyTitleCount);
             return new NaverParseResult(mapped, rawItemCount);
         } catch (Exception ex) {
             log.warn("[NAVER] failed to parse response bucket={} query='{}' pageStart={}", bucket, query, pageStart, ex);
@@ -435,6 +458,23 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private boolean isRelevantForMacroNews(String title, String description) {
+        return containsRelevanceKeyword(title) || containsRelevanceKeyword(description);
+    }
+
+    private boolean containsRelevanceKeyword(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        String normalized = value.toLowerCase(Locale.ROOT);
+        for (String keyword : RELEVANCE_KEYWORDS) {
+            if (normalized.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String formatAgeHours(Instant publishedAt, Instant now) {
