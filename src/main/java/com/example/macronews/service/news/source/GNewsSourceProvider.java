@@ -73,6 +73,8 @@ public class GNewsSourceProvider implements NewsSourceProvider {
     @Override
     public List<ExternalNewsItem> fetchTopHeadlines(int limit, NewsFreshnessBucket bucket) {
         if (!isConfigured()) {
+            log.info("[GNEWS] provider unavailable enabled={} apiKeyPresent={} configuredBaseUrl={}",
+                    enabled, StringUtils.hasText(apiKey), normalizeConfiguredBaseUrl(baseUrl));
             return List.of();
         }
         if (!StringUtils.hasText(query)) {
@@ -81,7 +83,8 @@ public class GNewsSourceProvider implements NewsSourceProvider {
         }
 
         int resolvedLimit = Math.max(limit, 1);
-        String url = UriComponentsBuilder.fromUriString(baseUrl)
+        String normalizedBaseUrl = normalizeConfiguredBaseUrl(baseUrl);
+        String url = UriComponentsBuilder.fromUriString(normalizedBaseUrl)
                 .queryParam("q", query)
                 .queryParam("lang", language)
                 .queryParam("country", country)
@@ -91,6 +94,7 @@ public class GNewsSourceProvider implements NewsSourceProvider {
                 .build()
                 .encode()
                 .toUriString();
+        String sanitizedUrl = sanitizeUrl(url);
 
         ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
                 HttpMethod.GET,
@@ -99,7 +103,9 @@ public class GNewsSourceProvider implements NewsSourceProvider {
                 null
         ));
         if (result == null || result.statusCode() < 200 || result.statusCode() >= 300) {
-            log.warn("[GNEWS] bucket={} call failed status={}", bucket, result == null ? -1 : result.statusCode());
+            log.warn("[GNEWS] bucket={} enabled={} requestFamily={} status={} configuredBaseUrl={} requestUrl={}",
+                    bucket, enabled, resolveRequestFamily(normalizedBaseUrl),
+                    result == null ? -1 : result.statusCode(), normalizedBaseUrl, sanitizedUrl);
             return List.of();
         }
         return parseArticles(result.body(), resolvedLimit, bucket);
@@ -186,5 +192,38 @@ public class GNewsSourceProvider implements NewsSourceProvider {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private String normalizeConfiguredBaseUrl(String configuredBaseUrl) {
+        String trimmed = defaultText(configuredBaseUrl, "https://gnews.io/api/v4/search").trim();
+        if (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        if (trimmed.endsWith("/search")) {
+            return trimmed;
+        }
+        return trimmed + "/search";
+    }
+
+    private String sanitizeUrl(String url) {
+        if (!StringUtils.hasText(url)) {
+            return "";
+        }
+        try {
+            return UriComponentsBuilder.fromUriString(url)
+                    .replaceQueryParam("apikey", "***")
+                    .build()
+                    .toUriString();
+        } catch (Exception ex) {
+            return url.replace(apiKey, "***");
+        }
+    }
+
+    private String resolveRequestFamily(String normalizedBaseUrl) {
+        if (!StringUtils.hasText(normalizedBaseUrl)) {
+            return "unknown";
+        }
+        int lastSlash = normalizedBaseUrl.lastIndexOf('/');
+        return lastSlash >= 0 ? normalizedBaseUrl.substring(lastSlash + 1) : normalizedBaseUrl;
     }
 }

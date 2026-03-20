@@ -59,6 +59,9 @@ public class NewsSourceProviderSelector {
 
         List<NewsSourceProvider> preferredProviders = selectConfiguredProviders(preferredPriority);
         List<NewsSourceProvider> fallbackProviders = selectConfiguredProviders(fallbackPriority);
+        log.info("[NEWS-SOURCE] provider plan preferredPriority={} preferredProviders={} fallbackPriority={} fallbackProviders={} requested={}",
+                preferredPriority, summarizeProviders(preferredProviders),
+                fallbackPriority, summarizeProviders(fallbackProviders), resolvedLimit);
         if (preferredProviders.isEmpty() && fallbackProviders.isEmpty()) {
             log.info("[NEWS-SOURCE] no configured provider available priority={}", preferredPriority);
             return List.of();
@@ -154,6 +157,12 @@ public class NewsSourceProviderSelector {
                 .toList();
     }
 
+    private List<String> summarizeProviders(List<NewsSourceProvider> selectedProviders) {
+        return selectedProviders.stream()
+                .map(NewsSourceProvider::sourceCode)
+                .toList();
+    }
+
     private int collectCandidates(Map<String, RankedNewsCandidate> ranked,
             Map<String, RankedNewsCandidate> preferredBucket,
             List<NewsSourceProvider> selectedProviders,
@@ -162,17 +171,26 @@ public class NewsSourceProviderSelector {
             boolean preferredSource,
             NewsFreshnessBucket bucket) {
         int returnedCount = 0;
-        for (NewsSourceProvider provider : selectedProviders) {
+        for (int providerIndex = 0; providerIndex < selectedProviders.size(); providerIndex++) {
+            NewsSourceProvider provider = selectedProviders.get(providerIndex);
             if (fetchLimit <= 0 || ranked.size() >= fetchLimit) {
-                log.info("[NEWS-SOURCE] stopping early reason=requested-limit-satisfied providerStage={} bucket={}",
-                        priority, bucket);
+                log.info("[NEWS-SOURCE] stopping early reason=requested-limit-satisfied providerStage={} bucket={} skippedProviders={}",
+                        priority, bucket, summarizeProviders(selectedProviders.subList(providerIndex, selectedProviders.size())));
                 break;
             }
             log.info("[NEWS-SOURCE] loading provider={} priority={} preferred={} limit={}",
                     provider.sourceCode(), priority, preferredSource, fetchLimit);
-            List<ExternalNewsItem> fetched = provider.fetchTopHeadlines(fetchLimit, bucket);
-            log.info("[NEWS-SOURCE] provider={} returned {}={}", provider.sourceCode(),
-                    bucket == NewsFreshnessBucket.FRESH ? "fresh" : "semiFresh", fetched.size());
+            List<ExternalNewsItem> fetched;
+            try {
+                fetched = provider.fetchTopHeadlines(fetchLimit, bucket);
+            } catch (Exception ex) {
+                log.warn("[NEWS-SOURCE] provider outcome status=FAILED provider={} priority={} preferred={} bucket={} limit={}",
+                        provider.sourceCode(), priority, preferredSource, bucket, fetchLimit, ex);
+                continue;
+            }
+            log.info("[NEWS-SOURCE] provider outcome status={} provider={} priority={} preferred={} bucket={} returned={}",
+                    fetched.isEmpty() ? ProviderOutcomeStatus.EMPTY : ProviderOutcomeStatus.SUCCESS,
+                    provider.sourceCode(), priority, preferredSource, bucket, fetched.size());
             returnedCount += fetched.size();
             for (ExternalNewsItem item : fetched) {
                 String dedupKey = resolveDedupKey(item);
@@ -311,5 +329,11 @@ public class NewsSourceProviderSelector {
             Instant publishedAt,
             Instant effectivePublishedAt
     ) {
+    }
+
+    private enum ProviderOutcomeStatus {
+        SUCCESS,
+        EMPTY,
+        FAILED
     }
 }
