@@ -28,6 +28,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class NewsQueryServiceTest {
@@ -601,6 +602,33 @@ class NewsQueryServiceTest {
         List<NewsListItemDto> items = newsQueryService.getRecentNews();
 
         assertThat(items).extracting(NewsListItemDto::id).containsExactly("recently-ingested");
+    }
+
+    @Test
+    @DisplayName("Recent news list should use primary freshness window before fallback window")
+    void getRecentNews_prefersPrimaryFreshnessWindowOverFallback() {
+        ReflectionTestUtils.setField(newsQueryService, "globalMaxAgeHours", 24L);
+        ReflectionTestUtils.setField(newsQueryService, "globalFallbackMaxAgeHours", 36L);
+
+        NewsEvent staleForPrimaryWindow = new NewsEvent(
+                "stale-primary-window",
+                null,
+                "Article should be excluded once the primary window expires",
+                "Summary",
+                "Reuters",
+                "https://example.com/stale-primary-window",
+                FIXED_NOW.minus(Duration.ofDays(2)),
+                FIXED_NOW.minus(Duration.ofHours(30)),
+                NewsStatus.INGESTED,
+                null
+        );
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(staleForPrimaryWindow));
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNews();
+
+        assertThat(items).isEmpty();
     }
 
     @Test

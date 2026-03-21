@@ -124,7 +124,8 @@ public class NewsQueryService {
                 .toList();
 
         if (log.isDebugEnabled()) {
-            Instant cutoff = Instant.now(clock).minus(Duration.ofHours(Math.max(globalFallbackMaxAgeHours, naverFallbackMaxAgeHours)));
+            Instant cutoff = Instant.now(clock).minus(Duration.ofHours(
+                    Math.max(resolveDisplayHours(false), resolveDisplayHours(true))));
             log.debug("[NEWS-QUERY] displayCandidates={} signalCandidates={} signalBasis=analysisResult.createdAt|ingestedAt|publishedAt cutoff={}",
                     candidates.size(), recentAnalyzed.size(), cutoff);
         }
@@ -588,10 +589,20 @@ public class NewsQueryService {
     private Duration resolveDisplayMaxAge(NewsEvent event) {
         String source = event == null ? "" : normalize(event.source());
         boolean naver = "naver".equals(source);
-        long hours = naver ? naverFallbackMaxAgeHours : globalFallbackMaxAgeHours;
-        long fallbackHours = naver ? naverMaxAgeHours : globalMaxAgeHours;
-        long resolvedHours = hours > 0 ? hours : fallbackHours;
-        return Duration.ofHours(resolvedHours > 0 ? resolvedHours : (naver ? 24L : 36L));
+        return Duration.ofHours(resolveDisplayHours(naver));
+    }
+
+    private long resolveDisplayHours(boolean naver) {
+        long primaryHours = naver ? naverMaxAgeHours : globalMaxAgeHours;
+        long fallbackHours = naver ? naverFallbackMaxAgeHours : globalFallbackMaxAgeHours;
+        long defaultHours = naver ? 12L : 24L;
+        if (primaryHours > 0) {
+            return primaryHours;
+        }
+        if (fallbackHours > 0) {
+            return fallbackHours;
+        }
+        return defaultHours;
     }
 
     private record KeywordWeightRule(

@@ -2,6 +2,7 @@ package com.example.macronews.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 
 import com.example.macronews.domain.ImpactDirection;
 import com.example.macronews.domain.MacroVariable;
@@ -242,6 +243,67 @@ class NewsControllerTest {
         assertThat(viewName).isEqualTo("news/list");
         assertThat(model.getAttribute("featuredNews")).isEqualTo(featuredNews);
         assertThat(model.getAttribute("featuredSummaryMode")).isEqualTo(false);
+        assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("article");
+    }
+
+    @Test
+    @DisplayName("list should fail open when optional featured summary lookup throws")
+    void list_failsOpenWhenFeaturedSummaryLookupThrows() {
+        NewsListItemDto featuredNews = new NewsListItemDto(
+                "news-1",
+                "Raw market headline",
+                "Raw market headline",
+                "Reuters",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse("2026-03-17T02:35:00Z"),
+                com.example.macronews.domain.NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.POSITIVE,
+                "Headline",
+                "Interpretation",
+                10
+        );
+
+        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(featuredNews));
+        given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(new MarketSignalOverviewDto(List.of()));
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+        willThrow(new RuntimeException("snapshot store unavailable"))
+                .given(marketSummarySnapshotService).getLatestValidSummary();
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.list(null, null, null, model);
+
+        assertThat(viewName).isEqualTo("news/list");
+        assertThat(model.getAttribute("featuredNews")).isEqualTo(featuredNews);
+        assertThat(model.getAttribute("featuredSummaryMode")).isEqualTo(false);
+        assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("article");
+        assertThat(model.getAttribute("featuredStoredMarketSummary")).isNull();
+        assertThat(model.getAttribute("featuredAiMarketSummary")).isNull();
+        assertThat(model.getAttribute("featuredMarketSummary")).isNull();
+    }
+
+    @Test
+    @DisplayName("list should fail open when market forecast lookup throws")
+    void list_failsOpenWhenMarketForecastLookupThrows() {
+        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of());
+        given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(new MarketSignalOverviewDto(List.of()));
+        given(marketSummarySnapshotService.getLatestValidSummary()).willReturn(Optional.empty());
+        given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        willThrow(new RuntimeException("forecast unavailable"))
+                .given(marketForecastQueryService).getCurrentSnapshot();
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.list(null, null, null, model);
+
+        assertThat(viewName).isEqualTo("news/list");
+        assertThat(model.getAttribute("marketForecastSnapshot")).isNull();
         assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("article");
     }
 }

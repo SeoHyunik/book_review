@@ -52,17 +52,16 @@ public class NewsController {
             Model model) {
         NewsStatus selectedStatus = resolveStatus(status);
         NewsListSort selectedSort = resolveSort(sort);
-        List<NewsListItemDto> allNewsItems = newsQueryService.getRecentNews(selectedStatus, selectedSort);
+        List<NewsListItemDto> allNewsItems = safeGetRecentNews(selectedStatus, selectedSort);
         int totalItems = allNewsItems.size();
         int totalPages = Math.max(1, (int) Math.ceil((double) totalItems / NEWS_PAGE_SIZE));
         int currentPage = resolvePage(page, totalPages);
         int fromIndex = Math.min((currentPage - 1) * NEWS_PAGE_SIZE, totalItems);
         int toIndex = Math.min(fromIndex + NEWS_PAGE_SIZE, totalItems);
         List<NewsListItemDto> newsItems = allNewsItems.subList(fromIndex, toIndex);
-        MarketSignalOverviewDto marketSignalOverview =
-                newsQueryService.getMarketSignalOverview(selectedStatus, selectedSort);
-        MarketForecastSnapshotDto marketForecastSnapshot = marketForecastQueryService.getCurrentSnapshot().orElse(null);
-        FeaturedSummarySelection featuredSummarySelection = resolveFeaturedSummarySelection();
+        MarketSignalOverviewDto marketSignalOverview = safeGetMarketSignalOverview(selectedStatus, selectedSort);
+        MarketForecastSnapshotDto marketForecastSnapshot = safeGetCurrentForecastSnapshot();
+        FeaturedSummarySelection featuredSummarySelection = safeResolveFeaturedSummarySelection();
         FeaturedMarketSummaryDto featuredStoredMarketSummary = featuredSummarySelection.storedSummary();
         FeaturedMarketSummaryDto featuredAiMarketSummary = featuredSummarySelection.aiSummary();
         FeaturedMarketSummaryDto featuredMarketSummary = featuredSummarySelection.recentSummary();
@@ -92,6 +91,44 @@ public class NewsController {
         log.info("Rendering news list page entries={} statusFilter={} sort={} featuredMode={}",
                 newsItems.size(), selectedStatus, selectedSort, featuredPrimaryMode);
         return "news/list";
+    }
+
+    private List<NewsListItemDto> safeGetRecentNews(NewsStatus selectedStatus, NewsListSort selectedSort) {
+        try {
+            return newsQueryService.getRecentNews(selectedStatus, selectedSort);
+        } catch (RuntimeException ex) {
+            log.warn("Rendering /news with empty news list due to query failure status={} sort={}",
+                    selectedStatus, selectedSort, ex);
+            return List.of();
+        }
+    }
+
+    private MarketSignalOverviewDto safeGetMarketSignalOverview(NewsStatus selectedStatus, NewsListSort selectedSort) {
+        try {
+            return newsQueryService.getMarketSignalOverview(selectedStatus, selectedSort);
+        } catch (RuntimeException ex) {
+            log.warn("Rendering /news without market signal overview due to query failure status={} sort={}",
+                    selectedStatus, selectedSort, ex);
+            return new MarketSignalOverviewDto(List.of());
+        }
+    }
+
+    private MarketForecastSnapshotDto safeGetCurrentForecastSnapshot() {
+        try {
+            return marketForecastQueryService.getCurrentSnapshot().orElse(null);
+        } catch (RuntimeException ex) {
+            log.warn("Rendering /news without market forecast snapshot due to forecast query failure", ex);
+            return null;
+        }
+    }
+
+    private FeaturedSummarySelection safeResolveFeaturedSummarySelection() {
+        try {
+            return resolveFeaturedSummarySelection();
+        } catch (RuntimeException ex) {
+            log.warn("Rendering /news without featured market summary due to summary resolution failure", ex);
+            return new FeaturedSummarySelection(null, null, null, "article", false);
+        }
     }
 
     private FeaturedSummarySelection resolveFeaturedSummarySelection() {
