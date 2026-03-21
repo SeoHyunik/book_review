@@ -26,7 +26,8 @@ description = "Macro news monolith"
 
 /**
  * Java Toolchain (compile/runtime for tasks)
- * - KEEP AS-IS (User requested)
+ * - KEEP AS-IS (User requested)echo $env:Path
+ * [Environment]::GetEnvironmentVariable("Path","User")
  */
 java {
     toolchain {
