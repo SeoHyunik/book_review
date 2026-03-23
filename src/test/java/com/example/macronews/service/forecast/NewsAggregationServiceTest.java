@@ -15,6 +15,7 @@ import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.dto.market.GoldSnapshotDto;
+import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.market.MarketDataFacade;
@@ -135,6 +136,7 @@ class NewsAggregationServiceTest {
         given(marketDataFacade.getUsdKrw()).willReturn(java.util.Optional.empty());
         given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
         given(marketDataFacade.getOil()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getKospi()).willReturn(java.util.Optional.empty());
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
                 .willReturn(successfulForecastResponse());
 
@@ -159,6 +161,8 @@ class NewsAggregationServiceTest {
         given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
         given(marketDataFacade.getOil())
                 .willReturn(java.util.Optional.of(new OilSnapshotDto(78.3d, null, Instant.now())));
+        given(marketDataFacade.getKospi())
+                .willReturn(java.util.Optional.of(new IndexSnapshotDto("KOSPI", 2685.4d, Instant.now())));
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
                 .willReturn(successfulForecastResponse());
 
@@ -178,6 +182,7 @@ class NewsAggregationServiceTest {
         assertThat(userContent).contains("Current market context:");
         assertThat(userContent).contains("- USD/KRW: 1350.2");
         assertThat(userContent).contains("- WTI: 78.3");
+        assertThat(userContent).contains("- KOSPI: 2685.4");
         assertThat(userContent).doesNotContain("- Gold:");
         assertThat(userContent).doesNotContain("- Brent:");
     }

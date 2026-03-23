@@ -13,6 +13,7 @@ import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.dto.market.GoldSnapshotDto;
+import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.repository.NewsEventRepository;
@@ -266,6 +267,7 @@ public class NewsAggregationService {
             FxSnapshotDto fxSnapshot = marketDataFacade.getUsdKrw().orElse(null);
             GoldSnapshotDto goldSnapshot = marketDataFacade.getGold().orElse(null);
             OilSnapshotDto oilSnapshot = marketDataFacade.getOil().orElse(null);
+            IndexSnapshotDto kospiSnapshot = marketDataFacade.getKospi().orElse(null);
 
             if (fxSnapshot != null) {
                 lines.add("- USD/KRW: " + formatDecimal(fxSnapshot.rate()));
@@ -280,6 +282,9 @@ public class NewsAggregationService {
                 if (oilSnapshot.brentUsd() != null) {
                     lines.add("- Brent: " + formatDecimal(oilSnapshot.brentUsd()));
                 }
+            }
+            if (kospiSnapshot != null && kospiSnapshot.price() != null) {
+                lines.add("- KOSPI: " + formatDecimal(kospiSnapshot.price()));
             }
 
             if (lines.isEmpty()) {

@@ -24,6 +24,7 @@ class MarketProviderParsingTest {
     private ExchangeRateApiProvider exchangeRateApiProvider;
     private MetalPriceApiProvider metalPriceApiProvider;
     private OilPriceApiProvider oilPriceApiProvider;
+    private TwelveDataIndexQuoteProvider twelveDataIndexQuoteProvider;
 
     @BeforeEach
     void setUp() {
@@ -31,6 +32,7 @@ class MarketProviderParsingTest {
         exchangeRateApiProvider = new ExchangeRateApiProvider(externalApiUtils, objectMapper);
         metalPriceApiProvider = new MetalPriceApiProvider(externalApiUtils, objectMapper);
         oilPriceApiProvider = new OilPriceApiProvider(externalApiUtils, objectMapper);
+        twelveDataIndexQuoteProvider = new TwelveDataIndexQuoteProvider(externalApiUtils, objectMapper);
 
         ReflectionTestUtils.setField(exchangeRateApiProvider, "enabled", true);
         ReflectionTestUtils.setField(exchangeRateApiProvider, "baseUrl", "https://v6.exchangerate-api.com");
@@ -43,6 +45,9 @@ class MarketProviderParsingTest {
         ReflectionTestUtils.setField(oilPriceApiProvider, "enabled", true);
         ReflectionTestUtils.setField(oilPriceApiProvider, "url", "https://api.oilpriceapi.com/v1/prices/latest");
         ReflectionTestUtils.setField(oilPriceApiProvider, "apiKey", "oil-key");
+
+        ReflectionTestUtils.setField(twelveDataIndexQuoteProvider, "enabled", true);
+        ReflectionTestUtils.setField(twelveDataIndexQuoteProvider, "apiKey", "index-key");
     }
 
     @Test
@@ -102,5 +107,23 @@ class MarketProviderParsingTest {
         assertThat(snapshot).isPresent();
         assertThat(snapshot.get().wtiUsd()).isEqualTo(78.12d);
         assertThat(snapshot.get().brentUsd()).isEqualTo(82.45d);
+    }
+
+    @Test
+    @DisplayName("Index provider should parse KOSPI quote from mocked response")
+    void getQuote_parsesKospiPrice() {
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "symbol": "KOSPI",
+                  "price": "2685.40",
+                  "timestamp": 1710000000
+                }
+                """));
+
+        var snapshot = twelveDataIndexQuoteProvider.getQuote("KOSPI");
+
+        assertThat(snapshot).isPresent();
+        assertThat(snapshot.get().symbol()).isEqualTo("KOSPI");
+        assertThat(snapshot.get().price()).isEqualTo(2685.40d);
     }
 }
