@@ -9,7 +9,9 @@ import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
+import com.example.macronews.dto.forecast.MarketForecastSummaryHandoffDto;
 import com.example.macronews.repository.NewsEventRepository;
+import com.example.macronews.service.forecast.MarketForecastQueryService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,8 +36,12 @@ public class RecentMarketSummaryService {
 
     private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
     private static final int MAX_KEY_DRIVERS = 3;
+    private static final double DEFAULT_IMPACT_CONFIDENCE = 0.55d;
+    private static final double NEUTRAL_WEIGHT_DAMPING = 0.7d;
+    private static final double DOMINANCE_EDGE_THRESHOLD = 0.12d;
 
     private final NewsEventRepository newsEventRepository;
+    private final MarketForecastQueryService marketForecastQueryService;
 
     @Value("${app.featured.market-summary.enabled:true}")
     private boolean enabled;
@@ -63,11 +69,13 @@ public class RecentMarketSummaryService {
             return Optional.empty();
         }
 
-        SignalSentiment dominantSentiment = resolveDominantSentiment(recentItems);
+        SentimentAggregation aggregation = resolveDominantSentiment(recentItems);
+        SignalSentiment dominantSentiment = aggregation.sentiment();
         List<DriverCount> topDrivers = resolveTopDrivers(recentItems);
         Instant generatedAt = Instant.now(clock);
         Instant toPublishedAt = recentItems.get(0).publishedAt();
         Instant fromPublishedAt = recentItems.get(recentItems.size() - 1).publishedAt();
+        Double confidence = applyPriceAwareConfidenceModifier(aggregation.confidence(), dominantSentiment);
 
         return Optional.of(new FeaturedMarketSummaryDto(
                 buildHeadlineKo(dominantSentiment),
@@ -87,7 +95,7 @@ public class RecentMarketSummaryService {
                         .toList(),
                 null,
                 null,
-                null,
+                confidence,
                 false,
                 null
         ));
@@ -123,34 +131,53 @@ public class RecentMarketSummaryService {
                 : event.ingestedAt();
     }
 
-    private SignalSentiment resolveDominantSentiment(List<NewsEvent> recentItems) {
-        Map<SignalSentiment, Integer> counts = new EnumMap<>(SignalSentiment.class);
-        counts.put(SignalSentiment.POSITIVE, 0);
-        counts.put(SignalSentiment.NEGATIVE, 0);
-        counts.put(SignalSentiment.NEUTRAL, 0);
+    private SentimentAggregation resolveDominantSentiment(List<NewsEvent> recentItems) {
+        Map<SignalSentiment, Double> weightedScores = new EnumMap<>(SignalSentiment.class);
+        weightedScores.put(SignalSentiment.POSITIVE, 0d);
+        weightedScores.put(SignalSentiment.NEGATIVE, 0d);
+        weightedScores.put(SignalSentiment.NEUTRAL, 0d);
 
         for (NewsEvent event : recentItems) {
-            SignalSentiment sentiment = resolvePrimarySentiment(event);
-            counts.computeIfPresent(sentiment, (key, value) -> value + 1);
+            WeightedSentiment weightedSentiment = resolvePrimarySentiment(event);
+            weightedScores.computeIfPresent(weightedSentiment.sentiment(),
+                    (key, value) -> value + weightedSentiment.weight());
         }
 
-        int positive = counts.getOrDefault(SignalSentiment.POSITIVE, 0);
-        int negative = counts.getOrDefault(SignalSentiment.NEGATIVE, 0);
-        int neutral = counts.getOrDefault(SignalSentiment.NEUTRAL, 0);
+        double positive = weightedScores.getOrDefault(SignalSentiment.POSITIVE, 0d);
+        double negative = weightedScores.getOrDefault(SignalSentiment.NEGATIVE, 0d);
+        double neutral = weightedScores.getOrDefault(SignalSentiment.NEUTRAL, 0d);
+        double total = positive + negative + neutral;
+        if (total <= 0d) {
+            return new SentimentAggregation(SignalSentiment.NEUTRAL, null);
+        }
 
-        if (positive > negative && positive > neutral) {
-            return SignalSentiment.POSITIVE;
+        double directionalMax = Math.max(positive, negative);
+        double directionalMin = Math.min(positive, negative);
+        SignalSentiment directionalCandidate = positive >= negative
+                ? SignalSentiment.POSITIVE
+                : SignalSentiment.NEGATIVE;
+
+        boolean directionalWins = directionalMax > 0d
+                && (directionalMax - directionalMin) >= DOMINANCE_EDGE_THRESHOLD
+                && directionalMax >= (neutral * 0.92d);
+
+        if (!directionalWins) {
+            return new SentimentAggregation(
+                    SignalSentiment.NEUTRAL,
+                    calculateConfidence(neutral, Math.max(positive, negative), total)
+            );
         }
-        if (negative > positive && negative > neutral) {
-            return SignalSentiment.NEGATIVE;
-        }
-        return SignalSentiment.NEUTRAL;
+
+        return new SentimentAggregation(
+                directionalCandidate,
+                calculateConfidence(directionalMax, Math.max(neutral, directionalMin), total)
+        );
     }
 
-    private SignalSentiment resolvePrimarySentiment(NewsEvent event) {
+    private WeightedSentiment resolvePrimarySentiment(NewsEvent event) {
         AnalysisResult analysisResult = event.analysisResult();
         if (analysisResult == null) {
-            return SignalSentiment.NEUTRAL;
+            return new WeightedSentiment(SignalSentiment.NEUTRAL, DEFAULT_IMPACT_CONFIDENCE * NEUTRAL_WEIGHT_DAMPING);
         }
 
         if (analysisResult.macroImpacts() != null) {
@@ -158,7 +185,8 @@ public class RecentMarketSummaryService {
                 if (impact == null || impact.variable() == null || impact.direction() == null) {
                     continue;
                 }
-                return impact.variable().sentimentFor(impact.direction());
+                SignalSentiment sentiment = impact.variable().sentimentFor(impact.direction());
+                return new WeightedSentiment(sentiment, resolveImpactWeight(sentiment, impact.confidence()));
             }
         }
 
@@ -167,11 +195,72 @@ public class RecentMarketSummaryService {
                 if (impact == null || impact.market() == null || impact.direction() == null) {
                     continue;
                 }
-                return impact.market().sentimentFor(impact.direction());
+                SignalSentiment sentiment = impact.market().sentimentFor(impact.direction());
+                return new WeightedSentiment(sentiment, resolveImpactWeight(sentiment, impact.confidence()));
             }
         }
 
-        return SignalSentiment.NEUTRAL;
+        return new WeightedSentiment(SignalSentiment.NEUTRAL, DEFAULT_IMPACT_CONFIDENCE * NEUTRAL_WEIGHT_DAMPING);
+    }
+
+    private double resolveImpactWeight(SignalSentiment sentiment, Double confidence) {
+        double normalized = normalizeConfidence(confidence);
+        return sentiment == SignalSentiment.NEUTRAL
+                ? normalized * NEUTRAL_WEIGHT_DAMPING
+                : normalized;
+    }
+
+    private double normalizeConfidence(Double confidence) {
+        if (confidence == null || confidence.isNaN() || confidence <= 0d) {
+            return DEFAULT_IMPACT_CONFIDENCE;
+        }
+        return Math.max(0.2d, Math.min(confidence, 1d));
+    }
+
+    private Double calculateConfidence(double winner, double runnerUp, double total) {
+        if (total <= 0d) {
+            return null;
+        }
+        double dominance = Math.max(0d, winner - runnerUp) / total;
+        double participation = Math.min(1d, total / 3d);
+        double confidence = 0.34d + (dominance * 0.46d) + (participation * 0.12d);
+        return Math.max(0.18d, Math.min(confidence, 0.94d));
+    }
+
+    private Double applyPriceAwareConfidenceModifier(Double baseConfidence, SignalSentiment dominantSentiment) {
+        if (baseConfidence == null || dominantSentiment == SignalSentiment.NEUTRAL) {
+            return baseConfidence;
+        }
+        try {
+            MarketForecastSummaryHandoffDto handoff = marketForecastQueryService.getCurrentSummaryHandoff().orElse(null);
+            if (handoff == null || handoff.macroDirections() == null || handoff.macroDirections().isEmpty()) {
+                return baseConfidence;
+            }
+
+            int aligned = 0;
+            int conflicting = 0;
+            for (MacroVariable variable : List.of(MacroVariable.USD, MacroVariable.GOLD, MacroVariable.OIL, MacroVariable.KOSPI)) {
+                var direction = handoff.macroDirections().get(variable);
+                if (direction == null) {
+                    continue;
+                }
+                SignalSentiment forecastSentiment = variable.sentimentFor(direction);
+                if (forecastSentiment == SignalSentiment.NEUTRAL) {
+                    continue;
+                }
+                if (forecastSentiment == dominantSentiment) {
+                    aligned++;
+                } else {
+                    conflicting++;
+                }
+            }
+
+            double modifier = Math.min(0.08d, aligned * 0.02d) - Math.min(0.06d, conflicting * 0.02d);
+            return Math.max(0.18d, Math.min(baseConfidence + modifier, 0.96d));
+        } catch (RuntimeException ex) {
+            log.debug("[FEATURED_SUMMARY] price-aware confidence modifier skipped", ex);
+            return baseConfidence;
+        }
     }
 
     private List<DriverCount> resolveTopDrivers(List<NewsEvent> recentItems) {
@@ -342,5 +431,17 @@ public class RecentMarketSummaryService {
         private DriverCount increment() {
             return new DriverCount(chipLabel, labelKo, labelEn, count + 1);
         }
+    }
+
+    private record WeightedSentiment(
+            SignalSentiment sentiment,
+            double weight
+    ) {
+    }
+
+    private record SentimentAggregation(
+            SignalSentiment sentiment,
+            Double confidence
+    ) {
     }
 }

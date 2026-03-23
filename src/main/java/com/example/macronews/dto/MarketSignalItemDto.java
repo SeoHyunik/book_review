@@ -8,6 +8,7 @@ public record MarketSignalItemDto(
         MacroVariable variable,
         ImpactDirection direction,
         SignalSentiment sentiment,
-        int sampleCount
+        int sampleCount,
+        Double confidence
 ) {
 }

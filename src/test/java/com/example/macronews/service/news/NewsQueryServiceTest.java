@@ -548,6 +548,7 @@ class NewsQueryServiceTest {
                     assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
                     assertThat(item.sentiment()).isEqualTo(SignalSentiment.NEGATIVE);
                     assertThat(item.sampleCount()).isEqualTo(2);
+                    assertThat(item.confidence()).isNotNull();
                 });
         assertThat(overview.items())
                 .filteredOn(item -> item.variable() == MacroVariable.USD)
@@ -555,6 +556,7 @@ class NewsQueryServiceTest {
                 .satisfies(item -> {
                     assertThat(item.direction()).isEqualTo(ImpactDirection.DOWN);
                     assertThat(item.sentiment()).isEqualTo(SignalSentiment.POSITIVE);
+                    assertThat(item.confidence()).isNotNull();
                 });
         assertThat(overview.items())
                 .filteredOn(item -> item.variable() == MacroVariable.KOSPI)
@@ -562,6 +564,7 @@ class NewsQueryServiceTest {
                 .satisfies(item -> {
                     assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
                     assertThat(item.sentiment()).isEqualTo(SignalSentiment.POSITIVE);
+                    assertThat(item.confidence()).isNotNull();
                 });
         assertThat(overview.items())
                 .filteredOn(item -> item.variable() == MacroVariable.INTEREST_RATE)
@@ -576,6 +579,109 @@ class NewsQueryServiceTest {
                 .satisfies(item -> {
                     assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
                     assertThat(item.sentiment()).isEqualTo(SignalSentiment.NEUTRAL);
+                });
+    }
+
+    @Test
+    @DisplayName("Market signal overview should not collapse to neutral when directional confidence outweighs weak neutral noise")
+    void getMarketSignalOverview_reducesNeutralCompressionForDirectionalConfidence() {
+        NewsEvent strongNegativeOne = newsEvent(
+                "strong-negative-1",
+                "Oil spikes on supply shock",
+                "Summary",
+                "Reuters",
+                "https://example.com/strong-negative-1",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.92d)),
+                        List.of()));
+        NewsEvent strongNegativeTwo = newsEvent(
+                "strong-negative-2",
+                "Energy inflation fears deepen",
+                "Summary",
+                "Bloomberg",
+                "https://example.com/strong-negative-2",
+                "2026-03-10T08:30:00Z",
+                "2026-03-10T08:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.83d)),
+                        List.of()));
+        NewsEvent neutralNoise = newsEvent(
+                "neutral-noise",
+                "Oil outlook stays steady",
+                "Summary",
+                "MarketWatch",
+                "https://example.com/neutral-noise",
+                "2026-03-10T07:30:00Z",
+                "2026-03-10T07:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.NEUTRAL, 0.35d)),
+                        List.of()));
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(strongNegativeOne, strongNegativeTwo, neutralNoise));
+
+        var overview = newsQueryService.getMarketSignalOverview(null, NewsListSort.PUBLISHED_DESC);
+
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.OIL)
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
+                    assertThat(item.sentiment()).isEqualTo(SignalSentiment.NEGATIVE);
+                    assertThat(item.confidence()).isGreaterThan(0.6d);
+                });
+    }
+
+    @Test
+    @DisplayName("Market signal overview should keep neutral when directional weights are genuinely balanced")
+    void getMarketSignalOverview_keepsNeutralForNearTie() {
+        NewsEvent upSignal = newsEvent(
+                "usd-up",
+                "Dollar rebounds",
+                "Summary",
+                "Reuters",
+                "https://example.com/usd-up",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.UP, 0.61d)),
+                        List.of()));
+        NewsEvent downSignal = newsEvent(
+                "usd-down",
+                "Dollar eases",
+                "Summary",
+                "Bloomberg",
+                "https://example.com/usd-down",
+                "2026-03-10T08:30:00Z",
+                "2026-03-10T08:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.58d)),
+                        List.of()));
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(upSignal, downSignal));
+
+        var overview = newsQueryService.getMarketSignalOverview(null, NewsListSort.PUBLISHED_DESC);
+
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.USD)
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.direction()).isEqualTo(ImpactDirection.NEUTRAL);
+                    assertThat(item.sentiment()).isEqualTo(SignalSentiment.NEUTRAL);
+                    assertThat(item.confidence()).isNotNull();
                 });
     }
 

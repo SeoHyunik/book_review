@@ -43,6 +43,11 @@ import org.springframework.util.StringUtils;
 public class NewsQueryService {
 
     private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
+    private static final double DEFAULT_IMPACT_CONFIDENCE = 0.55d;
+    private static final double MIN_CONFIDENCE = 0.18d;
+    private static final double MAX_CONFIDENCE = 0.94d;
+    private static final double NEUTRAL_WEIGHT_DAMPING = 0.65d;
+    private static final double DIRECTIONAL_EDGE_THRESHOLD = 0.12d;
     private static final List<KeywordWeightRule> PRIORITY_WEIGHT_RULES = List.of(
             new KeywordWeightRule(8, 5, 3,
                     "south korea", "korea", "kospi", "krw", "won"),
@@ -335,10 +340,10 @@ public class NewsQueryService {
     }
 
     private MarketSignalItemDto aggregateSignal(MacroVariable variable, List<NewsEvent> recentAnalyzed) {
-        Map<ImpactDirection, Integer> counts = new EnumMap<>(ImpactDirection.class);
-        counts.put(ImpactDirection.UP, 0);
-        counts.put(ImpactDirection.DOWN, 0);
-        counts.put(ImpactDirection.NEUTRAL, 0);
+        Map<ImpactDirection, Double> weightedScores = new EnumMap<>(ImpactDirection.class);
+        weightedScores.put(ImpactDirection.UP, 0d);
+        weightedScores.put(ImpactDirection.DOWN, 0d);
+        weightedScores.put(ImpactDirection.NEUTRAL, 0d);
 
         int sampleCount = 0;
         for (NewsEvent event : recentAnalyzed) {
@@ -349,13 +354,20 @@ public class NewsQueryService {
                 if (impact == null || impact.variable() != variable || impact.direction() == null) {
                     continue;
                 }
-                counts.computeIfPresent(impact.direction(), (key, value) -> value + 1);
+                weightedScores.computeIfPresent(impact.direction(),
+                        (key, value) -> value + resolveImpactWeight(impact));
                 sampleCount++;
             }
         }
 
-        ImpactDirection dominantDirection = resolveDominantDirection(counts);
-        return new MarketSignalItemDto(variable, dominantDirection, variable.sentimentFor(dominantDirection), sampleCount);
+        AggregatedDirection aggregatedDirection = resolveDominantDirection(weightedScores);
+        return new MarketSignalItemDto(
+                variable,
+                aggregatedDirection.direction(),
+                variable.sentimentFor(aggregatedDirection.direction()),
+                sampleCount,
+                aggregatedDirection.confidence()
+        );
     }
 
     private String extractLeadingSentence(String text) {
@@ -394,18 +406,59 @@ public class NewsQueryService {
         return boundary;
     }
 
-    private ImpactDirection resolveDominantDirection(Map<ImpactDirection, Integer> counts) {
-        int up = counts.getOrDefault(ImpactDirection.UP, 0);
-        int down = counts.getOrDefault(ImpactDirection.DOWN, 0);
-        int neutral = counts.getOrDefault(ImpactDirection.NEUTRAL, 0);
+    private AggregatedDirection resolveDominantDirection(Map<ImpactDirection, Double> weightedScores) {
+        double up = weightedScores.getOrDefault(ImpactDirection.UP, 0d);
+        double down = weightedScores.getOrDefault(ImpactDirection.DOWN, 0d);
+        double neutral = weightedScores.getOrDefault(ImpactDirection.NEUTRAL, 0d);
+        double directionalMax = Math.max(up, down);
+        double directionalMin = Math.min(up, down);
+        double total = up + down + neutral;
 
-        if (up > down && up > neutral) {
-            return ImpactDirection.UP;
+        if (total <= 0d) {
+            return new AggregatedDirection(ImpactDirection.NEUTRAL, null);
         }
-        if (down > up && down > neutral) {
-            return ImpactDirection.DOWN;
+
+        ImpactDirection directionalCandidate = up >= down ? ImpactDirection.UP : ImpactDirection.DOWN;
+        double directionalEdge = directionalMax - directionalMin;
+        boolean directionalWins = directionalMax > 0d
+                && directionalEdge >= DIRECTIONAL_EDGE_THRESHOLD
+                && directionalMax >= (neutral * 0.9d);
+
+        if (!directionalWins) {
+            return new AggregatedDirection(ImpactDirection.NEUTRAL,
+                    calculateConfidence(neutral, Math.max(up, down), total));
         }
-        return ImpactDirection.NEUTRAL;
+
+        return new AggregatedDirection(directionalCandidate,
+                calculateConfidence(directionalMax, Math.max(neutral, directionalMin), total));
+    }
+
+    private double resolveImpactWeight(MacroImpact impact) {
+        double confidence = normalizeConfidence(impact.confidence());
+        return impact.direction() == ImpactDirection.NEUTRAL
+                ? confidence * NEUTRAL_WEIGHT_DAMPING
+                : confidence;
+    }
+
+    private Double calculateConfidence(double winner, double runnerUp, double total) {
+        if (total <= 0d) {
+            return null;
+        }
+        double dominance = Math.max(0d, winner - runnerUp) / total;
+        double participation = Math.min(1d, total / 3d);
+        double confidence = 0.32d + (dominance * 0.48d) + (participation * 0.14d);
+        return clamp(confidence, MIN_CONFIDENCE, MAX_CONFIDENCE);
+    }
+
+    private double normalizeConfidence(Double confidence) {
+        if (confidence == null || confidence.isNaN() || confidence <= 0d) {
+            return DEFAULT_IMPACT_CONFIDENCE;
+        }
+        return clamp(confidence, 0.2d, 1d);
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private int calculatePriorityScore(NewsEvent event) {
@@ -610,6 +663,12 @@ public class NewsQueryService {
             int summaryWeight,
             int sourceWeight,
             String... keywords
+    ) {
+    }
+
+    private record AggregatedDirection(
+            ImpactDirection direction,
+            Double confidence
     ) {
     }
 }

@@ -630,6 +630,48 @@
             color: color-mix(in srgb, var(--surface-muted) 90%, #334155);
         }
 
+        .signal-confidence {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            margin-top: 0.7rem;
+        }
+
+        .signal-confidence-meter {
+            position: relative;
+            flex: 1 1 auto;
+            height: 0.35rem;
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(148, 163, 184, 0.22);
+        }
+
+        .signal-confidence-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, rgba(100, 116, 139, 0.7), rgba(30, 41, 59, 0.96));
+        }
+
+        .signal-confidence-value {
+            min-width: 2.7rem;
+            text-align: right;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: color-mix(in srgb, var(--surface-muted) 82%, #1f2937);
+        }
+
+        .signal-confidence-strong .signal-confidence-fill {
+            background: linear-gradient(90deg, rgba(185, 56, 45, 0.84), rgba(127, 29, 29, 1));
+        }
+
+        .signal-confidence-strong.signal-sentiment-negative .signal-confidence-fill {
+            background: linear-gradient(90deg, rgba(33, 88, 181, 0.82), rgba(29, 78, 216, 1));
+        }
+
+        .signal-confidence-soft .signal-confidence-fill {
+            opacity: 0.66;
+        }
+
         .signal-tile:hover {
             transform: translateY(-4px);
             box-shadow: 0 1.15rem 2.4rem rgba(15, 23, 42, 0.11);
@@ -923,7 +965,7 @@
                 <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3">
                     <div class="col" th:each="signal : ${marketSignalOverview.items}">
                         <div class="border rounded-4 p-3 h-100 signal-tile news-surface"
-                             th:classappend="${signal.sentiment.name() == 'POSITIVE' ? ' signal-sentiment-positive' : (signal.sentiment.name() == 'NEGATIVE' ? ' signal-sentiment-negative' : ' signal-sentiment-neutral')}"
+                             th:classappend="${signal.sentiment.name() == 'POSITIVE' ? ' signal-sentiment-positive' : (signal.sentiment.name() == 'NEGATIVE' ? ' signal-sentiment-negative' : ' signal-sentiment-neutral')} + ${signal.confidence != null and signal.confidence >= 0.7 ? ' signal-confidence-strong' : (signal.confidence != null and signal.confidence < 0.45 ? ' signal-confidence-soft' : '')}"
                              th:with="specificDirectionKey=${'news.overview.direction.' + #strings.toLowerCase(signal.variable.name()) + '.' + #strings.toLowerCase(signal.direction.name())},
                                       genericDirectionKey=${'news.overview.direction.generic.' + #strings.toLowerCase(signal.direction.name())}">
                             <div class="d-flex justify-content-between align-items-start gap-3">
@@ -950,6 +992,14 @@
                             <div class="small mt-3 signal-count"
                                  th:text="#{news.overview.sampleCount(${signal.sampleCount})}">
                                 0 signals
+                            </div>
+                            <div class="signal-confidence" th:if="${signal.confidence != null}">
+                                <div class="signal-confidence-meter" aria-hidden="true">
+                                    <div class="signal-confidence-fill"
+                                         th:style="'width:' + ${#numbers.formatDecimal(signal.confidence * 100, 1, 0)} + '%'"></div>
+                                </div>
+                                <div class="signal-confidence-value"
+                                     th:text="${#numbers.formatDecimal(signal.confidence * 100, 1, 0)} + '%'">68%</div>
                             </div>
                         </div>
                     </div>
