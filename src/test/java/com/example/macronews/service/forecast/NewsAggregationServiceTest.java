@@ -19,7 +19,7 @@ import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.market.MarketDataFacade;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
-import com.example.macronews.util.ExternalApiRequest;
+import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.JsonNode;
