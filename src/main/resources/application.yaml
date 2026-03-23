@@ -180,7 +180,7 @@ app:
       max-age-hours: 24
       fallback-max-age-hours: 36
     naver:
-      enabled: false
+      enabled: ${APP_NEWS_NAVER_ENABLED:false}
       base-url: https://openapi.naver.com
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}

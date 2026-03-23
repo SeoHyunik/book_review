@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -125,6 +126,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private Clock clock = DEFAULT_CLOCK;
 
+    @PostConstruct
+    void logConfigurationState() {
+        log.info("[NAVER] configuration enabled={} clientIdPresent={} clientSecretPresent={} configured={}",
+                enabled, hasClientId(), hasClientSecret(), isConfigured());
+    }
+
     @Override
     public String sourceCode() {
         return "naver";
@@ -164,7 +171,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     @Override
     public boolean isConfigured() {
-        return enabled && StringUtils.hasText(clientId) && StringUtils.hasText(clientSecret);
+        return enabled && hasClientId() && hasClientSecret();
     }
 
     private List<String> resolveQueries() {
@@ -458,6 +465,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private boolean hasClientId() {
+        return StringUtils.hasText(clientId);
+    }
+
+    private boolean hasClientSecret() {
+        return StringUtils.hasText(clientSecret);
     }
 
     private boolean isRelevantForMacroNews(String title, String description) {

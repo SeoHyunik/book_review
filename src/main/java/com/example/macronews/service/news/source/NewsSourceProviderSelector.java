@@ -59,6 +59,9 @@ public class NewsSourceProviderSelector {
 
         List<NewsSourceProvider> preferredProviders = selectConfiguredProviders(preferredPriority);
         List<NewsSourceProvider> fallbackProviders = selectConfiguredProviders(fallbackPriority);
+        if (preferredPriority == NewsFeedPriority.DOMESTIC && preferredProviders.isEmpty()) {
+            log.warn("[NEWS-SOURCE] domestic priority active but no configured domestic provider is available");
+        }
         log.info("[NEWS-SOURCE] provider plan preferredPriority={} preferredProviders={} fallbackPriority={} fallbackProviders={} requested={}",
                 preferredPriority, summarizeProviders(preferredProviders),
                 fallbackPriority, summarizeProviders(fallbackProviders), resolvedLimit);

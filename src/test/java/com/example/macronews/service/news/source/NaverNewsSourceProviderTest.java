@@ -52,6 +52,12 @@ class NaverNewsSourceProviderTest {
     }
 
     @Test
+    @DisplayName("NAVER provider should be configured when enabled and credentials are present")
+    void isConfigured_returnsTrueWhenEnabledAndCredentialsPresent() {
+        assertThat(provider.isConfigured()).isTrue();
+    }
+
+    @Test
     @DisplayName("NAVER provider should strip bold tags and prefer original links")
     void fetchTopHeadlines_stripsBoldTagsAndPrefersOriginalLink() {
         ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C");
@@ -591,6 +597,7 @@ class NaverNewsSourceProviderTest {
         ReflectionTestUtils.setField(provider, "enabled", false);
         ReflectionTestUtils.setField(provider, "rawQueries", "");
 
+        assertThat(provider.isConfigured()).isFalse();
         List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
 
         assertThat(results).isEmpty();
@@ -603,6 +610,20 @@ class NaverNewsSourceProviderTest {
         ReflectionTestUtils.setField(provider, "clientId", "");
         ReflectionTestUtils.setField(provider, "rawQueries", "");
 
+        assertThat(provider.isConfigured()).isFalse();
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).isEmpty();
+        verify(externalApiUtils, never()).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("NAVER provider should remain unconfigured when client secret is missing")
+    void fetchTopHeadlines_returnsEmptyWhenClientSecretMissing() {
+        ReflectionTestUtils.setField(provider, "clientSecret", "");
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+
+        assertThat(provider.isConfigured()).isFalse();
         List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
 
         assertThat(results).isEmpty();
