@@ -1,6 +1,9 @@
 package com.example.macronews.service.forecast;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.macronews.domain.AnalysisResult;
@@ -10,9 +13,16 @@ import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
+import com.example.macronews.dto.market.FxSnapshotDto;
+import com.example.macronews.dto.market.GoldSnapshotDto;
+import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.repository.NewsEventRepository;
+import com.example.macronews.service.market.MarketDataFacade;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
+import com.example.macronews.util.ExternalApiRequest;
+import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -21,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
@@ -38,11 +49,20 @@ class NewsAggregationServiceTest {
     @Mock
     private OpenAiUsageLoggingService openAiUsageLoggingService;
 
+    @Mock
+    private MarketDataFacade marketDataFacade;
+
     private NewsAggregationService newsAggregationService;
 
     @BeforeEach
     void setUp() {
-        newsAggregationService = new NewsAggregationService(newsEventRepository, externalApiUtils, new ObjectMapper(), openAiUsageLoggingService);
+        newsAggregationService = new NewsAggregationService(
+                newsEventRepository,
+                externalApiUtils,
+                new ObjectMapper(),
+                openAiUsageLoggingService,
+                marketDataFacade
+        );
         ReflectionTestUtils.setField(newsAggregationService, "forecastEnabled", true);
         ReflectionTestUtils.setField(newsAggregationService, "windowHours", 3);
         ReflectionTestUtils.setField(newsAggregationService, "maxNewsItems", 20);
@@ -68,12 +88,13 @@ class NewsAggregationServiceTest {
         String payload = newsAggregationService.buildPayload(List.of(
                 newsEvent("news-1", "KOSPI rises"),
                 newsEvent("news-2", "Dollar eases")
-        ));
+        ), "");
 
         assertThat(payload).contains("KOSPI rises");
         assertThat(payload).contains("Dollar eases");
         assertThat(payload).contains("summaryKo");
         assertThat(payload).contains("macroImpacts");
+        assertThat(payload).doesNotContain("Current market context:");
     }
 
     @Test
@@ -99,11 +120,106 @@ class NewsAggregationServiceTest {
     @Test
     @DisplayName("getCurrentSnapshot should fall back to empty when recent analyzed news is insufficient")
     void getCurrentSnapshot_returnsEmptyWhenInsufficientNews() {
-        org.mockito.BDDMockito.given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(newsEvent("news-1", "Only one item")));
 
         assertThat(newsAggregationService.getCurrentSnapshot()).isEmpty();
         verifyNoInteractions(externalApiUtils);
+    }
+
+    @Test
+    @DisplayName("getCurrentSnapshot should keep news-only payload when all market data is missing")
+    void getCurrentSnapshot_usesNewsOnlyPayloadWhenAllMarketDataMissing() throws Exception {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(recentNews());
+        given(marketDataFacade.getUsdKrw()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getOil()).willReturn(java.util.Optional.empty());
+        given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
+                .willReturn(successfulForecastResponse());
+
+        ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
+
+        assertThat(newsAggregationService.getCurrentSnapshot()).isPresent();
+
+        org.mockito.Mockito.verify(externalApiUtils).callAPI(requestCaptor.capture());
+        JsonNode payload = new ObjectMapper().readTree(requestCaptor.getValue().body());
+        assertThat(payload.path("messages")).hasSize(2);
+        assertThat(payload.path("messages").get(1).path("content").asText()).contains("Items:");
+        assertThat(payload.path("messages").get(1).path("content").asText()).doesNotContain("Current market context:");
+    }
+
+    @Test
+    @DisplayName("getCurrentSnapshot should append only available market values")
+    void getCurrentSnapshot_appendsOnlyAvailableMarketValues() throws Exception {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(recentNews());
+        given(marketDataFacade.getUsdKrw())
+                .willReturn(java.util.Optional.of(new FxSnapshotDto("USD", "KRW", 1350.2d, Instant.now())));
+        given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getOil())
+                .willReturn(java.util.Optional.of(new OilSnapshotDto(78.3d, null, Instant.now())));
+        given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
+                .willReturn(successfulForecastResponse());
+
+        ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
+
+        assertThat(newsAggregationService.getCurrentSnapshot()).isPresent();
+
+        org.mockito.Mockito.verify(externalApiUtils).callAPI(requestCaptor.capture());
+        JsonNode payload = new ObjectMapper().readTree(requestCaptor.getValue().body());
+        JsonNode root = payload;
+        String userContent = root.path("messages").get(1).path("content").asText();
+        assertThat(root.path("model").asText()).isEqualTo("gpt-4o");
+        assertThat(root.path("max_tokens").asInt()).isEqualTo(800);
+        assertThat(root.path("temperature").asDouble()).isEqualTo(0.2d);
+        assertThat(root.path("response_format").path("type").asText()).isEqualTo("json_object");
+        assertThat(userContent).contains("Items:");
+        assertThat(userContent).contains("Current market context:");
+        assertThat(userContent).contains("- USD/KRW: 1350.2");
+        assertThat(userContent).contains("- WTI: 78.3");
+        assertThat(userContent).doesNotContain("- Gold:");
+        assertThat(userContent).doesNotContain("- Brent:");
+    }
+
+    @Test
+    @DisplayName("getCurrentSnapshot should fail open when marketDataFacade throws")
+    void getCurrentSnapshot_continuesWhenMarketDataFacadeThrows() throws Exception {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(recentNews());
+        given(marketDataFacade.getUsdKrw()).willThrow(new RuntimeException("market api down"));
+        given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
+                .willReturn(successfulForecastResponse());
+
+        ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
+
+        assertThatCode(() -> newsAggregationService.getCurrentSnapshot())
+                .doesNotThrowAnyException();
+        assertThat(newsAggregationService.getCurrentSnapshot()).isPresent();
+
+        org.mockito.Mockito.verify(externalApiUtils, org.mockito.Mockito.atLeastOnce()).callAPI(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().body()).doesNotContain("Current market context:");
+    }
+
+    private List<NewsEvent> recentNews() {
+        return List.of(
+                newsEvent("news-1", "KOSPI rises"),
+                newsEvent("news-2", "Dollar eases")
+        );
+    }
+
+    private ExternalApiResult successfulForecastResponse() {
+        return new ExternalApiResult(200, """
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "{\\"mood\\":\\"sun\\",\\"headlineKo\\":\\"Headline KO\\",\\"headlineEn\\":\\"Headline EN\\",\\"summaryKo\\":\\"Summary KO\\",\\"summaryEn\\":\\"Summary EN\\",\\"keyDrivers\\":[\\"driver-1\\"],\\"relatedNewsIds\\":[\\"news-1\\"],\\"relatedNewsTitles\\":[\\"KOSPI rises\\"],\\"macroDirections\\":{\\"USD\\":\\"DOWN\\"}}"
+                      }
+                    }
+                  ]
+                }
+                """);
     }
 
     private NewsEvent newsEvent(String id, String title) {
