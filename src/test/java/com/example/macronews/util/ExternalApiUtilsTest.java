@@ -3,6 +3,7 @@ package com.example.macronews.util;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.macronews.dto.request.ExternalApiRequest;
+import java.lang.reflect.Method;
 import java.io.IOException;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -48,5 +49,18 @@ class ExternalApiUtilsTest {
         assertThat(response).isNotNull();
         assertThat(response.statusCode()).isEqualTo(500);
         assertThat(response.body()).contains("server error");
+    }
+
+    @Test
+    void sanitizeUrl_masksServiceKeyQueryParameter() throws Exception {
+        Method sanitizeUrl = ExternalApiUtils.class.getDeclaredMethod("sanitizeUrl", String.class);
+        sanitizeUrl.setAccessible(true);
+
+        String sanitized = (String) sanitizeUrl.invoke(
+                externalApiUtils,
+                "https://apis.data.go.kr/test?serviceKey=secret-value&resultType=json");
+
+        assertThat(sanitized).contains("serviceKey=****(masked)");
+        assertThat(sanitized).doesNotContain("secret-value");
     }
 }

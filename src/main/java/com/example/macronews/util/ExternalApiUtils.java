@@ -109,7 +109,7 @@ public class ExternalApiUtils {
         if (!StringUtils.hasText(value)) {
             return value;
         }
-        String sanitized = value.replaceAll("(?i)([?&](?:apiKey|api_key|access_key)=)[^&]+", "$1****(masked)");
+        String sanitized = value.replaceAll("(?i)([?&](?:apiKey|api_key|access_key|serviceKey)=)[^&]+", "$1****(masked)");
         sanitized = sanitized.replaceAll("(?i)(/v6/)[^/]+(/latest/[^?]+)", "$1****(masked)$2");
         return sanitized;
     }

@@ -3,7 +3,9 @@ package com.example.macronews.service.market;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
+import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -110,20 +113,57 @@ class MarketProviderParsingTest {
     }
 
     @Test
-    @DisplayName("Index provider should parse KOSPI quote from mocked response")
-    void getQuote_parsesKospiPrice() {
+    @DisplayName("Index provider should parse KOSPI quote from public-data response")
+    void getQuote_parsesKospiPriceFromPublicData() {
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
                 {
-                  "symbol": "KOSPI",
-                  "price": "2685.40",
-                  "timestamp": 1710000000
+                  "response": {
+                    "body": {
+                      "items": {
+                        "item": [
+                          {
+                            "idxNm": "코스피",
+                            "clpr": "2685.40",
+                            "basDt": "20260323"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                """));
+        ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
+
+        var snapshot = twelveDataIndexQuoteProvider.getQuote("KOSPI");
+
+        assertThat(snapshot).isPresent();
+        verify(externalApiUtils).callAPI(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().url()).contains("apis.data.go.kr/1160100/service/GetMarketIndexInfoService/getStockMarketIndex");
+        assertThat(requestCaptor.getValue().url()).contains("resultType=json");
+        assertThat(requestCaptor.getValue().url()).contains("numOfRows=1");
+        assertThat(requestCaptor.getValue().url()).contains("pageNo=1");
+        assertThat(requestCaptor.getValue().url()).contains("idxNm=%EC%BD%94%EC%8A%A4%ED%94%BC");
+        assertThat(snapshot.get().symbol()).isEqualTo("코스피");
+        assertThat(snapshot.get().price()).isEqualTo(2685.40d);
+    }
+
+    @Test
+    @DisplayName("Index provider should fail open on empty public-data response")
+    void getQuote_returnsEmptyWhenPublicDataResponseHasNoItem() {
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "response": {
+                    "body": {
+                      "items": {
+                        "item": []
+                      }
+                    }
+                  }
                 }
                 """));
 
         var snapshot = twelveDataIndexQuoteProvider.getQuote("KOSPI");
 
-        assertThat(snapshot).isPresent();
-        assertThat(snapshot.get().symbol()).isEqualTo("KOSPI");
-        assertThat(snapshot.get().price()).isEqualTo(2685.40d);
+        assertThat(snapshot).isEmpty();
     }
 }

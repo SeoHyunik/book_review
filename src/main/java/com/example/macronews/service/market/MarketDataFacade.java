@@ -35,9 +35,7 @@ public class MarketDataFacade {
     }
 
     public Optional<IndexSnapshotDto> getKospi() {
-        if (!StringUtils.hasText(kospiSymbol)) {
-            return Optional.empty();
-        }
-        return indexQuoteProvider.getQuote(kospiSymbol);
+        String symbol = StringUtils.hasText(kospiSymbol) ? kospiSymbol : "KOSPI";
+        return indexQuoteProvider.getQuote(symbol);
     }
 }
