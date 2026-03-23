@@ -1,99 +1,29 @@
-# Runtime environment variables:
+# Runtime secrets / environment-specific values:
+# - PORT
+# - MONGODB_URI
 # - OPENAI_API_KEY
-# - OPENAI_API_URL
-# - OPENAI_MODEL
-# - OPENAI_MAX_TOKENS
-# - OPENAI_TEMPERATURE
-# - OPENAI_INTERPRETATION_MODEL
-# - OPENAI_PRICING_INTERPRETATION_MODEL
-# - OPENAI_PRICING_INTERPRETATION_MODEL_PROMPT_PER_1K_USD
-# - OPENAI_PRICING_INTERPRETATION_MODEL_COMPLETION_PER_1K_USD
-# - OPENAI_PRICING_SUMMARY_MODEL
-# - OPENAI_PRICING_SUMMARY_MODEL_PROMPT_PER_1K_USD
-# - OPENAI_PRICING_SUMMARY_MODEL_COMPLETION_PER_1K_USD
-# - OPENAI_PRICING_PRIMARY_MODEL
-# - OPENAI_PRICING_PRIMARY_MODEL_PROMPT_PER_1K_USD
-# - OPENAI_PRICING_PRIMARY_MODEL_COMPLETION_PER_1K_USD
-# - OPENAI_PRICING_DEFAULT_PROMPT_PER_1K_USD
-# - OPENAI_PRICING_DEFAULT_COMPLETION_PER_1K_USD
-# - OPENAI_COST_KRW_FALLBACK_RATE
 # - SPRING_MAIL_HOST
-# - SPRING_MAIL_PORT
 # - SPRING_MAIL_USERNAME
 # - SPRING_MAIL_PASSWORD
-# - SPRING_MAIL_SMTP_AUTH
-# - SPRING_MAIL_SMTP_STARTTLS_ENABLE
 # - NEWS_API_KEY
-# - NEWS_API_RECENT_QUERY
-# - NEWS_API_RECENT_QUERY_FALLBACK
-# - NEWS_API_FILTER_KEYWORDS
 # - JASYPT_PASSWORD
 # - APP_ADMIN_ALLOWED_USERNAMES
 # - APP_BOOTSTRAP_ADMIN_USERNAME
 # - APP_BOOTSTRAP_ADMIN_PASSWORD
 # - APP_BOOTSTRAP_ADMIN_EMAIL
-# - APP_INGESTION_SCHEDULER_ENABLED
-# - APP_INGESTION_SCHEDULER_CRON
-# - APP_INGESTION_SCHEDULER_PAGE_SIZE
-# - APP_KEEP_ALIVE_ENABLED
-# - APP_KEEP_ALIVE_CRON
 # - APP_KEEP_ALIVE_TARGET_URL
-# - APP_NOTIFICATION_EMAIL_ENABLED
 # - APP_NOTIFICATION_EMAIL_RECIPIENT
 # - APP_NOTIFICATION_EMAIL_FROM
-# - APP_INGESTION_BUSINESS_TIMEZONE
-# - APP_INGESTION_DOMESTIC_START_HOUR
-# - APP_INGESTION_DOMESTIC_END_HOUR
-# - APP_INGESTION_BREAKING_BONUS_MINUTES
-# - APP_INGESTION_PREFERRED_SOURCE_BONUS_MINUTES
-# - APP_NEWS_GLOBAL_ENABLED
-# - APP_NEWS_GLOBAL_MAX_AGE_HOURS
-# - APP_NEWS_GLOBAL_FALLBACK_MAX_AGE_HOURS
-# - APP_NEWS_NAVER_ENABLED
 # - NAVER_CLIENT_ID
 # - NAVER_CLIENT_SECRET
-# - APP_NEWS_NAVER_QUERIES
-# - APP_NEWS_NAVER_DISPLAY
-# - APP_NEWS_NAVER_START
-# - APP_NEWS_NAVER_MAX_AGE_HOURS
-# - APP_NEWS_NAVER_FALLBACK_MAX_AGE_HOURS
-# - APP_NEWS_NAVER_MAX_PAGES
-# - APP_NEWS_GNEWS_ENABLED
 # - APP_NEWS_GNEWS_API_KEY
-# - APP_NEWS_GNEWS_QUERY
-# - APP_NEWS_GNEWS_MAX_AGE_HOURS
-# - APP_NEWS_GNEWS_FALLBACK_MAX_AGE_HOURS
-# - APP_MARKET_FX_ENABLED
 # - EXCHANGE_RATE_API_KEY
-# - APP_MARKET_GOLD_ENABLED
 # - METALPRICE_API_KEY
-# - APP_MARKET_OIL_ENABLED
 # - OILPRICE_API_KEY
-# - APP_MARKET_INDEX_PROVIDER
-# - APP_MARKET_INDEX_ENABLED
+# - APP_MARKET_INDEX_PUBLIC_DATA_API_KEY
 # - TWELVEDATA_API_KEY
 # - APP_MARKET_INDEX_SYMBOL_KOSPI
 # - APP_MARKET_INDEX_SYMBOL_KOSDAQ
-# - MARKET_FORECAST_ENABLED
-# - MARKET_FORECAST_WINDOW_HOURS
-# - MARKET_FORECAST_MAX_NEWS_ITEMS
-# - MARKET_FORECAST_CACHE_MINUTES
-# - APP_FEATURED_MARKET_SUMMARY_ENABLED
-# - APP_FEATURED_MARKET_SUMMARY_WINDOW_HOURS
-# - APP_FEATURED_MARKET_SUMMARY_MAX_ITEMS
-# - APP_FEATURED_MARKET_SUMMARY_MIN_ITEMS
-# - APP_FEATURED_MARKET_SUMMARY_AI_ENABLED
-# - APP_FEATURED_MARKET_SUMMARY_AI_MODEL
-# - APP_FEATURED_MARKET_SUMMARY_AI_WINDOW_HOURS
-# - APP_FEATURED_MARKET_SUMMARY_AI_MAX_ITEMS
-# - APP_FEATURED_MARKET_SUMMARY_AI_MIN_ITEMS
-# - APP_FEATURED_MARKET_SUMMARY_AI_MAX_INPUT_CHARS
-# - APP_FEATURED_MARKET_SUMMARY_AI_CACHE_MINUTES
-# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_ENABLED
-# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_READ_ENABLED
-# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_ENABLED
-# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_CRON
-# - APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_MAX_AGE_MINUTES
 server:
   port: ${PORT:8080}
 
@@ -144,7 +74,7 @@ spring:
 
   mail:
     host: ${SPRING_MAIL_HOST:}
-    port: ${SPRING_MAIL_PORT:587}
+    port: 587
     username: ${SPRING_MAIL_USERNAME:}
     password: ${SPRING_MAIL_PASSWORD:}
     properties:
@@ -155,36 +85,36 @@ spring:
             enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:true}
 openai:
   api-key: ${OPENAI_API_KEY:}
-  api-url: ${OPENAI_API_URL:https://api.openai.com/v1/chat/completions}
+  api-url: https://api.openai.com/v1/chat/completions
   models-url: https://api.openai.com/v1/models
   # Cost-sensitive default for article interpretation and similar base analysis flows.
-  model: ${OPENAI_MODEL:gpt-4o-mini}
-  interpretation-model: ${OPENAI_INTERPRETATION_MODEL:${OPENAI_MODEL:gpt-4o-mini}}
-  max-tokens: ${OPENAI_MAX_TOKENS:800}
-  temperature: ${OPENAI_TEMPERATURE:0.2}
+  model: gpt-4o-mini
+  interpretation-model: ${openai.model}
+  max-tokens: 800
+  temperature: 0.2
   macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
   forecast-prompt-file: classpath:ai/prompts/market_forecast_aggregation_prompt.json
   featured-market-summary-prompt-file: classpath:ai/prompts/featured_market_summary_prompt.json
   pricing:
-    interpretation-model-name: ${OPENAI_PRICING_INTERPRETATION_MODEL:${OPENAI_INTERPRETATION_MODEL:${OPENAI_MODEL:gpt-4o-mini}}}
+    interpretation-model-name: ${OPENAI_PRICING_INTERPRETATION_MODEL:${openai.interpretation-model}}
     interpretation-model:
-      prompt-per-1k-usd: ${OPENAI_PRICING_INTERPRETATION_MODEL_PROMPT_PER_1K_USD:0.00015}
-      completion-per-1k-usd: ${OPENAI_PRICING_INTERPRETATION_MODEL_COMPLETION_PER_1K_USD:0.0006}
-    summary-model-name: ${OPENAI_PRICING_SUMMARY_MODEL:${APP_FEATURED_MARKET_SUMMARY_AI_MODEL:gpt-5}}
+      prompt-per-1k-usd: 0.00015
+      completion-per-1k-usd: 0.0006
+    summary-model-name: ${OPENAI_PRICING_SUMMARY_MODEL:${app.featured.market-summary.ai-model}}
     summary-model:
-      prompt-per-1k-usd: ${OPENAI_PRICING_SUMMARY_MODEL_PROMPT_PER_1K_USD:0.00125}
-      completion-per-1k-usd: ${OPENAI_PRICING_SUMMARY_MODEL_COMPLETION_PER_1K_USD:0.01}
-    primary-model-name: ${OPENAI_PRICING_PRIMARY_MODEL:${OPENAI_MODEL:gpt-4o-mini}}
+      prompt-per-1k-usd: 0.00125
+      completion-per-1k-usd: 0.01
+    primary-model-name: ${OPENAI_PRICING_PRIMARY_MODEL:${openai.model}}
     primary-model:
-      prompt-per-1k-usd: ${OPENAI_PRICING_PRIMARY_MODEL_PROMPT_PER_1K_USD:0.005}
-      completion-per-1k-usd: ${OPENAI_PRICING_PRIMARY_MODEL_COMPLETION_PER_1K_USD:0.015}
+      prompt-per-1k-usd: 0.005
+      completion-per-1k-usd: 0.015
     default:
-      prompt-per-1k-usd: ${OPENAI_PRICING_DEFAULT_PROMPT_PER_1K_USD:0.005}
-      completion-per-1k-usd: ${OPENAI_PRICING_DEFAULT_COMPLETION_PER_1K_USD:0.015}
+      prompt-per-1k-usd: 0.005
+      completion-per-1k-usd: 0.015
   cost:
-    krw-fallback-rate: ${OPENAI_COST_KRW_FALLBACK_RATE:1350.0}
-    daily-days: ${OPENAI_COST_DAILY_DAYS:7}
-    monthly-months: ${OPENAI_COST_MONTHLY_MONTHS:6}
+    krw-fallback-rate: 1350.0
+    daily-days: 7
+    monthly-months: 6
 
 jasypt:
   encryptor:
@@ -199,12 +129,12 @@ news:
     country: us
     category: business
     default-limit: 5
-    # Primary foreign/global NewsAPI query. Override with NEWS_API_RECENT_QUERY.
-    recent-query: ${NEWS_API_RECENT_QUERY:market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR selloff OR rally}
+    # Primary foreign/global NewsAPI query.
+    recent-query: market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR selloff OR rally
     # Secondary recent-query variant used only when the primary recent search underfills.
-    recent-query-fallback: ${NEWS_API_RECENT_QUERY_FALLBACK:breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi}
-    # Macro relevance filter applied to title + description. Override with NEWS_API_FILTER_KEYWORDS.
-    filter-keywords: ${NEWS_API_FILTER_KEYWORDS:korea,kospi,kosdaq,volatility,oil,usd,interest rate,inflation,gold,semiconductor,tariff,fed}
+    recent-query-fallback: breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi
+    # Macro relevance filter applied to title + description.
+    filter-keywords: korea,kospi,kosdaq,volatility,oil,usd,interest rate,inflation,gold,semiconductor,tariff,fed
     recency-hours: 72
 
 logging:
@@ -212,82 +142,82 @@ logging:
 
 app:
   admin:
-    allowed-usernames: ${APP_ADMIN_ALLOWED_USERNAMES:admin01}
-    bootstrap-username: ${APP_BOOTSTRAP_ADMIN_USERNAME:admin01}
-    bootstrap-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:kqU58JuYwHS!}
-    bootstrap-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:hos0917@naver.com}
+    allowed-usernames: ${APP_ADMIN_ALLOWED_USERNAMES:}
+    bootstrap-username: ${APP_BOOTSTRAP_ADMIN_USERNAME:}
+    bootstrap-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:}
+    bootstrap-email: ${APP_BOOTSTRAP_ADMIN_EMAIL:}
   ingestion:
-    business-timezone: ${APP_INGESTION_BUSINESS_TIMEZONE:Asia/Seoul}
-    domestic-start-hour: ${APP_INGESTION_DOMESTIC_START_HOUR:5}
-    domestic-end-hour: ${APP_INGESTION_DOMESTIC_END_HOUR:22}
-    breaking-bonus-minutes: ${APP_INGESTION_BREAKING_BONUS_MINUTES:45}
-    preferred-source-bonus-minutes: ${APP_INGESTION_PREFERRED_SOURCE_BONUS_MINUTES:15}
+    business-timezone: Asia/Seoul
+    domestic-start-hour: 5
+    domestic-end-hour: 22
+    breaking-bonus-minutes: 45
+    preferred-source-bonus-minutes: 15
     scheduler:
-      enabled: ${APP_INGESTION_SCHEDULER_ENABLED:false}
-      cron: ${APP_INGESTION_SCHEDULER_CRON:0 */30 * * * *}
-      page-size: ${APP_INGESTION_SCHEDULER_PAGE_SIZE:5}
+      enabled: false
+      cron: 0 */30 * * * *
+      page-size: 5
   keep-alive:
     # Static gate for keep-alive availability. Default remains false because external uptime monitoring
     # is more reliable than self-calling the same Render public URL from inside the app.
-    enabled: ${APP_KEEP_ALIVE_ENABLED:false}
+    enabled: false
     # Runtime toggle state is in-memory only and resets on restart or redeploy.
-    cron: ${APP_KEEP_ALIVE_CRON:0 */10 * * * *}
+    cron: 0 */10 * * * *
     # Required for effective keep-alive execution. Prefer an external monitor or GitHub Actions ping.
     target-url: ${APP_KEEP_ALIVE_TARGET_URL:}
   notification:
     email:
       # Static gate for email notification availability. Admin runtime toggle can only operate when this is true.
-      enabled: ${APP_NOTIFICATION_EMAIL_ENABLED:false}
+      enabled: false
       # Required for effective email notification delivery.
       recipient: ${APP_NOTIFICATION_EMAIL_RECIPIENT:}
       # Spring mail sender configuration is also required; runtime toggle state resets on restart or redeploy.
       from: ${APP_NOTIFICATION_EMAIL_FROM:}
   news:
     cleanup:
-      cron: ${APP_NEWS_CLEANUP_CRON:0 0 * * * *}
+      cron: 0 0 * * * *
     global:
-      enabled: ${APP_NEWS_GLOBAL_ENABLED:true}
-      max-age-hours: ${APP_NEWS_GLOBAL_MAX_AGE_HOURS:24}
-      fallback-max-age-hours: ${APP_NEWS_GLOBAL_FALLBACK_MAX_AGE_HOURS:36}
+      enabled: true
+      max-age-hours: 24
+      fallback-max-age-hours: 36
     naver:
-      enabled: ${APP_NEWS_NAVER_ENABLED:false}
-      base-url: ${APP_NEWS_NAVER_BASE_URL:https://openapi.naver.com}
+      enabled: false
+      base-url: https://openapi.naver.com
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}
-      # Override with APP_NEWS_NAVER_QUERIES. If left blank, NAVER falls back to a small
-      # high-specificity macro query set and only probes the first couple of result pages by default.
-      queries: ${APP_NEWS_NAVER_QUERIES:}
-      display: ${APP_NEWS_NAVER_DISPLAY:5}
-      start: ${APP_NEWS_NAVER_START:1}
-      max-pages: ${APP_NEWS_NAVER_MAX_PAGES:2}
-      max-age-hours: ${APP_NEWS_NAVER_MAX_AGE_HOURS:12}
-      fallback-max-age-hours: ${APP_NEWS_NAVER_FALLBACK_MAX_AGE_HOURS:24}
+      # If left blank, NAVER falls back to a small high-specificity macro query set
+      # and only probes the first couple of result pages by default.
+      queries: ""
+      display: 5
+      start: 1
+      max-pages: 2
+      max-age-hours: 12
+      fallback-max-age-hours: 24
     gnews:
-      enabled: ${APP_NEWS_GNEWS_ENABLED:false}
-      base-url: ${APP_NEWS_GNEWS_BASE_URL:https://gnews.io/api/v4/search}
+      enabled: false
+      base-url: https://gnews.io/api/v4/search
       api-key: ${APP_NEWS_GNEWS_API_KEY:}
-      query: ${APP_NEWS_GNEWS_QUERY:market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi}
-      lang: ${APP_NEWS_GNEWS_LANG:en}
-      country: ${APP_NEWS_GNEWS_COUNTRY:us}
-      max-age-hours: ${APP_NEWS_GNEWS_MAX_AGE_HOURS:24}
-      fallback-max-age-hours: ${APP_NEWS_GNEWS_FALLBACK_MAX_AGE_HOURS:36}
+      query: market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi
+      lang: en
+      country: us
+      max-age-hours: 24
+      fallback-max-age-hours: 36
   market:
     fx:
-      enabled: ${APP_MARKET_FX_ENABLED:false}
-      base-url: ${APP_MARKET_FX_BASE_URL:https://v6.exchangerate-api.com}
+      enabled: false
+      base-url: https://v6.exchangerate-api.com
       api-key: ${EXCHANGE_RATE_API_KEY:}
     gold:
-      enabled: ${APP_MARKET_GOLD_ENABLED:false}
-      base-url: ${APP_MARKET_GOLD_BASE_URL:https://api.metalpriceapi.com/v1/latest}
+      enabled: false
+      base-url: https://api.metalpriceapi.com/v1/latest
       api-key: ${METALPRICE_API_KEY:}
     oil:
-      enabled: ${APP_MARKET_OIL_ENABLED:false}
-      url: ${APP_MARKET_OIL_URL:https://api.oilpriceapi.com/v1/prices/latest}
+      enabled: false
+      url: https://api.oilpriceapi.com/v1/prices/latest
       api-key: ${OILPRICE_API_KEY:}
     index:
-      provider: ${APP_MARKET_INDEX_PROVIDER:twelvedata}
-      enabled: ${APP_MARKET_INDEX_ENABLED:false}
-      api-key: ${TWELVEDATA_API_KEY:}
+      provider: twelvedata
+      enabled: false
+      api-key: ${APP_MARKET_INDEX_PUBLIC_DATA_API_KEY:${TWELVEDATA_API_KEY:}}
       symbol:
         kospi: ${APP_MARKET_INDEX_SYMBOL_KOSPI:}
         kosdaq: ${APP_MARKET_INDEX_SYMBOL_KOSDAQ:}
@@ -301,24 +231,24 @@ app:
       # Deterministic recent analyzed-news aggregation for the main featured card.
       # If not enough recent analyzed items exist, the homepage falls back to the
       # existing market forecast snapshot or featured news behavior.
-      enabled: ${APP_FEATURED_MARKET_SUMMARY_ENABLED:true}
-      window-hours: ${APP_FEATURED_MARKET_SUMMARY_WINDOW_HOURS:3}
-      max-items: ${APP_FEATURED_MARKET_SUMMARY_MAX_ITEMS:10}
-      min-items: ${APP_FEATURED_MARKET_SUMMARY_MIN_ITEMS:3}
-      ai-enabled: ${APP_FEATURED_MARKET_SUMMARY_AI_ENABLED:true}
+      enabled: true
+      window-hours: 3
+      max-items: 10
+      min-items: 3
+      ai-enabled: true
       # Dedicated stronger model for current/featured market summary generation.
-      ai-model: ${APP_FEATURED_MARKET_SUMMARY_AI_MODEL:gpt-5}
-      ai-window-hours: ${APP_FEATURED_MARKET_SUMMARY_AI_WINDOW_HOURS:3}
-      ai-max-items: ${APP_FEATURED_MARKET_SUMMARY_AI_MAX_ITEMS:10}
-      ai-min-items: ${APP_FEATURED_MARKET_SUMMARY_AI_MIN_ITEMS:3}
-      ai-max-input-chars: ${APP_FEATURED_MARKET_SUMMARY_AI_MAX_INPUT_CHARS:12000}
+      ai-model: gpt-5
+      ai-window-hours: 3
+      ai-max-items: 10
+      ai-min-items: 3
+      ai-max-input-chars: 12000
       # In-memory cache only. This helps keep homepage synthesis cost under control.
-      ai-cache-minutes: ${APP_FEATURED_MARKET_SUMMARY_AI_CACHE_MINUTES:15}
-      snapshot-enabled: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_ENABLED:true}
-      snapshot-read-enabled: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_READ_ENABLED:true}
-      snapshot-refresh-enabled: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_ENABLED:true}
-      snapshot-refresh-cron: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_REFRESH_CRON:0 10 */3 * * *}
-      snapshot-max-age-minutes: ${APP_FEATURED_MARKET_SUMMARY_SNAPSHOT_MAX_AGE_MINUTES:180}
+      ai-cache-minutes: 15
+      snapshot-enabled: true
+      snapshot-read-enabled: true
+      snapshot-refresh-enabled: true
+      snapshot-refresh-cron: 0 10 */3 * * *
+      snapshot-max-age-minutes: 180
   gating:
     free-detail-views: 3
   auth:
