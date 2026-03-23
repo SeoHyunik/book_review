@@ -153,13 +153,13 @@ app:
     breaking-bonus-minutes: 45
     preferred-source-bonus-minutes: 15
     scheduler:
-      enabled: false
+      enabled: true
       cron: 0 */30 * * * *
       page-size: 5
   keep-alive:
     # Static gate for keep-alive availability. Default remains false because external uptime monitoring
     # is more reliable than self-calling the same Render public URL from inside the app.
-    enabled: false
+    enabled: true
     # Runtime toggle state is in-memory only and resets on restart or redeploy.
     cron: 0 */10 * * * *
     # Required for effective keep-alive execution. Prefer an external monitor or GitHub Actions ping.
@@ -180,7 +180,7 @@ app:
       max-age-hours: 24
       fallback-max-age-hours: 36
     naver:
-      enabled: ${APP_NEWS_NAVER_ENABLED:false}
+      enabled: ${APP_NEWS_NAVER_ENABLED:true}
       base-url: https://openapi.naver.com
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}
@@ -193,7 +193,7 @@ app:
       max-age-hours: 12
       fallback-max-age-hours: 24
     gnews:
-      enabled: false
+      enabled: true
       base-url: https://gnews.io/api/v4/search
       api-key: ${APP_NEWS_GNEWS_API_KEY:}
       query: market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi
