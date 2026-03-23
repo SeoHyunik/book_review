@@ -11,8 +11,12 @@ import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.OpenAiUsageFeatureType;
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
+import com.example.macronews.dto.market.FxSnapshotDto;
+import com.example.macronews.dto.market.GoldSnapshotDto;
+import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.repository.NewsEventRepository;
+import com.example.macronews.service.market.MarketDataFacade;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
@@ -56,6 +60,7 @@ public class NewsAggregationService {
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
     private final OpenAiUsageLoggingService openAiUsageLoggingService;
+    private final MarketDataFacade marketDataFacade;
 
     private final AtomicReference<CachedSnapshot> cachedSnapshot = new AtomicReference<>();
 
@@ -116,7 +121,8 @@ public class NewsAggregationService {
         }
 
         try {
-            String payload = buildPayload(candidates);
+            String marketContext = resolveMarketContext();
+            String payload = buildPayload(candidates, marketContext);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.setBearerAuth(openAiApiKey);
@@ -152,7 +158,7 @@ public class NewsAggregationService {
                 .toList();
     }
 
-    String buildPayload(List<NewsEvent> recentNews) {
+    String buildPayload(List<NewsEvent> recentNews, String marketContext) {
         try {
             JsonNode promptRoot = loadPromptTemplate();
             JsonNode promptMessages = promptRoot.path("messages");
@@ -168,7 +174,10 @@ public class NewsAggregationService {
                 }
                 String content = node.has("content")
                         ? node.path("content").asText("")
-                        : node.path("template").asText("").replace("{{newsItemsJson}}", buildNewsItemsJson(recentNews));
+                        : appendMarketContext(
+                                node.path("template").asText("").replace("{{newsItemsJson}}", buildNewsItemsJson(recentNews)),
+                                marketContext
+                        );
                 if (!StringUtils.hasText(content)) {
                     continue;
                 }
@@ -249,6 +258,56 @@ public class NewsAggregationService {
             ));
         }
         return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(items);
+    }
+
+    private String resolveMarketContext() {
+        try {
+            List<String> lines = new ArrayList<>();
+            FxSnapshotDto fxSnapshot = marketDataFacade.getUsdKrw().orElse(null);
+            GoldSnapshotDto goldSnapshot = marketDataFacade.getGold().orElse(null);
+            OilSnapshotDto oilSnapshot = marketDataFacade.getOil().orElse(null);
+
+            if (fxSnapshot != null) {
+                lines.add("- USD/KRW: " + formatDecimal(fxSnapshot.rate()));
+            }
+            if (goldSnapshot != null) {
+                lines.add("- Gold: " + formatDecimal(goldSnapshot.usdPerOunce()));
+            }
+            if (oilSnapshot != null) {
+                if (oilSnapshot.wtiUsd() != null) {
+                    lines.add("- WTI: " + formatDecimal(oilSnapshot.wtiUsd()));
+                }
+                if (oilSnapshot.brentUsd() != null) {
+                    lines.add("- Brent: " + formatDecimal(oilSnapshot.brentUsd()));
+                }
+            }
+
+            if (lines.isEmpty()) {
+                log.debug("[FORECAST] market context skipped");
+                return "";
+            }
+
+            StringBuilder builder = new StringBuilder("Current market context:");
+            for (String line : lines) {
+                builder.append('\n').append(line);
+            }
+            log.debug("[FORECAST] market context injected lines={}", lines.size());
+            return builder.toString();
+        } catch (RuntimeException ex) {
+            log.debug("[FORECAST] market context skipped", ex);
+            return "";
+        }
+    }
+
+    private String appendMarketContext(String content, String marketContext) {
+        if (!StringUtils.hasText(marketContext)) {
+            return content;
+        }
+        return content + "\n\n" + marketContext;
+    }
+
+    private String formatDecimal(double value) {
+        return String.format(Locale.ROOT, "%.1f", value);
     }
 
     private List<Map<String, Object>> summarizeMacroImpacts(List<MacroImpact> impacts) {
