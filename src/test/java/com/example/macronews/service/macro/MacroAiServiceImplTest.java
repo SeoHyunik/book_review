@@ -2,6 +2,7 @@ package com.example.macronews.service.macro;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -79,6 +80,26 @@ class MacroAiServiceImplTest {
         assertThat(result.summaryEn()).isEqualTo("English only summary");
     }
 
+    @Test
+    @DisplayName("interpretAndSave should initialize retry metadata on initial failure")
+    void interpretAndSave_initialFailureInitializesRetryMetadata() {
+        NewsEvent event = sampleEvent();
+        given(newsEventRepository.findById("news-1")).willReturn(java.util.Optional.of(event));
+        given(externalApiUtils.callAPI(any())).willThrow(new IllegalStateException("boom"));
+        given(newsEventRepository.save(any(NewsEvent.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        NewsEvent saved = macroAiService.interpretAndSave("news-1");
+
+        assertThat(saved.status()).isEqualTo(NewsStatus.FAILED);
+        assertThat(saved.analysisRetryCount()).isZero();
+        assertThat(saved.analysisLastAttemptAt()).isNotNull();
+        verify(newsEventRepository).save(argThat(news ->
+                news.status() == NewsStatus.FAILED
+                        && news.analysisRetryCount() != null
+                        && news.analysisRetryCount() == 0
+                        && news.analysisLastAttemptAt() != null));
+    }
+
     private NewsEvent sampleEvent() {
         return new NewsEvent(
                 "news-1",
@@ -90,6 +111,8 @@ class MacroAiServiceImplTest {
                 Instant.parse("2026-03-10T09:00:00Z"),
                 Instant.parse("2026-03-10T09:05:00Z"),
                 NewsStatus.INGESTED,
+                null,
+                null,
                 null
         );
     }

@@ -15,6 +15,8 @@ public record NewsEvent(
         Instant publishedAt,
         Instant ingestedAt,
         NewsStatus status,
-        AnalysisResult analysisResult
+        AnalysisResult analysisResult,
+        Integer analysisRetryCount,
+        Instant analysisLastAttemptAt
 ) {
 }

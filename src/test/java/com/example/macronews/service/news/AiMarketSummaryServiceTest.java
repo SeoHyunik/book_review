@@ -184,7 +184,9 @@ class AiMarketSummaryServiceTest {
                         "summary en",
                         List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.8d)),
                         List.of(new MarketImpact(MarketType.KOSPI, ImpactDirection.UP, 0.6d))
-                )
+                ),
+                null,
+                null
         );
     }
 }

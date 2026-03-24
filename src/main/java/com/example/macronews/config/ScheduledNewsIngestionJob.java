@@ -69,6 +69,12 @@ public class ScheduledNewsIngestionJob {
 
             log.info("[SCHEDULER] runId={} started pageSize={}", runId, resolvedPageSize);
             List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(resolvedPageSize);
+            int retriedFailedAnalyses = 0;
+            try {
+                retriedFailedAnalyses = newsIngestionService.retryFailedAnalyses();
+            } catch (RuntimeException ex) {
+                log.warn("[SCHEDULER] runId={} failed-analysis-retry skipped", runId, ex);
+            }
             AutoIngestionBatchStatusDto batchStatus = newsQueryService.getAutoIngestionBatchStatus(
                     resolvedPageSize,
                     ingested.size(),
@@ -81,7 +87,8 @@ public class ScheduledNewsIngestionJob {
                     countByStatus(ingested, NewsStatus.ANALYZED),
                     countByStatus(ingested, NewsStatus.INGESTED),
                     countByStatus(ingested, NewsStatus.FAILED),
-                    countByStatus(ingested, NewsStatus.DUPLICATE));
+                    countByStatus(ingested, NewsStatus.DUPLICATE),
+                    retriedFailedAnalyses);
         } catch (RuntimeException ex) {
             autoIngestionControlService.failRun(resolvedPageSize);
             autoIngestionEmailNotificationService.sendRunResult(autoIngestionControlService.getStatus(), null);

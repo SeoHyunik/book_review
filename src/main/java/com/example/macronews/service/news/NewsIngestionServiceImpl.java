@@ -10,6 +10,8 @@ import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -36,6 +38,8 @@ import org.springframework.util.StringUtils;
 @Slf4j
 public class NewsIngestionServiceImpl implements NewsIngestionService {
 
+    private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
+
     private final NewsEventRepository newsEventRepository;
     private final NewsSourceProviderSelector newsSourceProviderSelector;
     private final MacroAiService macroAiService;
@@ -54,6 +58,14 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
 
     @Value("${app.news.global.fallback-max-age-hours:36}")
     private long globalFallbackMaxAgeHours;
+
+    @Value("${app.ingestion.analysis-retry.max-retries:2}")
+    private int maxAnalysisRetries;
+
+    @Value("${app.ingestion.analysis-retry.min-delay-minutes:60}")
+    private long analysisRetryMinDelayMinutes;
+
+    private Clock clock = DEFAULT_CLOCK;
 
     @Override
     @Transactional
@@ -84,6 +96,8 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
                 item.publishedAt() == null ? now : item.publishedAt(),
                 now,
                 NewsStatus.INGESTED,
+                null,
+                null,
                 null
         );
 
@@ -114,6 +128,28 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         log.info("[INGEST] batch completed requested={} processed={} asyncSubmitted={}",
                 limit, results.size(), interpretationTargets.size());
         return results;
+    }
+
+    @Override
+    @Transactional
+    public int retryFailedAnalyses() {
+        Instant now = Instant.now(clock);
+        Instant retryCutoff = now.minus(Duration.ofMinutes(resolveAnalysisRetryMinDelayMinutes()));
+        List<NewsEvent> eligibleFailedItems = newsEventRepository.findByStatus(NewsStatus.FAILED).stream()
+                .filter(event -> isEligibleForAnalysisRetry(event, retryCutoff))
+                .map(event -> reserveAnalysisRetry(event, now))
+                .toList();
+
+        if (eligibleFailedItems.isEmpty()) {
+            log.debug("[INGEST-RETRY] skipped reason=no-eligible-failed-items cutoff={} maxRetries={}",
+                    retryCutoff, resolveMaxAnalysisRetries());
+            return 0;
+        }
+
+        submitAsyncInterpretations(eligibleFailedItems.stream().map(NewsEvent::id).toList());
+        log.info("[INGEST-RETRY] submitted eligible={} cutoff={} maxRetries={}",
+                eligibleFailedItems.size(), retryCutoff, resolveMaxAnalysisRetries());
+        return eligibleFailedItems.size();
     }
 
     @Override
@@ -241,6 +277,43 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
                 && event.analysisResult() == null;
     }
 
+    boolean isEligibleForAnalysisRetry(NewsEvent event, Instant retryCutoff) {
+        if (event == null
+                || !StringUtils.hasText(event.id())
+                || event.status() != NewsStatus.FAILED
+                || event.analysisResult() != null) {
+            return false;
+        }
+
+        int retryCount = event.analysisRetryCount() == null ? 0 : event.analysisRetryCount();
+        if (retryCount >= resolveMaxAnalysisRetries()) {
+            return false;
+        }
+
+        Instant lastAttemptAt = event.analysisLastAttemptAt() != null
+                ? event.analysisLastAttemptAt()
+                : event.ingestedAt();
+        return lastAttemptAt == null || !lastAttemptAt.isAfter(retryCutoff);
+    }
+
+    private NewsEvent reserveAnalysisRetry(NewsEvent event, Instant attemptedAt) {
+        NewsEvent reserved = new NewsEvent(
+                event.id(),
+                event.externalId(),
+                event.title(),
+                event.summary(),
+                event.source(),
+                event.url(),
+                event.publishedAt(),
+                event.ingestedAt(),
+                event.status(),
+                event.analysisResult(),
+                (event.analysisRetryCount() == null ? 0 : event.analysisRetryCount()) + 1,
+                attemptedAt
+        );
+        return newsEventRepository.save(reserved);
+    }
+
     private Optional<NewsEvent> findDuplicate(ExternalNewsItem item, String resolvedExternalId) {
         if (StringUtils.hasText(resolvedExternalId)) {
             Optional<NewsEvent> byExternalId = newsEventRepository.findByExternalId(resolvedExternalId);
@@ -331,5 +404,13 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         boolean domesticSource = "NAVER".equalsIgnoreCase(source);
         long hours = domesticSource ? naverFallbackMaxAgeHours : globalFallbackMaxAgeHours;
         return java.time.Duration.ofHours(hours > 0 ? hours : (domesticSource ? 24L : 36L));
+    }
+
+    private int resolveMaxAnalysisRetries() {
+        return Math.max(0, maxAnalysisRetries);
+    }
+
+    private long resolveAnalysisRetryMinDelayMinutes() {
+        return analysisRetryMinDelayMinutes > 0 ? analysisRetryMinDelayMinutes : 60L;
     }
 }

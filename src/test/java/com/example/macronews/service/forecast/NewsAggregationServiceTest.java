@@ -247,7 +247,9 @@ class NewsAggregationServiceTest {
                         "Summary EN",
                         List.of(new MacroImpact(MacroVariable.KOSPI, ImpactDirection.UP, 0.8d)),
                         List.of()
-                )
+                ),
+                null,
+                null
         );
     }
 }

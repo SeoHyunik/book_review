@@ -266,6 +266,8 @@ class AdminNewsControllerTest {
                 Instant.parse("2026-03-13T00:00:00Z"),
                 Instant.parse("2026-03-13T00:01:00Z"),
                 null,
+                null,
+                null,
                 null
         );
     }

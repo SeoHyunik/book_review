@@ -152,6 +152,9 @@ app:
     domestic-end-hour: 22
     breaking-bonus-minutes: 45
     preferred-source-bonus-minutes: 15
+    analysis-retry:
+      max-retries: 2
+      min-delay-minutes: 60
     scheduler:
       enabled: true
       cron: 0 */30 * * * *

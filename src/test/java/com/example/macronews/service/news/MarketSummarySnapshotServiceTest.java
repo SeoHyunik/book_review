@@ -167,7 +167,9 @@ class MarketSummarySnapshotServiceTest {
                         Instant.parse("2026-03-17T02:00:00Z"),
                         null,
                         NewsStatus.ANALYZED,
-                        new AnalysisResult("test-model", null, null, null, null, null, List.of(), List.of())
+                        new AnalysisResult("test-model", null, null, null, null, null, List.of(), List.of()),
+                        null,
+                        null
                 )
         ));
 
@@ -285,7 +287,9 @@ class MarketSummarySnapshotServiceTest {
                         "summary en",
                         List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.UP, 0.8d)),
                         List.of()
-                )
+                ),
+                null,
+                null
         );
     }
 }

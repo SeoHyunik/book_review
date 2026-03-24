@@ -114,16 +114,17 @@ public class MacroAiServiceImpl implements MacroAiService {
         log.info("[INTERPRET] persist-start id={}", newsEventId);
         NewsEvent event = newsEventRepository.findById(newsEventId)
                 .orElseThrow(() -> new IllegalArgumentException("NewsEvent not found: " + newsEventId));
+        Instant attemptedAt = Instant.now();
 
         try {
             AnalysisResult analysisResult = interpret(event);
-            NewsEvent analyzed = copyWithStatusAndResult(event, NewsStatus.ANALYZED, analysisResult);
+            NewsEvent analyzed = copyWithStatusAndResult(event, NewsStatus.ANALYZED, analysisResult, attemptedAt);
             NewsEvent saved = newsEventRepository.save(analyzed);
             log.info("[INTERPRET] persist-success id={} status={}", saved.id(), saved.status());
             return saved;
         } catch (Exception ex) {
             log.error("[INTERPRET] persist-failure id={}", newsEventId, ex);
-            NewsEvent failed = copyWithStatusAndResult(event, NewsStatus.FAILED, null);
+            NewsEvent failed = copyWithStatusAndResult(event, NewsStatus.FAILED, null, attemptedAt);
             NewsEvent saved = newsEventRepository.save(failed);
             log.info("[INTERPRET] persisted-failed id={} status={}", saved.id(), saved.status());
             return saved;
@@ -131,7 +132,7 @@ public class MacroAiServiceImpl implements MacroAiService {
     }
 
     private NewsEvent copyWithStatusAndResult(NewsEvent base, NewsStatus status,
-            AnalysisResult result) {
+            AnalysisResult result, Instant attemptedAt) {
         return new NewsEvent(
                 base.id(),
                 base.externalId(),
@@ -142,8 +143,18 @@ public class MacroAiServiceImpl implements MacroAiService {
                 base.publishedAt(),
                 base.ingestedAt(),
                 status,
-                result
+                result,
+                resolveRetryCount(base),
+                resolveAttemptedAt(base, attemptedAt)
         );
+    }
+
+    private int resolveRetryCount(NewsEvent event) {
+        return event.analysisRetryCount() == null ? 0 : event.analysisRetryCount();
+    }
+
+    private Instant resolveAttemptedAt(NewsEvent event, Instant attemptedAt) {
+        return event.analysisLastAttemptAt() != null ? event.analysisLastAttemptAt() : attemptedAt;
     }
 
     private void validateConfig() {

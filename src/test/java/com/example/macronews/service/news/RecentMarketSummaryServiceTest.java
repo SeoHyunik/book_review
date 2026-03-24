@@ -444,7 +444,9 @@ class RecentMarketSummaryServiceTest {
                         null,
                         macroImpacts,
                         marketImpacts
-                )
+                ),
+                null,
+                null
         );
     }
 }

@@ -1,6 +1,7 @@
 package com.example.macronews.config;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -114,6 +115,7 @@ class ScheduledNewsIngestionJobTest {
         verify(autoIngestionControlService).beginScheduledRun(12);
         verify(newsSourceProviderSelector).isConfigured();
         verify(newsIngestionService).ingestTopHeadlines(12);
+        verify(newsIngestionService).retryFailedAnalyses();
         verify(autoIngestionControlService).completeRun(org.mockito.ArgumentMatchers.any(AutoIngestionBatchStatusDto.class));
         verify(autoIngestionEmailNotificationService)
                 .sendRunResult(org.mockito.ArgumentMatchers.any(AutoIngestionControlStatusDto.class),
@@ -189,6 +191,30 @@ class ScheduledNewsIngestionJobTest {
         verifyNoInteractions(autoIngestionEmailNotificationService);
     }
 
+    @Test
+    @DisplayName("Scheduled ingestion should continue when failed-analysis retry recovery throws")
+    void ingestTopHeadlines_continuesWhenRetryRecoveryFails() {
+        ReflectionTestUtils.setField(scheduledNewsIngestionJob, "pageSize", 12);
+        given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
+        given(newsSourceProviderSelector.isConfigured()).willReturn(true);
+        given(autoIngestionControlService.beginScheduledRun(12)).willReturn(AutoIngestionRunCommandResult.STARTED);
+        List<NewsEvent> ingested = List.of(sampleNewsEvent("event-1"));
+        given(newsIngestionService.ingestTopHeadlines(12)).willReturn(ingested);
+        doThrow(new IllegalStateException("retry-failed")).when(newsIngestionService).retryFailedAnalyses();
+        AutoIngestionBatchStatusDto batchStatus = new AutoIngestionBatchStatusDto(12, 1, 1, 0, 0, 1, false, List.of());
+        given(newsQueryService.getAutoIngestionBatchStatus(12, 1, List.of("event-1")))
+                .willReturn(batchStatus);
+        given(autoIngestionControlService.getStatus()).willReturn(new AutoIngestionControlStatusDto(
+                true, false, AutoIngestionRunOutcome.COMPLETED,
+                Instant.parse("2026-03-16T00:00:00Z"), Instant.parse("2026-03-16T00:01:00Z"),
+                12, 1, 0, 1, 0));
+
+        scheduledNewsIngestionJob.ingestTopHeadlines();
+
+        verify(newsIngestionService).retryFailedAnalyses();
+        verify(autoIngestionControlService).completeRun(batchStatus);
+    }
+
     private NewsEvent sampleNewsEvent(String id) {
         return new NewsEvent(
                 id,
@@ -199,6 +225,8 @@ class ScheduledNewsIngestionJobTest {
                 "https://example.com/" + id,
                 Instant.parse("2026-03-13T00:00:00Z"),
                 Instant.parse("2026-03-13T00:01:00Z"),
+                null,
+                null,
                 null,
                 null
         );

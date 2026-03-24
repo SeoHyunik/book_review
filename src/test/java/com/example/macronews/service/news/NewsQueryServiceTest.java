@@ -362,6 +362,8 @@ class NewsQueryServiceTest {
                 Instant.parse("2026-03-10T09:00:00Z"),
                 Instant.parse("2026-03-10T09:05:00Z"),
                 NewsStatus.INGESTED,
+                null,
+                null,
                 null
         );
 
@@ -817,6 +819,8 @@ class NewsQueryServiceTest {
                 now.minus(Duration.ofDays(3)),
                 now.minus(Duration.ofHours(2)),
                 NewsStatus.INGESTED,
+                null,
+                null,
                 null
         );
 
@@ -844,6 +848,8 @@ class NewsQueryServiceTest {
                 FIXED_NOW.minus(Duration.ofDays(2)),
                 FIXED_NOW.minus(Duration.ofHours(30)),
                 NewsStatus.INGESTED,
+                null,
+                null,
                 null
         );
 
@@ -872,7 +878,9 @@ class NewsQueryServiceTest {
                 new AnalysisResult("test-model", now.minus(Duration.ofMinutes(30)),
                         null, null, null, null,
                         List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.8d)),
-                        List.of())
+                        List.of()),
+                null,
+                null
         );
 
         given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
@@ -903,7 +911,9 @@ class NewsQueryServiceTest {
                 Instant.parse(publishedAt),
                 Instant.parse(ingestedAt),
                 status,
-                analysisResult
+                analysisResult,
+                null,
+                null
         );
     }
 
