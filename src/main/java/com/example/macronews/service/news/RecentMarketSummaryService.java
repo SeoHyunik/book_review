@@ -90,11 +90,17 @@ public class RecentMarketSummaryService {
         Instant generatedAt = Instant.now(clock);
         Instant toPublishedAt = recentItems.get(0).publishedAt();
         Instant fromPublishedAt = recentItems.get(recentItems.size() - 1).publishedAt();
-        Double confidence = applyPriceAwareConfidenceModifier(
+        ConfidenceBreakdown confidenceBreakdown = buildConfidenceBreakdown(
                 aggregation.baseConfidence(),
                 aggregation.confidence(),
                 dominantSentiment
         );
+        log.debug("[FEATURED_SUMMARY] confidence breakdown: base={}, crisis={}, market={}, final={}",
+                confidenceBreakdown.baseConfidence(),
+                confidenceBreakdown.crisisBoost(),
+                confidenceBreakdown.marketBoost(),
+                confidenceBreakdown.finalConfidence());
+        Double confidence = confidenceBreakdown.finalConfidence();
 
         return Optional.of(new FeaturedMarketSummaryDto(
                 buildHeadlineKo(dominantSentiment),
@@ -263,9 +269,18 @@ public class RecentMarketSummaryService {
             Double boostedConfidence,
             SignalSentiment dominantSentiment
     ) {
+        return buildConfidenceBreakdown(baseConfidence, boostedConfidence, dominantSentiment).finalConfidence();
+    }
+
+    private ConfidenceBreakdown buildConfidenceBreakdown(
+            Double baseConfidence,
+            Double boostedConfidence,
+            SignalSentiment dominantSentiment
+    ) {
         if (baseConfidence == null || boostedConfidence == null || dominantSentiment == SignalSentiment.NEUTRAL) {
-            return boostedConfidence;
+            return new ConfidenceBreakdown(baseConfidence, 0d, 0d, boostedConfidence);
         }
+        double crisisBoost = Math.max(0d, boostedConfidence - baseConfidence);
         try {
             FxSnapshotDto usdKrw = marketDataFacade.getUsdKrw().orElse(null);
             GoldSnapshotDto gold = marketDataFacade.getGold().orElse(null);
@@ -300,16 +315,18 @@ public class RecentMarketSummaryService {
             }
 
             if (alignedSignals == 0) {
-                return boostedConfidence;
+                return new ConfidenceBreakdown(baseConfidence, crisisBoost, 0d, boostedConfidence);
             }
 
             double marketBoost = Math.min(MAX_MARKET_CONFIDENCE_BOOST, alignedSignals * 0.03d);
             double totalBoost = (boostedConfidence - baseConfidence) + marketBoost;
             double cappedBoost = Math.min(totalBoost, MAX_TOTAL_CONFIDENCE_BOOST);
-            return Math.min(1.0d, baseConfidence + cappedBoost);
+            double finalConfidence = Math.min(1.0d, baseConfidence + cappedBoost);
+            double effectiveMarketBoost = Math.max(0d, finalConfidence - boostedConfidence);
+            return new ConfidenceBreakdown(baseConfidence, crisisBoost, effectiveMarketBoost, finalConfidence);
         } catch (RuntimeException ex) {
             log.debug("[FEATURED_SUMMARY] price-aware confidence modifier skipped", ex);
-            return boostedConfidence;
+            return new ConfidenceBreakdown(baseConfidence, crisisBoost, 0d, boostedConfidence);
         }
     }
 
@@ -493,6 +510,14 @@ public class RecentMarketSummaryService {
             SignalSentiment sentiment,
             Double confidence,
             Double baseConfidence
+    ) {
+    }
+
+    private record ConfidenceBreakdown(
+            Double baseConfidence,
+            double crisisBoost,
+            double marketBoost,
+            Double finalConfidence
     ) {
     }
 }
