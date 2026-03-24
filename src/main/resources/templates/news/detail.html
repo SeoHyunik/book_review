@@ -168,6 +168,8 @@
         .detail-copy--article {
             max-width: 72ch;
             color: color-mix(in srgb, var(--surface-muted) 84%, #243246);
+            font-size: 0.96rem;
+            line-height: 1.68;
         }
 
         .detail-interpretation-card {
@@ -466,6 +468,10 @@
                 max-width: none;
             }
 
+            .detail-copy--article {
+                font-size: 0.93rem;
+            }
+
             .detail-meta-chip {
                 font-size: 0.8rem;
                 padding: 0.45rem 0.65rem;
@@ -517,9 +523,10 @@
     <section class="card border-0 mb-4 detail-surface detail-hero">
         <div class="card-body p-4 d-flex flex-column gap-3">
             <div class="detail-hero-copy">
-                <div class="detail-section-kicker" th:text="#{news.detail.summary}">Summary</div>
+                <div class="detail-section-kicker" th:text="#{news.table.title}">Title</div>
                 <h2 class="fw-bold mb-0 detail-heading" th:text="${localizedDetailTitle ?: (newsDetail.title ?: #messages.msg('news.untitled'))}">News Title</h2>
-                <p class="text-secondary mb-0 detail-subheading" th:text="#{news.detail.subheading}">AI market interpretation built from the latest news context.</p>
+                <p class="text-secondary mb-0 detail-subheading"
+                   th:text="${originalArticleSummary != null and !#strings.isEmpty(originalArticleSummary) ? originalArticleSummary : #messages.msg('news.detail.subheading')}">AI market interpretation built from the latest news context.</p>
             </div>
             <div class="detail-meta-list">
                 <span class="detail-meta-chip">
@@ -599,7 +606,8 @@
                     <h2 class="fw-bold detail-section-title" th:text="#{news.detail.originalSummary}">Original News Summary</h2>
                 </div>
             </div>
-            <p class="detail-copy detail-copy--article" th:text="${newsDetail.summary ?: '-'}"></p>
+            <p class="detail-copy detail-copy--article"
+               th:text="${originalArticleSummary != null and !#strings.isEmpty(originalArticleSummary) ? originalArticleSummary : '-'}"></p>
         </div>
     </section>
 

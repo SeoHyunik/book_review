@@ -743,10 +743,14 @@
         }
 
         .news-title {
-            color: #E6EDF3;
+            color: var(--surface-strong);
             font-weight: 600;
             letter-spacing: -0.01em;
             opacity: 1;
+        }
+
+        [data-bs-theme="dark"] .news-title {
+            color: #E6EDF3;
         }
 
         .news-table-card tbody td {

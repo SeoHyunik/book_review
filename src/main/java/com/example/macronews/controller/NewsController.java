@@ -179,8 +179,10 @@ public class NewsController {
         model.addAttribute("newsDetail", newsDetail);
         String localizedTitle = resolveLocalizedDetailTitle(newsDetail);
         String localizedSummary = resolveLocalizedInterpretationSummary(newsDetail, localizedTitle);
+        String originalArticleSummary = resolveOriginalArticleSummary(newsDetail, localizedTitle);
         model.addAttribute("localizedDetailTitle", localizedTitle);
         model.addAttribute("localizedInterpretationSummary", localizedSummary);
+        model.addAttribute("originalArticleSummary", originalArticleSummary);
         model.addAttribute("pageTitle", localizedTitle == null ? "News Detail" : localizedTitle);
         String description = localizedSummary == null || localizedSummary.isBlank()
                 ? "Macro news detail and interpretation result."
@@ -254,6 +256,16 @@ public class NewsController {
             return preferredSummary;
         }
         return StringUtils.hasText(newsDetail.summary()) ? newsDetail.summary() : "";
+    }
+
+    private String resolveOriginalArticleSummary(NewsDetailDto newsDetail, String localizedTitle) {
+        String originalSummary = StringUtils.hasText(newsDetail.summary()) ? newsDetail.summary().trim() : "";
+        if (StringUtils.hasText(originalSummary)
+                && !originalSummary.equals(newsDetail.title())
+                && !originalSummary.equals(localizedTitle)) {
+            return originalSummary;
+        }
+        return StringUtils.hasText(newsDetail.title()) ? newsDetail.title() : "";
     }
 
     private String resolvePreferredAnalysisSummary(AnalysisResult analysisResult) {

@@ -480,8 +480,7 @@
                  th:if="${marketSummaryDetail.supportingNews != null and !#lists.isEmpty(marketSummaryDetail.supportingNews)}">
                 <a class="list-group-item list-group-item-action px-0"
                    th:each="news : ${marketSummaryDetail.supportingNews}"
-                   th:with="direction=${news.primaryDirection != null ? news.primaryDirection.name() : 'NEUTRAL'},
-                            sentiment=${news.primarySentiment != null ? news.primarySentiment.name() : 'NEUTRAL'}"
+                   th:with="sentiment=${news.primarySentiment != null ? news.primarySentiment.name() : 'NEUTRAL'}"
                    th:href="@{'/news/' + ${news.id}}">
                     <div class="fw-semibold mb-1" th:text="${news.title ?: #messages.msg('news.untitled')}">News title</div>
                     <div class="summary-support-meta">
@@ -491,8 +490,8 @@
                         <span class="summary-support-dot">&middot;</span>
                         <span class="summary-news-indicator"
                               th:classappend="${sentiment == 'POSITIVE' ? ' summary-news-sentiment--positive' : (sentiment == 'NEGATIVE' ? ' summary-news-sentiment--negative' : ' summary-news-sentiment--neutral')}"
-                              th:text="${direction == 'UP' ? '↑ ' + #messages.msg('news.direction.up') : (direction == 'DOWN' ? '↓ ' + #messages.msg('news.direction.down') : '• ' + #messages.msg('news.direction.neutral'))}">
-                            • Neutral
+                              th:text="${sentiment == 'POSITIVE' ? #messages.msg('news.signal.positiveShort') : (sentiment == 'NEGATIVE' ? #messages.msg('news.signal.negativeShort') : #messages.msg('news.signal.neutralShort'))}">
+                            Neutral
                         </span>
                     </div>
                 </a>

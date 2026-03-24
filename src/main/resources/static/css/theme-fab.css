@@ -19,7 +19,9 @@
     background-color: var(--bs-body-bg);
     color: var(--bs-body-color);
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    transition: transform 120ms ease, box-shadow 120ms ease, background-color 200ms ease, color 200ms ease;
+    outline: 3px solid transparent;
+    outline-offset: 2px;
+    transition: transform 120ms ease, box-shadow 120ms ease, background-color 200ms ease, color 200ms ease, outline-color 90ms ease;
 }
 
 #theme-fab:hover,
@@ -34,10 +36,9 @@
     box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.2);
 }
 
-#theme-fab:focus,
-#scroll-top-fab:focus {
-    outline: 3px solid rgba(13, 110, 253, 0.35);
-    outline-offset: 2px;
+#theme-fab:focus-visible,
+#scroll-top-fab:focus-visible {
+    outline-color: rgba(13, 110, 253, 0.35);
 }
 
 #theme-fab i,
