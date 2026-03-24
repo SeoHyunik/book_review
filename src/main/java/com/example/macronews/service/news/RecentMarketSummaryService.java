@@ -95,11 +95,17 @@ public class RecentMarketSummaryService {
                 aggregation.confidence(),
                 dominantSentiment
         );
-        log.debug("[FEATURED_SUMMARY] confidence breakdown: base={}, crisis={}, market={}, final={}",
-                confidenceBreakdown.baseConfidence(),
-                confidenceBreakdown.crisisBoost(),
-                confidenceBreakdown.marketBoost(),
-                confidenceBreakdown.finalConfidence());
+        if (log.isDebugEnabled()) {
+            log.debug("[FEATURED_SUMMARY] confidence breakdown: base={}, crisis={}, market={}, final={}",
+                    confidenceBreakdown.baseConfidence(),
+                    confidenceBreakdown.crisisBoost(),
+                    confidenceBreakdown.marketBoost(),
+                    confidenceBreakdown.finalConfidence());
+            log.debug("[CONF_METRIC] type=recent_summary crisis={} market={} cap={}",
+                    confidenceBreakdown.crisisApplied(),
+                    confidenceBreakdown.marketApplied(),
+                    confidenceBreakdown.capApplied());
+        }
         Double confidence = confidenceBreakdown.finalConfidence();
 
         return Optional.of(new FeaturedMarketSummaryDto(
@@ -278,7 +284,7 @@ public class RecentMarketSummaryService {
             SignalSentiment dominantSentiment
     ) {
         if (baseConfidence == null || boostedConfidence == null || dominantSentiment == SignalSentiment.NEUTRAL) {
-            return new ConfidenceBreakdown(baseConfidence, 0d, 0d, boostedConfidence);
+            return new ConfidenceBreakdown(baseConfidence, 0d, 0d, boostedConfidence, false, false, false);
         }
         double crisisBoost = Math.max(0d, boostedConfidence - baseConfidence);
         try {
@@ -315,7 +321,15 @@ public class RecentMarketSummaryService {
             }
 
             if (alignedSignals == 0) {
-                return new ConfidenceBreakdown(baseConfidence, crisisBoost, 0d, boostedConfidence);
+                return new ConfidenceBreakdown(
+                        baseConfidence,
+                        crisisBoost,
+                        0d,
+                        boostedConfidence,
+                        crisisBoost > 0d,
+                        false,
+                        false
+                );
             }
 
             double marketBoost = Math.min(MAX_MARKET_CONFIDENCE_BOOST, alignedSignals * 0.03d);
@@ -323,10 +337,27 @@ public class RecentMarketSummaryService {
             double cappedBoost = Math.min(totalBoost, MAX_TOTAL_CONFIDENCE_BOOST);
             double finalConfidence = Math.min(1.0d, baseConfidence + cappedBoost);
             double effectiveMarketBoost = Math.max(0d, finalConfidence - boostedConfidence);
-            return new ConfidenceBreakdown(baseConfidence, crisisBoost, effectiveMarketBoost, finalConfidence);
+            boolean capApplied = totalBoost > cappedBoost || (baseConfidence + cappedBoost) > finalConfidence;
+            return new ConfidenceBreakdown(
+                    baseConfidence,
+                    crisisBoost,
+                    effectiveMarketBoost,
+                    finalConfidence,
+                    crisisBoost > 0d,
+                    effectiveMarketBoost > 0d,
+                    capApplied
+            );
         } catch (RuntimeException ex) {
             log.debug("[FEATURED_SUMMARY] price-aware confidence modifier skipped", ex);
-            return new ConfidenceBreakdown(baseConfidence, crisisBoost, 0d, boostedConfidence);
+            return new ConfidenceBreakdown(
+                    baseConfidence,
+                    crisisBoost,
+                    0d,
+                    boostedConfidence,
+                    crisisBoost > 0d,
+                    false,
+                    false
+            );
         }
     }
 
@@ -517,7 +548,10 @@ public class RecentMarketSummaryService {
             Double baseConfidence,
             double crisisBoost,
             double marketBoost,
-            Double finalConfidence
+            Double finalConfidence,
+            boolean crisisApplied,
+            boolean marketApplied,
+            boolean capApplied
     ) {
     }
 }

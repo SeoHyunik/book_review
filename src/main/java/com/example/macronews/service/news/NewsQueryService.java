@@ -366,11 +366,16 @@ public class NewsQueryService {
 
         AggregatedDirection aggregatedDirection = resolveDominantDirection(variable, weightedScores, sampleCount);
         ConfidenceBreakdown confidenceBreakdown = aggregatedDirection.confidenceBreakdown();
-        log.debug("[NEWS_SIGNAL] confidence breakdown: variable={} base={} crisis={} final={}",
-                variable,
-                confidenceBreakdown.baseConfidence(),
-                confidenceBreakdown.crisisBoost(),
-                confidenceBreakdown.finalConfidence());
+        if (log.isDebugEnabled()) {
+            log.debug("[NEWS_SIGNAL] confidence breakdown: variable={} base={} crisis={} final={}",
+                    variable,
+                    confidenceBreakdown.baseConfidence(),
+                    confidenceBreakdown.crisisBoost(),
+                    confidenceBreakdown.finalConfidence());
+            log.debug("[CONF_METRIC] type=news crisis={} cap={}",
+                    confidenceBreakdown.crisisApplied(),
+                    confidenceBreakdown.capApplied());
+        }
         return new MarketSignalItemDto(
                 variable,
                 aggregatedDirection.direction(),
@@ -432,7 +437,7 @@ public class NewsQueryService {
             return new AggregatedDirection(
                     ImpactDirection.NEUTRAL,
                     null,
-                    new ConfidenceBreakdown(null, 0d, null)
+                    new ConfidenceBreakdown(null, 0d, null, false, false)
             );
         }
 
@@ -446,18 +451,21 @@ public class NewsQueryService {
             Double neutralConfidence = calculateConfidence(neutral, Math.max(up, down), total);
             return new AggregatedDirection(ImpactDirection.NEUTRAL,
                     neutralConfidence,
-                    new ConfidenceBreakdown(neutralConfidence, 0d, neutralConfidence));
+                    new ConfidenceBreakdown(neutralConfidence, 0d, neutralConfidence, false, false));
         }
 
         Double baseConfidence = calculateConfidence(directionalMax, Math.max(neutral, directionalMin), total);
         Double confidence = baseConfidence;
+        boolean capApplied = false;
         if (directionalCandidate != ImpactDirection.NEUTRAL
                 && sampleCount >= CRISIS_BOOST_MIN_SAMPLE_COUNT
                 && directionalEdge >= CRISIS_BOOST_EDGE_THRESHOLD
                 && variable.sentimentFor(directionalCandidate) == SignalSentiment.NEGATIVE
                 && directionalMax >= (neutral * CRISIS_BOOST_NEGATIVE_NEUTRAL_RATIO)) {
-            confidence = clamp((confidence == null ? 0d : confidence) + CRISIS_BOOST_CONFIDENCE,
+            double boostedConfidence = (confidence == null ? 0d : confidence) + CRISIS_BOOST_CONFIDENCE;
+            confidence = clamp(boostedConfidence,
                     MIN_CONFIDENCE, MAX_CONFIDENCE);
+            capApplied = confidence != boostedConfidence;
         }
 
         return new AggregatedDirection(
@@ -466,7 +474,9 @@ public class NewsQueryService {
                 new ConfidenceBreakdown(
                         baseConfidence,
                         Math.max(0d, (confidence == null || baseConfidence == null) ? 0d : confidence - baseConfidence),
-                        confidence
+                        confidence,
+                        confidence != null && baseConfidence != null && confidence > baseConfidence,
+                        capApplied
                 )
         );
     }
@@ -714,7 +724,9 @@ public class NewsQueryService {
     private record ConfidenceBreakdown(
             Double baseConfidence,
             double crisisBoost,
-            Double finalConfidence
+            Double finalConfidence,
+            boolean crisisApplied,
+            boolean capApplied
     ) {
     }
 }
