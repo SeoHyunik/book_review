@@ -9,9 +9,12 @@ import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
-import com.example.macronews.dto.forecast.MarketForecastSummaryHandoffDto;
+import com.example.macronews.dto.market.FxSnapshotDto;
+import com.example.macronews.dto.market.GoldSnapshotDto;
+import com.example.macronews.dto.market.IndexSnapshotDto;
+import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.repository.NewsEventRepository;
-import com.example.macronews.service.forecast.MarketForecastQueryService;
+import com.example.macronews.service.market.MarketDataFacade;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -39,9 +42,20 @@ public class RecentMarketSummaryService {
     private static final double DEFAULT_IMPACT_CONFIDENCE = 0.55d;
     private static final double NEUTRAL_WEIGHT_DAMPING = 0.7d;
     private static final double DOMINANCE_EDGE_THRESHOLD = 0.12d;
+    private static final int CRISIS_BOOST_MIN_ITEM_COUNT = 3;
+    private static final double CRISIS_BOOST_EDGE_THRESHOLD = 0.20d;
+    private static final double CRISIS_BOOST_NEGATIVE_NEUTRAL_RATIO = 1.12d;
+    private static final double CRISIS_BOOST_CONFIDENCE = 0.04d;
+    private static final double MAX_MARKET_CONFIDENCE_BOOST = 0.12d;
+    private static final double USD_KRW_NEGATIVE_LEVEL = 1380d;
+    private static final double USD_KRW_POSITIVE_LEVEL = 1330d;
+    private static final double GOLD_NEGATIVE_LEVEL = 3000d;
+    private static final double OIL_NEGATIVE_LEVEL = 85d;
+    private static final double KOSPI_NEGATIVE_LEVEL = 2500d;
+    private static final double KOSPI_POSITIVE_LEVEL = 2600d;
 
     private final NewsEventRepository newsEventRepository;
-    private final MarketForecastQueryService marketForecastQueryService;
+    private final MarketDataFacade marketDataFacade;
 
     @Value("${app.featured.market-summary.enabled:true}")
     private boolean enabled;
@@ -168,9 +182,17 @@ public class RecentMarketSummaryService {
             );
         }
 
+        Double confidence = calculateConfidence(directionalMax, Math.max(neutral, directionalMin), total);
+        if (directionalCandidate == SignalSentiment.NEGATIVE
+                && recentItems.size() >= CRISIS_BOOST_MIN_ITEM_COUNT
+                && (directionalMax - directionalMin) >= CRISIS_BOOST_EDGE_THRESHOLD
+                && directionalMax >= (neutral * CRISIS_BOOST_NEGATIVE_NEUTRAL_RATIO)) {
+            confidence = Math.max(0.18d, Math.min(confidence + CRISIS_BOOST_CONFIDENCE, 0.94d));
+        }
+
         return new SentimentAggregation(
                 directionalCandidate,
-                calculateConfidence(directionalMax, Math.max(neutral, directionalMin), total)
+                confidence
         );
     }
 
@@ -232,31 +254,44 @@ public class RecentMarketSummaryService {
             return baseConfidence;
         }
         try {
-            MarketForecastSummaryHandoffDto handoff = marketForecastQueryService.getCurrentSummaryHandoff().orElse(null);
-            if (handoff == null || handoff.macroDirections() == null || handoff.macroDirections().isEmpty()) {
+            FxSnapshotDto usdKrw = marketDataFacade.getUsdKrw().orElse(null);
+            GoldSnapshotDto gold = marketDataFacade.getGold().orElse(null);
+            OilSnapshotDto oil = marketDataFacade.getOil().orElse(null);
+            IndexSnapshotDto kospi = marketDataFacade.getKospi().orElse(null);
+
+            int alignedSignals = 0;
+
+            if (dominantSentiment == SignalSentiment.NEGATIVE) {
+                if (usdKrw != null && usdKrw.rate() >= USD_KRW_NEGATIVE_LEVEL) {
+                    alignedSignals++;
+                }
+                if (gold != null && gold.usdPerOunce() >= GOLD_NEGATIVE_LEVEL) {
+                    alignedSignals++;
+                }
+                Double oilPrice = oil == null
+                        ? null
+                        : (oil.wtiUsd() != null ? oil.wtiUsd() : oil.brentUsd());
+                if (oilPrice != null && oilPrice >= OIL_NEGATIVE_LEVEL) {
+                    alignedSignals++;
+                }
+                if (kospi != null && kospi.price() != null && kospi.price() <= KOSPI_NEGATIVE_LEVEL) {
+                    alignedSignals++;
+                }
+            } else if (dominantSentiment == SignalSentiment.POSITIVE) {
+                if (usdKrw != null && usdKrw.rate() <= USD_KRW_POSITIVE_LEVEL) {
+                    alignedSignals++;
+                }
+                if (kospi != null && kospi.price() != null && kospi.price() >= KOSPI_POSITIVE_LEVEL) {
+                    alignedSignals++;
+                }
+            }
+
+            if (alignedSignals == 0) {
                 return baseConfidence;
             }
 
-            int aligned = 0;
-            int conflicting = 0;
-            for (MacroVariable variable : List.of(MacroVariable.USD, MacroVariable.GOLD, MacroVariable.OIL, MacroVariable.KOSPI)) {
-                var direction = handoff.macroDirections().get(variable);
-                if (direction == null) {
-                    continue;
-                }
-                SignalSentiment forecastSentiment = variable.sentimentFor(direction);
-                if (forecastSentiment == SignalSentiment.NEUTRAL) {
-                    continue;
-                }
-                if (forecastSentiment == dominantSentiment) {
-                    aligned++;
-                } else {
-                    conflicting++;
-                }
-            }
-
-            double modifier = Math.min(0.08d, aligned * 0.02d) - Math.min(0.06d, conflicting * 0.02d);
-            return Math.max(0.18d, Math.min(baseConfidence + modifier, 0.96d));
+            double boost = Math.min(MAX_MARKET_CONFIDENCE_BOOST, alignedSignals * 0.03d);
+            return Math.min(1.0d, baseConfidence + boost);
         } catch (RuntimeException ex) {
             log.debug("[FEATURED_SUMMARY] price-aware confidence modifier skipped", ex);
             return baseConfidence;

@@ -48,6 +48,10 @@ public class NewsQueryService {
     private static final double MAX_CONFIDENCE = 0.94d;
     private static final double NEUTRAL_WEIGHT_DAMPING = 0.65d;
     private static final double DIRECTIONAL_EDGE_THRESHOLD = 0.12d;
+    private static final int CRISIS_BOOST_MIN_SAMPLE_COUNT = 3;
+    private static final double CRISIS_BOOST_EDGE_THRESHOLD = 0.20d;
+    private static final double CRISIS_BOOST_NEGATIVE_NEUTRAL_RATIO = 1.1d;
+    private static final double CRISIS_BOOST_CONFIDENCE = 0.03d;
     private static final List<KeywordWeightRule> PRIORITY_WEIGHT_RULES = List.of(
             new KeywordWeightRule(8, 5, 3,
                     "south korea", "korea", "kospi", "krw", "won"),
@@ -360,7 +364,7 @@ public class NewsQueryService {
             }
         }
 
-        AggregatedDirection aggregatedDirection = resolveDominantDirection(weightedScores);
+        AggregatedDirection aggregatedDirection = resolveDominantDirection(variable, weightedScores, sampleCount);
         return new MarketSignalItemDto(
                 variable,
                 aggregatedDirection.direction(),
@@ -406,7 +410,11 @@ public class NewsQueryService {
         return boundary;
     }
 
-    private AggregatedDirection resolveDominantDirection(Map<ImpactDirection, Double> weightedScores) {
+    private AggregatedDirection resolveDominantDirection(
+            MacroVariable variable,
+            Map<ImpactDirection, Double> weightedScores,
+            int sampleCount
+    ) {
         double up = weightedScores.getOrDefault(ImpactDirection.UP, 0d);
         double down = weightedScores.getOrDefault(ImpactDirection.DOWN, 0d);
         double neutral = weightedScores.getOrDefault(ImpactDirection.NEUTRAL, 0d);
@@ -429,8 +437,17 @@ public class NewsQueryService {
                     calculateConfidence(neutral, Math.max(up, down), total));
         }
 
-        return new AggregatedDirection(directionalCandidate,
-                calculateConfidence(directionalMax, Math.max(neutral, directionalMin), total));
+        Double confidence = calculateConfidence(directionalMax, Math.max(neutral, directionalMin), total);
+        if (directionalCandidate != ImpactDirection.NEUTRAL
+                && sampleCount >= CRISIS_BOOST_MIN_SAMPLE_COUNT
+                && directionalEdge >= CRISIS_BOOST_EDGE_THRESHOLD
+                && variable.sentimentFor(directionalCandidate) == SignalSentiment.NEGATIVE
+                && directionalMax >= (neutral * CRISIS_BOOST_NEGATIVE_NEUTRAL_RATIO)) {
+            confidence = clamp((confidence == null ? 0d : confidence) + CRISIS_BOOST_CONFIDENCE,
+                    MIN_CONFIDENCE, MAX_CONFIDENCE);
+        }
+
+        return new AggregatedDirection(directionalCandidate, confidence);
     }
 
     private double resolveImpactWeight(MacroImpact impact) {

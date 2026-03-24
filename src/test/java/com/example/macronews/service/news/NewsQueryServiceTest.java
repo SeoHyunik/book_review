@@ -1,6 +1,7 @@
 package com.example.macronews.service.news;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.BDDMockito.given;
 
 import com.example.macronews.domain.AnalysisResult;
@@ -636,7 +637,124 @@ class NewsQueryServiceTest {
                 .satisfies(item -> {
                     assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
                     assertThat(item.sentiment()).isEqualTo(SignalSentiment.NEGATIVE);
-                    assertThat(item.confidence()).isGreaterThan(0.6d);
+                    assertThat(item.confidence()).isGreaterThan(0.8d);
+                });
+    }
+
+    @Test
+    @DisplayName("Market signal overview should not apply crisis boost when neutral weight remains too strong")
+    void getMarketSignalOverview_keepsBaseConfidenceWhenNeutralRemainsStrong() {
+        NewsEvent negativeOne = newsEvent(
+                "negative-one",
+                "Oil extends gains",
+                "Summary",
+                "Reuters",
+                "https://example.com/negative-one",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.7d)),
+                        List.of()));
+        NewsEvent negativeTwo = newsEvent(
+                "negative-two",
+                "Oil remains elevated",
+                "Summary",
+                "Bloomberg",
+                "https://example.com/negative-two",
+                "2026-03-10T08:30:00Z",
+                "2026-03-10T08:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.7d)),
+                        List.of()));
+        NewsEvent neutralOne = newsEvent(
+                "neutral-one",
+                "Oil outlook remains steady",
+                "Summary",
+                "MarketWatch",
+                "https://example.com/neutral-one",
+                "2026-03-10T07:30:00Z",
+                "2026-03-10T07:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.NEUTRAL, 1.0d)),
+                        List.of()));
+        NewsEvent neutralTwo = newsEvent(
+                "neutral-two",
+                "Oil market waits for new catalyst",
+                "Summary",
+                "CNBC",
+                "https://example.com/neutral-two",
+                "2026-03-10T06:30:00Z",
+                "2026-03-10T06:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.NEUTRAL, 1.0d)),
+                        List.of()));
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(negativeOne, negativeTwo, neutralOne, neutralTwo));
+
+        var overview = newsQueryService.getMarketSignalOverview(null, NewsListSort.PUBLISHED_DESC);
+
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.OIL)
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
+                    assertThat(item.sentiment()).isEqualTo(SignalSentiment.NEGATIVE);
+                    assertThat(item.confidence()).isCloseTo(0.46377777777777773d, within(0.000001d));
+                });
+    }
+
+    @Test
+    @DisplayName("Market signal overview should not apply crisis boost when negative sample size is too low")
+    void getMarketSignalOverview_keepsBaseConfidenceForLowSampleNegativeSignals() {
+        NewsEvent negativeOne = newsEvent(
+                "low-sample-negative-one",
+                "Oil spikes on supply shock",
+                "Summary",
+                "Reuters",
+                "https://example.com/low-sample-negative-one",
+                "2026-03-10T09:30:00Z",
+                "2026-03-10T09:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.95d)),
+                        List.of()));
+        NewsEvent negativeTwo = newsEvent(
+                "low-sample-negative-two",
+                "Energy stress deepens",
+                "Summary",
+                "Bloomberg",
+                "https://example.com/low-sample-negative-two",
+                "2026-03-10T08:30:00Z",
+                "2026-03-10T08:40:00Z",
+                NewsStatus.ANALYZED,
+                new AnalysisResult("test-model", Instant.parse("2026-03-10T00:00:00Z"),
+                        null, null, null, null,
+                        List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.9d)),
+                        List.of()));
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(negativeOne, negativeTwo));
+
+        var overview = newsQueryService.getMarketSignalOverview(null, NewsListSort.PUBLISHED_DESC);
+
+        assertThat(overview.items())
+                .filteredOn(item -> item.variable() == MacroVariable.OIL)
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.direction()).isEqualTo(ImpactDirection.UP);
+                    assertThat(item.sentiment()).isEqualTo(SignalSentiment.NEGATIVE);
+                    assertThat(item.sampleCount()).isEqualTo(2);
+                    assertThat(item.confidence()).isCloseTo(0.8863333333333334d, within(0.000001d));
                 });
     }
 

@@ -1,6 +1,7 @@
 package com.example.macronews.service.news;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.BDDMockito.given;
 
 import com.example.macronews.domain.AnalysisResult;
@@ -12,15 +13,16 @@ import com.example.macronews.domain.MarketType;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
-import com.example.macronews.domain.MarketMood;
-import com.example.macronews.dto.forecast.MarketForecastSummaryHandoffDto;
+import com.example.macronews.dto.market.FxSnapshotDto;
+import com.example.macronews.dto.market.GoldSnapshotDto;
+import com.example.macronews.dto.market.IndexSnapshotDto;
+import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.repository.NewsEventRepository;
-import com.example.macronews.service.forecast.MarketForecastQueryService;
+import com.example.macronews.service.market.MarketDataFacade;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +41,7 @@ class RecentMarketSummaryServiceTest {
     private NewsEventRepository newsEventRepository;
 
     @Mock
-    private MarketForecastQueryService marketForecastQueryService;
+    private MarketDataFacade marketDataFacade;
 
     @InjectMocks
     private RecentMarketSummaryService recentMarketSummaryService;
@@ -52,7 +54,10 @@ class RecentMarketSummaryServiceTest {
         ReflectionTestUtils.setField(recentMarketSummaryService, "windowHours", 3);
         ReflectionTestUtils.setField(recentMarketSummaryService, "maxItems", 10);
         ReflectionTestUtils.setField(recentMarketSummaryService, "minItems", 3);
-        lenient().when(marketForecastQueryService.getCurrentSummaryHandoff()).thenReturn(Optional.empty());
+        lenient().when(marketDataFacade.getUsdKrw()).thenReturn(Optional.empty());
+        lenient().when(marketDataFacade.getGold()).thenReturn(Optional.empty());
+        lenient().when(marketDataFacade.getOil()).thenReturn(Optional.empty());
+        lenient().when(marketDataFacade.getKospi()).thenReturn(Optional.empty());
     }
 
     @Test
@@ -188,7 +193,7 @@ class RecentMarketSummaryServiceTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.NEGATIVE);
-        assertThat(result.get().confidence()).isGreaterThan(0.6d);
+        assertThat(result.get().confidence()).isGreaterThan(0.8d);
     }
 
     @Test
@@ -215,8 +220,56 @@ class RecentMarketSummaryServiceTest {
     }
 
     @Test
-    @DisplayName("price-aware confidence modifier should stay secondary and fail open when forecast data is missing")
-    void getCurrentSummary_keepsConfidenceWhenForecastDataMissing() {
+    @DisplayName("recent summary should not apply crisis boost when neutral weight remains too strong")
+    void getCurrentSummary_keepsBaseConfidenceWhenNeutralRemainsStrong() {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.7d)),
+                                List.of()),
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.7d)),
+                                List.of()),
+                        analyzedNews("news-3", "2026-03-12T01:55:00Z", "2026-03-17T01:55:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.NEUTRAL, 1.0d)),
+                                List.of()),
+                        analyzedNews("news-4", "2026-03-12T01:40:00Z", "2026-03-17T01:40:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.NEUTRAL, 1.0d)),
+                                List.of())
+                ));
+
+        var result = recentMarketSummaryService.getCurrentSummary();
+
+        assertThat(result).isPresent();
+        assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.NEGATIVE);
+        assertThat(result.get().confidence()).isCloseTo(0.452d, within(0.000001d));
+    }
+
+    @Test
+    @DisplayName("recent summary should not apply crisis boost when negative sample size is too low")
+    void getCurrentSummary_keepsBaseConfidenceForLowSampleNegativeSignals() {
+        ReflectionTestUtils.setField(recentMarketSummaryService, "minItems", 1);
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.95d)),
+                                List.of()),
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.9d)),
+                                List.of())
+                ));
+
+        var result = recentMarketSummaryService.getCurrentSummary();
+
+        assertThat(result).isPresent();
+        assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.NEGATIVE);
+        assertThat(result.get().sourceCount()).isEqualTo(2);
+        assertThat(result.get().confidence()).isCloseTo(0.874d, within(0.000001d));
+    }
+
+    @Test
+    @DisplayName("price-aware confidence modifier should keep confidence unchanged when market data is missing")
+    void getCurrentSummary_keepsConfidenceWhenMarketDataMissing() {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(
                         analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
@@ -229,18 +282,15 @@ class RecentMarketSummaryServiceTest {
                                 List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.40d)),
                                 List.of())
                 ));
-        given(marketForecastQueryService.getCurrentSummaryHandoff())
-                .willThrow(new RuntimeException("forecast unavailable"));
-
         var result = recentMarketSummaryService.getCurrentSummary();
 
         assertThat(result).isPresent();
         assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.POSITIVE);
-        assertThat(result.get().confidence()).isNotNull();
+        assertThat(result.get().confidence()).isCloseTo(0.6933414141414143d, within(0.000001d));
     }
 
     @Test
-    @DisplayName("price-aware confidence modifier may slightly increase confidence without flipping direction")
+    @DisplayName("price-aware confidence modifier should slightly increase confidence when market aligns")
     void getCurrentSummary_appliesSmallPriceAwareConfidenceModifier() {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(
@@ -254,25 +304,123 @@ class RecentMarketSummaryServiceTest {
                                 List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.40d)),
                                 List.of())
                 ));
-        given(marketForecastQueryService.getCurrentSummaryHandoff())
-                .willReturn(Optional.of(new MarketForecastSummaryHandoffDto(
-                        MarketMood.SUN,
-                        Map.of(
-                                MacroVariable.USD, ImpactDirection.DOWN,
-                                MacroVariable.KOSPI, ImpactDirection.UP
-                        ),
-                        List.of("USD", "KOSPI"),
-                        List.of("news-1"),
-                        3,
-                        "2026-03-17T03:00:00Z"
-                )));
+        given(marketDataFacade.getUsdKrw())
+                .willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1320d, Instant.parse("2026-03-17T03:00:00Z"))));
+        given(marketDataFacade.getKospi())
+                .willReturn(Optional.of(new IndexSnapshotDto("KOSPI", 2625d, Instant.parse("2026-03-17T03:00:00Z"))));
 
         var result = recentMarketSummaryService.getCurrentSummary();
 
         assertThat(result).isPresent();
         assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.POSITIVE);
-        assertThat(result.get().confidence()).isGreaterThan(0.6d);
-        assertThat(result.get().confidence()).isLessThanOrEqualTo(0.96d);
+        assertThat(result.get().confidence()).isGreaterThan(0.6933414141414143d);
+        assertThat(result.get().confidence()).isCloseTo(0.7533414141414143d, within(0.000001d));
+    }
+
+    @Test
+    @DisplayName("price-aware confidence modifier should slightly increase confidence for aligned negative market context")
+    void getCurrentSummary_appliesSmallPriceAwareConfidenceModifierForNegativeSentiment() {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.92d)),
+                                List.of()),
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.86d)),
+                                List.of()),
+                        analyzedNews("news-3", "2026-03-12T01:55:00Z", "2026-03-17T01:55:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.NEUTRAL, 0.34d)),
+                                List.of())
+                ));
+        given(marketDataFacade.getUsdKrw())
+                .willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1395d, Instant.parse("2026-03-17T03:00:00Z"))));
+        given(marketDataFacade.getGold())
+                .willReturn(Optional.of(new GoldSnapshotDto("USD", 3015d, Instant.parse("2026-03-17T03:00:00Z"))));
+        given(marketDataFacade.getKospi())
+                .willReturn(Optional.of(new IndexSnapshotDto("KOSPI", 2480d, Instant.parse("2026-03-17T03:00:00Z"))));
+
+        var result = recentMarketSummaryService.getCurrentSummary();
+
+        assertThat(result).isPresent();
+        assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.NEGATIVE);
+        assertThat(result.get().confidence()).isGreaterThan(0.8622165312190289d);
+        assertThat(result.get().confidence()).isCloseTo(0.9022165312190289d, within(0.000001d));
+    }
+
+    @Test
+    @DisplayName("price-aware confidence modifier should stay unchanged when available market data does not align")
+    void getCurrentSummary_keepsConfidenceWhenMarketDataDoesNotAlign() {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.82d)),
+                                List.of()),
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.76d)),
+                                List.of()),
+                        analyzedNews("news-3", "2026-03-12T01:55:00Z", "2026-03-17T01:55:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.40d)),
+                                List.of())
+                ));
+        given(marketDataFacade.getUsdKrw())
+                .willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1375d, Instant.parse("2026-03-17T03:00:00Z"))));
+
+        var result = recentMarketSummaryService.getCurrentSummary();
+
+        assertThat(result).isPresent();
+        assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.POSITIVE);
+        assertThat(result.get().confidence()).isCloseTo(0.6933414141414143d, within(0.000001d));
+    }
+
+    @Test
+    @DisplayName("price-aware confidence modifier should fail open when market facade throws")
+    void getCurrentSummary_keepsConfidenceWhenMarketFacadeThrows() {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.82d)),
+                                List.of()),
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.76d)),
+                                List.of()),
+                        analyzedNews("news-3", "2026-03-12T01:55:00Z", "2026-03-17T01:55:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.40d)),
+                                List.of())
+                ));
+        given(marketDataFacade.getUsdKrw()).willThrow(new RuntimeException("market unavailable"));
+
+        var result = recentMarketSummaryService.getCurrentSummary();
+
+        assertThat(result).isPresent();
+        assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.POSITIVE);
+        assertThat(result.get().confidence()).isCloseTo(0.6933414141414143d, within(0.000001d));
+    }
+
+    @Test
+    @DisplayName("price-aware confidence modifier should treat partial market availability as fail-open when nothing aligns")
+    void getCurrentSummary_keepsConfidenceWhenPartialMarketDataIsMissing() {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.82d)),
+                                List.of()),
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.76d)),
+                                List.of()),
+                        analyzedNews("news-3", "2026-03-12T01:55:00Z", "2026-03-17T01:55:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.40d)),
+                                List.of())
+                ));
+        given(marketDataFacade.getGold())
+                .willReturn(Optional.of(new GoldSnapshotDto("USD", 2950d, Instant.parse("2026-03-17T03:00:00Z"))));
+        given(marketDataFacade.getOil())
+                .willReturn(Optional.of(new OilSnapshotDto(82d, null, Instant.parse("2026-03-17T03:00:00Z"))));
+
+        var result = recentMarketSummaryService.getCurrentSummary();
+
+        assertThat(result).isPresent();
+        assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.POSITIVE);
+        assertThat(result.get().confidence()).isCloseTo(0.6933414141414143d, within(0.000001d));
     }
 
     private NewsEvent analyzedNews(String id, String publishedAt, String analyzedAt,
