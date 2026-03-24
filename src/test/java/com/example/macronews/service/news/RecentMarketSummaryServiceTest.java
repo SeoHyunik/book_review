@@ -318,8 +318,8 @@ class RecentMarketSummaryServiceTest {
     }
 
     @Test
-    @DisplayName("price-aware confidence modifier should slightly increase confidence for aligned negative market context")
-    void getCurrentSummary_appliesSmallPriceAwareConfidenceModifierForNegativeSentiment() {
+    @DisplayName("price-aware confidence modifier should cap combined crisis and market boosts for negative sentiment")
+    void getCurrentSummary_capsCombinedBoostForNegativeSentiment() {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(
                         analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
@@ -343,8 +343,8 @@ class RecentMarketSummaryServiceTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.NEGATIVE);
-        assertThat(result.get().confidence()).isGreaterThan(0.8622165312190289d);
-        assertThat(result.get().confidence()).isCloseTo(0.9022165312190289d, within(0.000001d));
+        assertThat(result.get().confidence()).isGreaterThan(0.8122165312190289d);
+        assertThat(result.get().confidence()).isCloseTo(0.8922165312190289d, within(0.000001d));
     }
 
     @Test

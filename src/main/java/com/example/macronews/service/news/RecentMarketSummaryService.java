@@ -46,6 +46,7 @@ public class RecentMarketSummaryService {
     private static final double CRISIS_BOOST_EDGE_THRESHOLD = 0.20d;
     private static final double CRISIS_BOOST_NEGATIVE_NEUTRAL_RATIO = 1.12d;
     private static final double CRISIS_BOOST_CONFIDENCE = 0.04d;
+    private static final double MAX_TOTAL_CONFIDENCE_BOOST = 0.12d;
     private static final double MAX_MARKET_CONFIDENCE_BOOST = 0.12d;
     private static final double USD_KRW_NEGATIVE_LEVEL = 1380d;
     private static final double USD_KRW_POSITIVE_LEVEL = 1330d;
@@ -89,7 +90,11 @@ public class RecentMarketSummaryService {
         Instant generatedAt = Instant.now(clock);
         Instant toPublishedAt = recentItems.get(0).publishedAt();
         Instant fromPublishedAt = recentItems.get(recentItems.size() - 1).publishedAt();
-        Double confidence = applyPriceAwareConfidenceModifier(aggregation.confidence(), dominantSentiment);
+        Double confidence = applyPriceAwareConfidenceModifier(
+                aggregation.baseConfidence(),
+                aggregation.confidence(),
+                dominantSentiment
+        );
 
         return Optional.of(new FeaturedMarketSummaryDto(
                 buildHeadlineKo(dominantSentiment),
@@ -162,7 +167,7 @@ public class RecentMarketSummaryService {
         double neutral = weightedScores.getOrDefault(SignalSentiment.NEUTRAL, 0d);
         double total = positive + negative + neutral;
         if (total <= 0d) {
-            return new SentimentAggregation(SignalSentiment.NEUTRAL, null);
+            return new SentimentAggregation(SignalSentiment.NEUTRAL, null, null);
         }
 
         double directionalMax = Math.max(positive, negative);
@@ -176,13 +181,16 @@ public class RecentMarketSummaryService {
                 && directionalMax >= (neutral * 0.92d);
 
         if (!directionalWins) {
+            Double neutralConfidence = calculateConfidence(neutral, Math.max(positive, negative), total);
             return new SentimentAggregation(
                     SignalSentiment.NEUTRAL,
-                    calculateConfidence(neutral, Math.max(positive, negative), total)
+                    neutralConfidence,
+                    neutralConfidence
             );
         }
 
-        Double confidence = calculateConfidence(directionalMax, Math.max(neutral, directionalMin), total);
+        Double baseConfidence = calculateConfidence(directionalMax, Math.max(neutral, directionalMin), total);
+        Double confidence = baseConfidence;
         if (directionalCandidate == SignalSentiment.NEGATIVE
                 && recentItems.size() >= CRISIS_BOOST_MIN_ITEM_COUNT
                 && (directionalMax - directionalMin) >= CRISIS_BOOST_EDGE_THRESHOLD
@@ -192,7 +200,8 @@ public class RecentMarketSummaryService {
 
         return new SentimentAggregation(
                 directionalCandidate,
-                confidence
+                confidence,
+                baseConfidence
         );
     }
 
@@ -249,9 +258,13 @@ public class RecentMarketSummaryService {
         return Math.max(0.18d, Math.min(confidence, 0.94d));
     }
 
-    private Double applyPriceAwareConfidenceModifier(Double baseConfidence, SignalSentiment dominantSentiment) {
-        if (baseConfidence == null || dominantSentiment == SignalSentiment.NEUTRAL) {
-            return baseConfidence;
+    private Double applyPriceAwareConfidenceModifier(
+            Double baseConfidence,
+            Double boostedConfidence,
+            SignalSentiment dominantSentiment
+    ) {
+        if (baseConfidence == null || boostedConfidence == null || dominantSentiment == SignalSentiment.NEUTRAL) {
+            return boostedConfidence;
         }
         try {
             FxSnapshotDto usdKrw = marketDataFacade.getUsdKrw().orElse(null);
@@ -287,14 +300,16 @@ public class RecentMarketSummaryService {
             }
 
             if (alignedSignals == 0) {
-                return baseConfidence;
+                return boostedConfidence;
             }
 
-            double boost = Math.min(MAX_MARKET_CONFIDENCE_BOOST, alignedSignals * 0.03d);
-            return Math.min(1.0d, baseConfidence + boost);
+            double marketBoost = Math.min(MAX_MARKET_CONFIDENCE_BOOST, alignedSignals * 0.03d);
+            double totalBoost = (boostedConfidence - baseConfidence) + marketBoost;
+            double cappedBoost = Math.min(totalBoost, MAX_TOTAL_CONFIDENCE_BOOST);
+            return Math.min(1.0d, baseConfidence + cappedBoost);
         } catch (RuntimeException ex) {
             log.debug("[FEATURED_SUMMARY] price-aware confidence modifier skipped", ex);
-            return baseConfidence;
+            return boostedConfidence;
         }
     }
 
@@ -476,7 +491,8 @@ public class RecentMarketSummaryService {
 
     private record SentimentAggregation(
             SignalSentiment sentiment,
-            Double confidence
+            Double confidence,
+            Double baseConfidence
     ) {
     }
 }
