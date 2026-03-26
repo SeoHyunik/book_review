@@ -3,12 +3,16 @@ package com.example.macronews.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.mock;
 
+import com.example.macronews.domain.AnalysisResult;
 import com.example.macronews.domain.ImpactDirection;
 import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.MarketMood;
+import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
+import com.example.macronews.dto.NewsDetailDto;
 import com.example.macronews.dto.MarketSignalOverviewDto;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
@@ -22,13 +26,16 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import jakarta.servlet.http.HttpSession;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
 import org.springframework.ui.ConcurrentModel;
+import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 @ExtendWith(MockitoExtension.class)
 class NewsControllerTest {
@@ -53,6 +60,106 @@ class NewsControllerTest {
 
     @InjectMocks
     private NewsController newsController;
+
+    @Test
+    @DisplayName("detail should expose original article summary when it is distinct from the title")
+    void detail_exposesDistinctOriginalArticleSummary() {
+        NewsDetailDto detail = new NewsDetailDto(
+                "news-1",
+                "Fed keeps rates unchanged",
+                "Officials signaled a cautious stance while watching inflation data.",
+                "Reuters",
+                "https://example.com/news-1",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                NewsStatus.ANALYZED,
+                new AnalysisResult(
+                        "gpt-4o-mini",
+                        Instant.parse("2026-03-17T02:40:00Z"),
+                        "연준 동결",
+                        "Fed pause",
+                        "시장 반응은 제한적이다.",
+                        "Market reaction remains contained.",
+                        List.of(),
+                        List.of()
+                )
+        );
+        given(newsQueryService.getNewsDetail("news-1")).willReturn(Optional.of(detail));
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.detail(
+                "news-1",
+                authenticatedUser(),
+                mock(HttpSession.class),
+                model,
+                new RedirectAttributesModelMap());
+
+        assertThat(viewName).isEqualTo("news/detail");
+        assertThat(model.getAttribute("originalArticleSummary"))
+                .isEqualTo("Officials signaled a cautious stance while watching inflation data.");
+    }
+
+    @Test
+    @DisplayName("detail should not fall back to title when original article summary is blank")
+    void detail_doesNotFallbackToTitleWhenOriginalSummaryIsBlank() {
+        NewsDetailDto detail = new NewsDetailDto(
+                "news-2",
+                "Fed keeps rates unchanged",
+                "   ",
+                "Reuters",
+                "https://example.com/news-2",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                NewsStatus.ANALYZED,
+                new AnalysisResult(
+                        "gpt-4o-mini",
+                        Instant.parse("2026-03-17T02:40:00Z"),
+                        "연준 동결",
+                        "Fed pause",
+                        "시장 반응은 제한적이다.",
+                        "Market reaction remains contained.",
+                        List.of(),
+                        List.of()
+                )
+        );
+        given(newsQueryService.getNewsDetail("news-2")).willReturn(Optional.of(detail));
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.detail(
+                "news-2",
+                authenticatedUser(),
+                mock(HttpSession.class),
+                model,
+                new RedirectAttributesModelMap());
+
+        assertThat(viewName).isEqualTo("news/detail");
+        assertThat(model.getAttribute("originalArticleSummary")).isEqualTo("");
+    }
+
+    @Test
+    @DisplayName("detail should not expose title-equal summary as original article summary")
+    void detail_doesNotExposeTitleEqualSummary() {
+        NewsDetailDto detail = new NewsDetailDto(
+                "news-3",
+                "Fed keeps rates unchanged",
+                "Fed keeps rates unchanged",
+                "Reuters",
+                "https://example.com/news-3",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                NewsStatus.INGESTED,
+                null
+        );
+        given(newsQueryService.getNewsDetail("news-3")).willReturn(Optional.of(detail));
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.detail(
+                "news-3",
+                authenticatedUser(),
+                mock(HttpSession.class),
+                model,
+                new RedirectAttributesModelMap());
+
+        assertThat(viewName).isEqualTo("news/detail");
+        assertThat(model.getAttribute("originalArticleSummary")).isEqualTo("");
+    }
 
     @Test
     @DisplayName("list should expose aggregated market forecast snapshot when present")
@@ -305,5 +412,11 @@ class NewsControllerTest {
         assertThat(viewName).isEqualTo("news/list");
         assertThat(model.getAttribute("marketForecastSnapshot")).isNull();
         assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("article");
+    }
+
+    private Authentication authenticatedUser() {
+        Authentication authentication = mock(Authentication.class);
+        given(authentication.isAuthenticated()).willReturn(true);
+        return authentication;
     }
 }

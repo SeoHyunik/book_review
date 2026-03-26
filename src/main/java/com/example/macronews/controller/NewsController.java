@@ -265,7 +265,7 @@ public class NewsController {
                 && !originalSummary.equals(localizedTitle)) {
             return originalSummary;
         }
-        return StringUtils.hasText(newsDetail.title()) ? newsDetail.title() : "";
+        return "";
     }
 
     private String resolvePreferredAnalysisSummary(AnalysisResult analysisResult) {
