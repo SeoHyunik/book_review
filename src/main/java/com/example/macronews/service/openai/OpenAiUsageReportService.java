@@ -38,42 +38,12 @@ public class OpenAiUsageReportService {
     private static final DateTimeFormatter DAY_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
     private static final Pattern DATED_MODEL_PATTERN = Pattern.compile("^(.*)-\\d{4}-\\d{2}-\\d{2}$");
+    private static final BigDecimal ONE_MILLION_TOKENS = BigDecimal.valueOf(1_000_000L);
+    private static final String FEATURE_DEFAULT_FALLBACK = "default_fallback";
 
     private final OpenAiUsageRecordRepository openAiUsageRecordRepository;
     private final MarketDataFacade marketDataFacade;
-
-    @Value("${openai.pricing.interpretation-model-name:${openai.interpretation-model:${openai.model:gpt-4o-mini}}}")
-    private String interpretationModel;
-
-    @Value("${openai.pricing.interpretation-model.prompt-per-1k-usd:0.00015}")
-    private BigDecimal interpretationPromptPer1kUsd;
-
-    @Value("${openai.pricing.interpretation-model.completion-per-1k-usd:0.0006}")
-    private BigDecimal interpretationCompletionPer1kUsd;
-
-    @Value("${openai.pricing.summary-model-name:${app.featured.market-summary.ai-model:gpt-4o-mini}}")
-    private String summaryModel;
-
-    @Value("${openai.pricing.summary-model.prompt-per-1k-usd:0.00125}")
-    private BigDecimal summaryPromptPer1kUsd;
-
-    @Value("${openai.pricing.summary-model.completion-per-1k-usd:0.01}")
-    private BigDecimal summaryCompletionPer1kUsd;
-
-    @Value("${openai.pricing.primary-model-name:}")
-    private String legacyPrimaryModel;
-
-    @Value("${openai.pricing.primary-model.prompt-per-1k-usd:0.005}")
-    private BigDecimal legacyPrimaryPromptPer1kUsd;
-
-    @Value("${openai.pricing.primary-model.completion-per-1k-usd:0.015}")
-    private BigDecimal legacyPrimaryCompletionPer1kUsd;
-
-    @Value("${openai.pricing.default.prompt-per-1k-usd:0.005}")
-    private BigDecimal defaultPromptPer1kUsd;
-
-    @Value("${openai.pricing.default.completion-per-1k-usd:0.015}")
-    private BigDecimal defaultCompletionPer1kUsd;
+    private final OpenAiPricingSnapshotLoader pricingSnapshotLoader;
 
     @Value("${openai.cost.krw-fallback-rate:1350.0}")
     private BigDecimal fallbackKrwRate;
@@ -244,7 +214,7 @@ public class OpenAiUsageReportService {
             return featureSpecific;
         }
 
-        Optional<Pricing> explicitModelMatch = resolveConfiguredModelPricing(normalizedModel);
+        Optional<Pricing> explicitModelMatch = resolveModelPricing(normalizedModel);
         if (explicitModelMatch.isPresent()) {
             return explicitModelMatch;
         }
@@ -254,7 +224,7 @@ public class OpenAiUsageReportService {
             if (featureFallback.isPresent()) {
                 return featureFallback;
             }
-            return Optional.of(new Pricing(defaultPromptPer1kUsd, defaultCompletionPer1kUsd));
+            return resolveNamedFeatureProfile(FEATURE_DEFAULT_FALLBACK);
         }
 
         return Optional.empty();
@@ -264,44 +234,24 @@ public class OpenAiUsageReportService {
         if (!StringUtils.hasText(normalizedModel)) {
             return Optional.empty();
         }
-        return switch (featureType) {
-            case MACRO_INTERPRETATION -> matchesConfiguredModel(normalizedModel, interpretationModel)
-                    ? Optional.of(new Pricing(interpretationPromptPer1kUsd, interpretationCompletionPer1kUsd))
-                    : Optional.empty();
-            case MARKET_SUMMARY -> matchesConfiguredModel(normalizedModel, summaryModel)
-                    ? Optional.of(new Pricing(summaryPromptPer1kUsd, summaryCompletionPer1kUsd))
-                    : Optional.empty();
-            case MARKET_FORECAST -> matchesConfiguredModel(normalizedModel, legacyPrimaryModel)
-                    ? Optional.of(new Pricing(legacyPrimaryPromptPer1kUsd, legacyPrimaryCompletionPer1kUsd))
-                    : Optional.empty();
-        };
+        return resolveNamedFeatureProfile(featureProfileName(featureType))
+                .filter(pricing -> matchesConfiguredModel(normalizedModel, pricing.modelAlias()));
     }
 
-    private Optional<Pricing> resolveConfiguredModelPricing(String normalizedModel) {
+    private Optional<Pricing> resolveModelPricing(String normalizedModel) {
         if (!StringUtils.hasText(normalizedModel)) {
             return Optional.empty();
         }
-        if (matchesConfiguredModel(normalizedModel, summaryModel)) {
-            return Optional.of(new Pricing(summaryPromptPer1kUsd, summaryCompletionPer1kUsd));
-        }
-        if (matchesConfiguredModel(normalizedModel, interpretationModel)) {
-            return Optional.of(new Pricing(interpretationPromptPer1kUsd, interpretationCompletionPer1kUsd));
-        }
-        if (matchesConfiguredModel(normalizedModel, legacyPrimaryModel)) {
-            return Optional.of(new Pricing(legacyPrimaryPromptPer1kUsd, legacyPrimaryCompletionPer1kUsd));
-        }
-        return Optional.empty();
+        return Optional.ofNullable(pricingSnapshot().models())
+                .map(models -> models.get(normalizedModel))
+                .flatMap(this::toPricing);
     }
 
     private Optional<Pricing> resolveFeatureDefaultPricing(OpenAiUsageFeatureType featureType) {
         if (featureType == null) {
             return Optional.empty();
         }
-        return switch (featureType) {
-            case MACRO_INTERPRETATION -> Optional.of(new Pricing(interpretationPromptPer1kUsd, interpretationCompletionPer1kUsd));
-            case MARKET_SUMMARY -> Optional.of(new Pricing(summaryPromptPer1kUsd, summaryCompletionPer1kUsd));
-            case MARKET_FORECAST -> Optional.of(new Pricing(legacyPrimaryPromptPer1kUsd, legacyPrimaryCompletionPer1kUsd));
-        };
+        return resolveNamedFeatureProfile(featureProfileName(featureType));
     }
 
     private Optional<BigDecimal> calculateUsdCost(OpenAiUsageRecord record, Optional<Pricing> pricing) {
@@ -309,11 +259,11 @@ public class OpenAiUsageReportService {
             return Optional.empty();
         }
         BigDecimal promptCost = BigDecimal.valueOf(record.promptTokens())
-                .multiply(pricing.get().promptPer1kUsd())
-                .divide(BigDecimal.valueOf(1000L), 8, RoundingMode.HALF_UP);
+                .multiply(pricing.get().inputPer1mUsd())
+                .divide(ONE_MILLION_TOKENS, 8, RoundingMode.HALF_UP);
         BigDecimal completionCost = BigDecimal.valueOf(record.completionTokens())
-                .multiply(pricing.get().completionPer1kUsd())
-                .divide(BigDecimal.valueOf(1000L), 8, RoundingMode.HALF_UP);
+                .multiply(pricing.get().outputPer1mUsd())
+                .divide(ONE_MILLION_TOKENS, 8, RoundingMode.HALF_UP);
         return Optional.of(promptCost.add(completionCost));
     }
 
@@ -335,6 +285,37 @@ public class OpenAiUsageReportService {
         return StringUtils.hasText(normalizedRecordedModel)
                 && StringUtils.hasText(normalizedConfiguredModel)
                 && normalizedRecordedModel.equals(normalizedConfiguredModel);
+    }
+
+    private OpenAiPricingSnapshot pricingSnapshot() {
+        return pricingSnapshotLoader.snapshot();
+    }
+
+    private String featureProfileName(OpenAiUsageFeatureType featureType) {
+        return featureType.name().toLowerCase(Locale.ROOT);
+    }
+
+    private Optional<Pricing> resolveNamedFeatureProfile(String profileName) {
+        if (!StringUtils.hasText(profileName)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(pricingSnapshot().featureProfiles())
+                .map(profiles -> profiles.get(profileName))
+                .flatMap(this::toPricing);
+    }
+
+    private Optional<Pricing> toPricing(OpenAiPricingSnapshot.ModelPricing modelPricing) {
+        if (modelPricing == null || modelPricing.input() == null || modelPricing.output() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new Pricing(modelPricing.input(), modelPricing.output(), null));
+    }
+
+    private Optional<Pricing> toPricing(OpenAiPricingSnapshot.FeaturePricingProfile profile) {
+        if (profile == null || profile.input() == null || profile.output() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new Pricing(profile.input(), profile.output(), profile.model()));
     }
 
     private String normalizeModel(String model) {
@@ -361,7 +342,7 @@ public class OpenAiUsageReportService {
         return value.setScale(0, RoundingMode.HALF_UP);
     }
 
-    private record Pricing(BigDecimal promptPer1kUsd, BigDecimal completionPer1kUsd) {
+    private record Pricing(BigDecimal inputPer1mUsd, BigDecimal outputPer1mUsd, String modelAlias) {
     }
 
     private record ExchangeRateResolution(BigDecimal exchangeRate, String messageKey, boolean fallback) {

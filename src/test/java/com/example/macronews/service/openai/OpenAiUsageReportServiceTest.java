@@ -8,6 +8,7 @@ import com.example.macronews.domain.OpenAiUsageRecord;
 import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.repository.OpenAiUsageRecordRepository;
 import com.example.macronews.service.market.MarketDataFacade;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -33,22 +35,20 @@ class OpenAiUsageReportServiceTest {
     @Mock
     private MarketDataFacade marketDataFacade;
 
+    private OpenAiPricingSnapshotLoader pricingSnapshotLoader;
     private OpenAiUsageReportService openAiUsageReportService;
 
     @BeforeEach
     void setUp() {
-        openAiUsageReportService = new OpenAiUsageReportService(openAiUsageRecordRepository, marketDataFacade);
-        ReflectionTestUtils.setField(openAiUsageReportService, "interpretationModel", "gpt-4o-mini");
-        ReflectionTestUtils.setField(openAiUsageReportService, "interpretationPromptPer1kUsd", BigDecimal.valueOf(0.00015d));
-        ReflectionTestUtils.setField(openAiUsageReportService, "interpretationCompletionPer1kUsd", BigDecimal.valueOf(0.0006d));
-        ReflectionTestUtils.setField(openAiUsageReportService, "summaryModel", "gpt-4o-mini");
-        ReflectionTestUtils.setField(openAiUsageReportService, "summaryPromptPer1kUsd", BigDecimal.valueOf(0.00125d));
-        ReflectionTestUtils.setField(openAiUsageReportService, "summaryCompletionPer1kUsd", BigDecimal.valueOf(0.01d));
-        ReflectionTestUtils.setField(openAiUsageReportService, "legacyPrimaryModel", "gpt-4o-mini");
-        ReflectionTestUtils.setField(openAiUsageReportService, "legacyPrimaryPromptPer1kUsd", BigDecimal.valueOf(0.005d));
-        ReflectionTestUtils.setField(openAiUsageReportService, "legacyPrimaryCompletionPer1kUsd", BigDecimal.valueOf(0.015d));
-        ReflectionTestUtils.setField(openAiUsageReportService, "defaultPromptPer1kUsd", BigDecimal.valueOf(0.010d));
-        ReflectionTestUtils.setField(openAiUsageReportService, "defaultCompletionPer1kUsd", BigDecimal.valueOf(0.030d));
+        pricingSnapshotLoader = new OpenAiPricingSnapshotLoader(
+                new ObjectMapper(),
+                new ClassPathResource("pricing/openai-pricing.json")
+        );
+        openAiUsageReportService = new OpenAiUsageReportService(
+                openAiUsageRecordRepository,
+                marketDataFacade,
+                pricingSnapshotLoader
+        );
         ReflectionTestUtils.setField(openAiUsageReportService, "fallbackKrwRate", BigDecimal.valueOf(1350d));
         ReflectionTestUtils.setField(openAiUsageReportService, "dailyDays", 7);
         ReflectionTestUtils.setField(openAiUsageReportService, "monthlyMonths", 6);
@@ -117,6 +117,24 @@ class OpenAiUsageReportServiceTest {
     }
 
     @Test
+    @DisplayName("estimateUsdCost should use repository JSON model pricing for gpt-5.4 family")
+    void estimateUsdCost_usesJsonModelPricing() {
+        BigDecimal gpt54Cost = openAiUsageReportService.estimateUsdCost(
+                record("gpt-5.4", OpenAiUsageFeatureType.MARKET_FORECAST, 1_000_000, 1_000_000, Instant.now())
+        );
+        BigDecimal gpt54MiniCost = openAiUsageReportService.estimateUsdCost(
+                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_FORECAST, 1_000_000, 1_000_000, Instant.now())
+        );
+        BigDecimal gpt54NanoCost = openAiUsageReportService.estimateUsdCost(
+                record("gpt-5.4-nano", OpenAiUsageFeatureType.MARKET_FORECAST, 1_000_000, 1_000_000, Instant.now())
+        );
+
+        assertThat(gpt54Cost).isEqualByComparingTo("17.5000");
+        assertThat(gpt54MiniCost).isEqualByComparingTo("5.2500");
+        assertThat(gpt54NanoCost).isEqualByComparingTo("1.4500");
+    }
+
+    @Test
     @DisplayName("dashboard should exclude unrecognized model slugs from estimated cost totals")
     void getDashboard_excludesUnrecognizedModelsFromCostTotals() {
         List<OpenAiUsageRecord> records = List.of(
@@ -134,6 +152,25 @@ class OpenAiUsageReportServiceTest {
         assertThat(dashboard.recentKrwTotal()).isEqualByComparingTo("0");
         assertThat(dashboard.hasUnpricedRecords()).isTrue();
         assertThat(dashboard.recentRecords().get(0).estimatedCostAvailable()).isFalse();
+    }
+
+    @Test
+    @DisplayName("dashboard should use feature fallback pricing when model is blank")
+    void getDashboard_usesFeatureFallbackWhenModelBlank() {
+        List<OpenAiUsageRecord> records = List.of(
+                record("", OpenAiUsageFeatureType.MARKET_FORECAST, 1000, 500, Instant.now())
+        );
+        given(openAiUsageRecordRepository.findAllByOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
+                .willReturn(new PageImpl<>(records));
+        given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
+                .willReturn(records);
+        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, Instant.now())));
+
+        var dashboard = openAiUsageReportService.getDashboard();
+
+        assertThat(dashboard.recentUsdTotal()).isEqualByComparingTo("0.0125");
+        assertThat(dashboard.recentRecords().get(0).estimatedCostAvailable()).isTrue();
+        assertThat(dashboard.hasUnpricedRecords()).isFalse();
     }
 
     @Test

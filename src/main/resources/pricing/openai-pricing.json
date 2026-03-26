@@ -1,0 +1,69 @@
+{
+  "version": "2026-03-26",
+  "source": {
+    "type": "manual_snapshot_from_official_pricing_page",
+    "verified_at": "2026-03-26",
+    "notes": "Runtime must not scrape vendor HTML directly. gpt-4o-mini values migrated from repository config if not present in current official snapshot."
+  },
+  "currency": "USD",
+  "unit": "per_1m_tokens",
+  "models": {
+    "gpt-4o-mini": {
+      "status": "active_in_app",
+      "source_status": "repository_config_verified",
+      "input": 0.15,
+      "cached_input": null,
+      "output": 0.6
+    },
+    "gpt-5.4": {
+      "status": "not_in_use",
+      "source_status": "official_page_verified",
+      "input": 2.5,
+      "cached_input": 0.25,
+      "output": 15.0
+    },
+    "gpt-5.4-mini": {
+      "status": "not_in_use",
+      "source_status": "official_page_verified",
+      "input": 0.75,
+      "cached_input": 0.075,
+      "output": 4.5
+    },
+    "gpt-5.4-nano": {
+      "status": "not_in_use",
+      "source_status": "official_page_verified",
+      "input": 0.2,
+      "cached_input": 0.02,
+      "output": 1.25
+    }
+  },
+  "feature_profiles": {
+    "macro_interpretation": {
+      "model": "gpt-4o-mini",
+      "source_status": "repository_config_migrated",
+      "input": 0.15,
+      "cached_input": null,
+      "output": 0.6
+    },
+    "market_summary": {
+      "model": "gpt-4o-mini",
+      "source_status": "repository_config_migrated",
+      "input": 1.25,
+      "cached_input": null,
+      "output": 10.0
+    },
+    "market_forecast": {
+      "model": "gpt-4o-mini",
+      "source_status": "repository_config_migrated",
+      "input": 5.0,
+      "cached_input": null,
+      "output": 15.0
+    },
+    "default_fallback": {
+      "source_status": "repository_config_migrated",
+      "input": 5.0,
+      "cached_input": null,
+      "output": 15.0
+    }
+  }
+}

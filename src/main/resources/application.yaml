@@ -95,22 +95,6 @@ openai:
   macro-prompt-file: classpath:ai/prompts/macro_interpretation_prompt.json
   forecast-prompt-file: classpath:ai/prompts/market_forecast_aggregation_prompt.json
   featured-market-summary-prompt-file: classpath:ai/prompts/featured_market_summary_prompt.json
-  pricing:
-    interpretation-model-name: ${OPENAI_PRICING_INTERPRETATION_MODEL:${openai.interpretation-model}}
-    interpretation-model:
-      prompt-per-1k-usd: 0.00015
-      completion-per-1k-usd: 0.0006
-    summary-model-name: ${OPENAI_PRICING_SUMMARY_MODEL:${app.featured.market-summary.ai-model}}
-    summary-model:
-      prompt-per-1k-usd: 0.00125
-      completion-per-1k-usd: 0.01
-    primary-model-name: ${OPENAI_PRICING_PRIMARY_MODEL:${openai.model}}
-    primary-model:
-      prompt-per-1k-usd: 0.005
-      completion-per-1k-usd: 0.015
-    default:
-      prompt-per-1k-usd: 0.005
-      completion-per-1k-usd: 0.015
   cost:
     krw-fallback-rate: 1350.0
     daily-days: 7
