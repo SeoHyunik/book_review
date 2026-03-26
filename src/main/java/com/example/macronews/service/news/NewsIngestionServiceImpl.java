@@ -86,11 +86,12 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         }
 
         Instant now = Instant.now();
+        String normalizedTitle = defaultText(item.title(), "Untitled");
         NewsEvent event = new NewsEvent(
                 null,
                 resolvedExternalId,
-                defaultText(item.title(), "Untitled"),
-                defaultText(item.summary(), ""),
+                normalizedTitle,
+                normalizeSummary(item.summary(), normalizedTitle),
                 defaultText(item.source(), "External"),
                 defaultText(item.url(), ""),
                 item.publishedAt() == null ? now : item.publishedAt(),
@@ -378,6 +379,15 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private String normalizeSummary(String summary, String title) {
+        if (!StringUtils.hasText(summary)) {
+            return "";
+        }
+        String normalizedSummary = summary.trim();
+        String normalizedTitle = StringUtils.hasText(title) ? title.trim() : "";
+        return normalizedSummary.equals(normalizedTitle) ? "" : normalizedSummary;
     }
 
     private Map<String, Integer> summarizeSources(List<ExternalNewsItem> items) {

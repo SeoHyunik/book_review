@@ -6,9 +6,11 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
+import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
@@ -40,6 +42,67 @@ class NewsIngestionServiceImplTest {
 
     @InjectMocks
     private NewsIngestionServiceImpl newsIngestionService;
+
+    @Test
+    @DisplayName("ingestExternalItem should preserve a real summary")
+    void ingestExternalItem_preservesRealSummary() {
+        ExternalNewsItem item = new ExternalNewsItem(
+                "external-1",
+                "Reuters",
+                "Fed keeps rates unchanged",
+                "Officials signaled a cautious stance while watching inflation data.",
+                "https://example.com/news-1",
+                Instant.parse("2026-03-13T00:00:00Z")
+        );
+        given(newsEventRepository.findByExternalId("external-1")).willReturn(java.util.Optional.empty());
+        given(newsEventRepository.findByUrl("https://example.com/news-1")).willReturn(java.util.Optional.empty());
+        given(newsEventRepository.save(any(NewsEvent.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        NewsEvent saved = newsIngestionService.ingestExternalItem(item);
+
+        assertThat(saved.summary()).isEqualTo("Officials signaled a cautious stance while watching inflation data.");
+        verifyNoInteractions(macroAiService, newsSourceProviderSelector, ingestionExecutor);
+    }
+
+    @Test
+    @DisplayName("ingestExternalItem should persist blank summary as empty")
+    void ingestExternalItem_persistsBlankSummaryAsEmpty() {
+        ExternalNewsItem item = new ExternalNewsItem(
+                "external-2",
+                "Reuters",
+                "Fed keeps rates unchanged",
+                "   ",
+                "https://example.com/news-2",
+                Instant.parse("2026-03-13T00:00:00Z")
+        );
+        given(newsEventRepository.findByExternalId("external-2")).willReturn(java.util.Optional.empty());
+        given(newsEventRepository.findByUrl("https://example.com/news-2")).willReturn(java.util.Optional.empty());
+        given(newsEventRepository.save(any(NewsEvent.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        NewsEvent saved = newsIngestionService.ingestExternalItem(item);
+
+        assertThat(saved.summary()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("ingestExternalItem should persist title-equal summary as empty")
+    void ingestExternalItem_persistsTitleEqualSummaryAsEmpty() {
+        ExternalNewsItem item = new ExternalNewsItem(
+                "external-3",
+                "Reuters",
+                "Fed keeps rates unchanged",
+                "Fed keeps rates unchanged",
+                "https://example.com/news-3",
+                Instant.parse("2026-03-13T00:00:00Z")
+        );
+        given(newsEventRepository.findByExternalId("external-3")).willReturn(java.util.Optional.empty());
+        given(newsEventRepository.findByUrl("https://example.com/news-3")).willReturn(java.util.Optional.empty());
+        given(newsEventRepository.save(any(NewsEvent.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        NewsEvent saved = newsIngestionService.ingestExternalItem(item);
+
+        assertThat(saved.summary()).isEmpty();
+    }
 
     @Test
     @DisplayName("deleteById should delete existing news item")
