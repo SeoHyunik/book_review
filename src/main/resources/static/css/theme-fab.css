@@ -19,9 +19,9 @@
     background-color: var(--bs-body-bg);
     color: var(--bs-body-color);
     box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    outline: 3px solid transparent;
-    outline-offset: 2px;
-    transition: transform 120ms ease, box-shadow 120ms ease, background-color 200ms ease, color 200ms ease, outline-color 90ms ease;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 90ms ease, box-shadow 100ms ease, background-color 160ms ease, color 160ms ease;
 }
 
 #theme-fab:hover,
@@ -33,12 +33,17 @@
 #theme-fab:active,
 #scroll-top-fab:active {
     transform: translateY(0);
-    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0.2rem 0.55rem rgba(0, 0, 0, 0.18);
 }
 
 #theme-fab:focus-visible,
 #scroll-top-fab:focus-visible {
-    outline-color: rgba(13, 110, 253, 0.35);
+    box-shadow: 0 0 0 0.18rem rgba(13, 110, 253, 0.22), 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+#theme-fab:focus:not(:focus-visible),
+#scroll-top-fab:focus:not(:focus-visible) {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
 }
 
 #theme-fab i,
