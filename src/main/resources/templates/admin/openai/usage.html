@@ -51,7 +51,7 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h2 class="h5 fw-bold mb-0" th:text="#{admin.openai.recent.heading}">Recent Usage Records</h2>
-                    <span class="badge ui-pill text-bg-light border" th:text="#{admin.openai.recent.count(${#lists.size(usageDashboard.recentRecords)})}">Records 0</span>
+                    <span class="badge ui-pill text-bg-light border" th:text="#{admin.openai.recent.count(${usageDashboard.recentRecordTotalCount})}">Records 0</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
@@ -84,6 +84,27 @@
                         </tbody>
                     </table>
                 </div>
+                <nav class="mt-3" th:if="${usageDashboard.recentRecordTotalPages > 1}" th:attr="aria-label=#{pagination.nav}">
+                    <ul class="pagination justify-content-center flex-wrap gap-2 mb-0">
+                        <li class="page-item" th:classappend="${!usageDashboard.recentRecordHasPreviousPage ? ' disabled' : ''}">
+                            <a class="page-link rounded-pill border-0 shadow-sm px-3"
+                               th:href="${usageDashboard.recentRecordHasPreviousPage} ? @{/admin/openai-usage(page=${usageDashboard.recentRecordCurrentPage - 1})} : '#'"
+                               th:text="#{pagination.previous}">Previous</a>
+                        </li>
+                        <li class="page-item"
+                            th:each="pageNumber : ${#numbers.sequence(1, usageDashboard.recentRecordTotalPages)}"
+                            th:classappend="${pageNumber == usageDashboard.recentRecordCurrentPage ? ' active' : ''}">
+                            <a class="page-link rounded-pill border-0 shadow-sm px-3"
+                               th:href="@{/admin/openai-usage(page=${pageNumber})}"
+                               th:text="${pageNumber}">1</a>
+                        </li>
+                        <li class="page-item" th:classappend="${!usageDashboard.recentRecordHasNextPage ? ' disabled' : ''}">
+                            <a class="page-link rounded-pill border-0 shadow-sm px-3"
+                               th:href="${usageDashboard.recentRecordHasNextPage} ? @{/admin/openai-usage(page=${usageDashboard.recentRecordCurrentPage + 1})} : '#'"
+                               th:text="#{pagination.next}">Next</a>
+                        </li>
+                    </ul>
+                </nav>
             </div>
         </div>
     </section>

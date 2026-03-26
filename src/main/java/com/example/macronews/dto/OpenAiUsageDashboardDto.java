@@ -5,6 +5,11 @@ import java.util.List;
 
 public record OpenAiUsageDashboardDto(
         List<OpenAiUsageRecordViewDto> recentRecords,
+        long recentRecordTotalCount,
+        int recentRecordCurrentPage,
+        int recentRecordTotalPages,
+        boolean recentRecordHasPreviousPage,
+        boolean recentRecordHasNextPage,
         List<OpenAiUsageAggregateDto> dailyAggregates,
         List<OpenAiUsageAggregateDto> monthlyAggregates,
         BigDecimal recentUsdTotal,

@@ -23,6 +23,9 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -30,6 +33,7 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class OpenAiUsageReportService {
 
+    private static final int RECENT_RECORD_PAGE_SIZE = 10;
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter DAY_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -81,10 +85,16 @@ public class OpenAiUsageReportService {
     private int monthlyMonths;
 
     public OpenAiUsageDashboardDto getDashboard() {
+        return getDashboard(1);
+    }
+
+    public OpenAiUsageDashboardDto getDashboard(int page) {
         ExchangeRateResolution exchangeRateResolution = resolveExchangeRate();
         BigDecimal exchangeRate = exchangeRateResolution.exchangeRate();
 
-        List<OpenAiUsageRecord> recentRecords = openAiUsageRecordRepository.findTop50ByOrderByTimestampDesc();
+        int requestedPage = resolveRecentRecordPage(page);
+        Page<OpenAiUsageRecord> recentRecordPage = fetchRecentRecordPage(requestedPage);
+        List<OpenAiUsageRecord> recentRecords = recentRecordPage.getContent();
         List<OpenAiUsageRecordViewDto> recentViews = recentRecords.stream()
                 .map(record -> toRecordView(record, exchangeRate))
                 .toList();
@@ -99,6 +109,10 @@ public class OpenAiUsageReportService {
 
         List<OpenAiUsageAggregateDto> dailyAggregates = buildDailyAggregates(aggregateWindowRecords, exchangeRate);
         List<OpenAiUsageAggregateDto> monthlyAggregates = buildMonthlyAggregates(aggregateWindowRecords, exchangeRate);
+        int recentRecordTotalPages = Math.max(recentRecordPage.getTotalPages(), 1);
+        int recentRecordCurrentPage = recentRecordPage.getTotalPages() == 0
+                ? 1
+                : recentRecordPage.getNumber() + 1;
 
         BigDecimal rawRecentUsdTotal = recentRecords.stream()
                 .map(record -> calculateUsdCost(record, resolvePricing(record)))
@@ -109,6 +123,11 @@ public class OpenAiUsageReportService {
 
         return new OpenAiUsageDashboardDto(
                 recentViews,
+                recentRecordPage.getTotalElements(),
+                recentRecordCurrentPage,
+                recentRecordTotalPages,
+                recentRecordPage.getTotalPages() > 0 && recentRecordPage.hasPrevious(),
+                recentRecordPage.getTotalPages() > 0 && recentRecordPage.hasNext(),
                 dailyAggregates,
                 monthlyAggregates,
                 scaleUsd(rawRecentUsdTotal),
@@ -118,6 +137,24 @@ public class OpenAiUsageReportService {
                 exchangeRateResolution.fallback(),
                 hasUnpricedRecords
         );
+    }
+
+    private int resolveRecentRecordPage(int page) {
+        return Math.max(page, 1);
+    }
+
+    private Page<OpenAiUsageRecord> fetchRecentRecordPage(int page) {
+        Page<OpenAiUsageRecord> recentRecordPage = openAiUsageRecordRepository.findAllByOrderByTimestampDesc(
+                recentRecordPageable(page));
+        int totalPages = recentRecordPage.getTotalPages();
+        if (totalPages > 0 && page > totalPages) {
+            return openAiUsageRecordRepository.findAllByOrderByTimestampDesc(recentRecordPageable(totalPages));
+        }
+        return recentRecordPage;
+    }
+
+    private PageRequest recentRecordPageable(int page) {
+        return PageRequest.of(page - 1, RECENT_RECORD_PAGE_SIZE, Sort.by(Sort.Direction.DESC, "timestamp"));
     }
 
     BigDecimal estimateUsdCost(OpenAiUsageRecord record) {
