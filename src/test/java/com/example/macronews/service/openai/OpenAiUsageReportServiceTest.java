@@ -41,7 +41,7 @@ class OpenAiUsageReportServiceTest {
         ReflectionTestUtils.setField(openAiUsageReportService, "interpretationModel", "gpt-4o-mini");
         ReflectionTestUtils.setField(openAiUsageReportService, "interpretationPromptPer1kUsd", BigDecimal.valueOf(0.00015d));
         ReflectionTestUtils.setField(openAiUsageReportService, "interpretationCompletionPer1kUsd", BigDecimal.valueOf(0.0006d));
-        ReflectionTestUtils.setField(openAiUsageReportService, "summaryModel", "gpt-5");
+        ReflectionTestUtils.setField(openAiUsageReportService, "summaryModel", "gpt-4o-mini");
         ReflectionTestUtils.setField(openAiUsageReportService, "summaryPromptPer1kUsd", BigDecimal.valueOf(0.00125d));
         ReflectionTestUtils.setField(openAiUsageReportService, "summaryCompletionPer1kUsd", BigDecimal.valueOf(0.01d));
         ReflectionTestUtils.setField(openAiUsageReportService, "legacyPrimaryModel", "gpt-4o-mini");
@@ -60,7 +60,7 @@ class OpenAiUsageReportServiceTest {
         Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         List<OpenAiUsageRecord> records = List.of(
                 record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 500, now),
-                record("gpt-5", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500, now.minus(2, ChronoUnit.DAYS))
+                record("gpt-4o-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500, now.minus(2, ChronoUnit.DAYS))
         );
         given(openAiUsageRecordRepository.findAllByOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
                 .willReturn(new PageImpl<>(records));

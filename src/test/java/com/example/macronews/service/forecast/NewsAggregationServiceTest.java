@@ -3,7 +3,9 @@ package com.example.macronews.service.forecast;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.macronews.domain.AnalysisResult;
@@ -70,7 +72,7 @@ class NewsAggregationServiceTest {
         ReflectionTestUtils.setField(newsAggregationService, "cacheMinutes", 15);
         ReflectionTestUtils.setField(newsAggregationService, "openAiApiKey", "test-key");
         ReflectionTestUtils.setField(newsAggregationService, "openAiUrl", "https://api.openai.com/v1/chat/completions");
-        ReflectionTestUtils.setField(newsAggregationService, "openAiModel", "gpt-4o");
+        ReflectionTestUtils.setField(newsAggregationService, "openAiModel", "gpt-4o-mini");
         ReflectionTestUtils.setField(newsAggregationService, "openAiMaxTokens", 800);
         ReflectionTestUtils.setField(newsAggregationService, "openAiTemperature", 0.2d);
         ReflectionTestUtils.setField(newsAggregationService, "forecastPromptFile", new ByteArrayResource("""
@@ -174,7 +176,7 @@ class NewsAggregationServiceTest {
         JsonNode payload = new ObjectMapper().readTree(requestCaptor.getValue().body());
         JsonNode root = payload;
         String userContent = root.path("messages").get(1).path("content").asText();
-        assertThat(root.path("model").asText()).isEqualTo("gpt-4o");
+        assertThat(root.path("model").asText()).isEqualTo("gpt-4o-mini");
         assertThat(root.path("max_tokens").asInt()).isEqualTo(800);
         assertThat(root.path("temperature").asDouble()).isEqualTo(0.2d);
         assertThat(root.path("response_format").path("type").asText()).isEqualTo("json_object");
@@ -185,6 +187,10 @@ class NewsAggregationServiceTest {
         assertThat(userContent).contains("- KOSPI: 2685.4");
         assertThat(userContent).doesNotContain("- Gold:");
         assertThat(userContent).doesNotContain("- Brent:");
+        verify(openAiUsageLoggingService).recordUsage(
+                eq(com.example.macronews.domain.OpenAiUsageFeatureType.MARKET_FORECAST),
+                eq("gpt-4o-mini"),
+                any());
     }
 
     @Test

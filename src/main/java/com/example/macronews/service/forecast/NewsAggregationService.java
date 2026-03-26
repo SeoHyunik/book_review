@@ -83,7 +83,7 @@ public class NewsAggregationService {
     @Value("${openai.api-url:}")
     private String openAiUrl;
 
-    @Value("${openai.model:gpt-4o}")
+    @Value("${openai.model:gpt-4o-mini}")
     private String openAiModel;
 
     @Value("${openai.max-tokens:800}")
@@ -470,6 +470,5 @@ public class NewsAggregationService {
         }
     }
 }
-
 
 

@@ -35,7 +35,7 @@ class OpenAiUsageLoggingServiceTest {
     void recordUsage_savesUsageRecord() {
         openAiUsageLoggingService.recordUsage(
                 OpenAiUsageFeatureType.MACRO_INTERPRETATION,
-                "gpt-4o",
+                "gpt-4o-mini",
                 "{\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":25,\"total_tokens\":125}}"
         );
 
@@ -51,7 +51,7 @@ class OpenAiUsageLoggingServiceTest {
     void recordUsage_skipsWhenUsageMissing() {
         openAiUsageLoggingService.recordUsage(
                 OpenAiUsageFeatureType.MARKET_FORECAST,
-                "gpt-4o",
+                "gpt-4o-mini",
                 "{\"choices\":[]}"
         );
 
@@ -63,12 +63,12 @@ class OpenAiUsageLoggingServiceTest {
     void recordUsage_prefersResponseModelSlug() {
         openAiUsageLoggingService.recordUsage(
                 OpenAiUsageFeatureType.MARKET_SUMMARY,
-                "gpt-5",
-                "{\"model\":\"gpt-5-2026-03-01\",\"usage\":{\"prompt_tokens\":40,\"completion_tokens\":10,\"total_tokens\":50}}"
+                "gpt-4o-mini",
+                "{\"model\":\"gpt-4o-mini-2026-03-01\",\"usage\":{\"prompt_tokens\":40,\"completion_tokens\":10,\"total_tokens\":50}}"
         );
 
         ArgumentCaptor<OpenAiUsageRecord> captor = ArgumentCaptor.forClass(OpenAiUsageRecord.class);
         verify(openAiUsageRecordRepository).save(captor.capture());
-        Assertions.assertThat(captor.getValue().model()).isEqualTo("gpt-5-2026-03-01");
+        Assertions.assertThat(captor.getValue().model()).isEqualTo("gpt-4o-mini-2026-03-01");
     }
 }

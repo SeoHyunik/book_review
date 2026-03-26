@@ -2,6 +2,7 @@ package com.example.macronews.service.news;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -63,7 +64,7 @@ class AiMarketSummaryServiceTest {
         ReflectionTestUtils.setField(aiMarketSummaryService, "clock",
                 Clock.fixed(Instant.parse("2026-03-17T03:00:00Z"), ZoneId.of("Asia/Seoul")));
         ReflectionTestUtils.setField(aiMarketSummaryService, "aiEnabled", true);
-        ReflectionTestUtils.setField(aiMarketSummaryService, "aiModel", "gpt-4o");
+        ReflectionTestUtils.setField(aiMarketSummaryService, "aiModel", "gpt-4o-mini");
         ReflectionTestUtils.setField(aiMarketSummaryService, "aiWindowHours", 3);
         ReflectionTestUtils.setField(aiMarketSummaryService, "aiMaxItems", 10);
         ReflectionTestUtils.setField(aiMarketSummaryService, "aiMinItems", 3);
@@ -115,7 +116,10 @@ class AiMarketSummaryServiceTest {
         assertThat(result.get().aiSynthesized()).isTrue();
         assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.NEGATIVE);
         assertThat(result.get().marketViewEn()).isEqualTo("Near term, a defensive interpretation remains appropriate.");
-        verify(openAiUsageLoggingService).recordUsage(any(), any(), any());
+        verify(openAiUsageLoggingService).recordUsage(
+                eq(com.example.macronews.domain.OpenAiUsageFeatureType.MARKET_SUMMARY),
+                eq("gpt-4o-mini"),
+                any());
     }
 
     @Test

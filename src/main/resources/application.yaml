@@ -239,8 +239,8 @@ app:
       max-items: 10
       min-items: 3
       ai-enabled: true
-      # Dedicated stronger model for current/featured market summary generation.
-      ai-model: gpt-5
+      # Dedicated AI model for current/featured market summary generation.
+      ai-model: gpt-4o-mini
       ai-window-hours: 3
       ai-max-items: 10
       ai-min-items: 3

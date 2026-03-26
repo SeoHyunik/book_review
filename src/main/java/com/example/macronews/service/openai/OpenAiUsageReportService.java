@@ -51,7 +51,7 @@ public class OpenAiUsageReportService {
     @Value("${openai.pricing.interpretation-model.completion-per-1k-usd:0.0006}")
     private BigDecimal interpretationCompletionPer1kUsd;
 
-    @Value("${openai.pricing.summary-model-name:${app.featured.market-summary.ai-model:gpt-5}}")
+    @Value("${openai.pricing.summary-model-name:${app.featured.market-summary.ai-model:gpt-4o-mini}}")
     private String summaryModel;
 
     @Value("${openai.pricing.summary-model.prompt-per-1k-usd:0.00125}")

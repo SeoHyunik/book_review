@@ -63,7 +63,7 @@ class MarketSummarySnapshotServiceTest {
     void refreshSnapshot_savesGeneratedSnapshot() {
         FeaturedMarketSummaryDto generated = summaryDto(Instant.parse("2026-03-17T03:00:00Z"));
         given(aiMarketSummaryService.generateCurrentSummary()).willReturn(Optional.of(generated));
-        given(aiMarketSummaryService.getConfiguredModel()).willReturn("gpt-4o");
+        given(aiMarketSummaryService.getConfiguredModel()).willReturn("gpt-4o-mini");
         given(marketSummarySnapshotRepository.save(org.mockito.ArgumentMatchers.any(MarketSummarySnapshot.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
@@ -263,7 +263,7 @@ class MarketSummarySnapshotServiceTest {
                 0.7d,
                 true,
                 true,
-                "gpt-4o"
+                "gpt-4o-mini"
         );
     }
 
