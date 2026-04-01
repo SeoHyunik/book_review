@@ -76,6 +76,7 @@
 - README.md는 현재 테스트 상황을 “실패하고 있다”는 식으로 단정하지만, 이번 baseline에서 실제로 확인된 것은 테스트 실패가 아니라 Gradle plugin resolution 실패였다.
 - README.md와 PROJECT_BRIEF.md는 `/news` 공용 페이지의 fail-open 성격을 강조하지만, 코드상 request-time 방어는 `NewsController.list()` 내부의 `RuntimeException` 범위에 한정된다.
 - provider fallback은 request path가 아니라 ingestion/scheduler path에서 일어난다. 문서가 이를 `/news` 직접 보장으로 읽히게 만들면 과장이다.
+- PROJECT_BRIEF.md는 최소 required indicators로 `USD/KRW`, `US 10Y Treasury Yield`, `DXY`, `WTI/Brent`, `KOSPI`를 제시하지만, `NewsAggregationService.resolveMarketContext()`는 현재 `USD/KRW`, `Gold`, `WTI`, `Brent`, `KOSPI`만 주입한다. `DXY`와 `US 10Y Treasury Yield`는 아직 구현되지 않았다.
 - 그 외 핵심 제품 범위(뉴스 해석, 시장 요약, snapshot/forecast 보조 기능)는 코드와 대체로 일치한다.
 
 ## 7. Recommended Next Implementation Order
