@@ -1,102 +1,88 @@
 # Reliability Baseline Report
 
 ## 1. Executive Summary
-- `/news` 목록 화면은 요청 시점에 provider를 직접 호출하지 않고, 저장된 `NewsEvent`와 파생 요약을 읽는 구조다.
-- request-time fail-open은 `NewsController.list()` 안의 `RuntimeException` 방어에 한정되며, provider fallback은 주로 배치/수집 경로에서 일어난다.
-- NAVER/GNews/NewsAPI provider와 selector에는 실패 격리 로직이 있으나, timeout 정책은 이번 점검 범위에서 확인되지 않았다.
-- 이번 baseline에서 실행한 Gradle 테스트는 플러그인 해석 단계에서 막혀서 실제 테스트 메서드까지 도달하지 못했다.
-- 현재 가장 큰 리스크는 `/news` 런타임 안정성보다도, 검증 자체가 막힌 빌드 설정과 예외 경로 통합 테스트 부재다.
+- `/news` 리스트는 컨트롤러와 일부 서비스 경계에서 fail-open이 걸려 있어, 단일 부가 의존성 실패가 곧바로 500으로 이어지지는 않습니다.
+- provider selector와 개별 NAVER/GNews/NewsAPI 구현은 서로의 실패를 흡수하는 방향으로 작성되어 있습니다.
+- 다만 외부 호출에 대한 명시적 timeout 설정이 코드상 보이지 않아, 느린 외부 API가 요청 스레드를 묶을 수 있습니다.
+- 이번 기준의 테스트는 Gradle 플러그인 해석 단계에서 막혀 실제 test execution 결과를 확보하지 못했습니다.
+- 문서에는 현재 코드보다 더 넓은 fail-open 인상과 더 불안정한 테스트 상태가 함께 적혀 있어, 일부 표현은 보수적으로 조정해야 합니다.
 
 ## 2. Current Test Status
-- 실행한 명령: `./gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.controller.NewsControllerTest --tests com.example.macronews.service.forecast.NewsAggregationServiceTest --tests com.example.macronews.service.news.NewsQueryServiceTest --tests com.example.macronews.service.news.NewsApiServiceImplTest --tests com.example.macronews.service.news.source.NewsSourceProviderSelectorTest --tests com.example.macronews.service.news.source.NaverNewsSourceProviderTest --tests com.example.macronews.service.news.source.GNewsSourceProviderTest --tests com.example.macronews.config.PublicNewsAccessIntegrationTest`
+- 실행 1: `./gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.controller.NewsControllerTest --tests com.example.macronews.service.forecast.NewsAggregationServiceTest --tests com.example.macronews.service.news.source.NewsSourceProviderSelectorTest --tests com.example.macronews.service.news.source.NaverNewsSourceProviderTest --tests com.example.macronews.service.news.source.GNewsSourceProviderTest --tests com.example.macronews.service.news.NewsApiServiceImplTest --tests com.example.macronews.service.news.NewsQueryServiceTest`
 - 결과: 실패
-- 통과한 테스트: 없음
-- 실패한 테스트 메서드: 없음, 테스트 단계까지 진입하지 못함
-- 건너뛴 테스트: 없음, 테스트 디스커버리 전에 빌드가 중단됨
-- 핵심 실패 메시지:
-  - `Plugin [id: 'org.springframework.boot', version: '4.0.0-SNAPSHOT'] was not found`
-  - `Build file 'S:\dev\project\auziraum\build.gradle.kts' line: 3`
-  - 플러그인 해석 중 `org.springframework.boot:org.springframework.boot.gradle.plugin:4.0.0-SNAPSHOT`을 찾지 못해 빌드가 종료됨
+- 실행된 테스트 클래스/메서드: 없음, Gradle 설정 단계에서 중단됨
+- 실패한 테스트: 없음
+- 핵심 실패 메시지: `Plugin [id: 'org.springframework.boot', version: '4.0.0-SNAPSHOT'] was not found`
+- 원인 추정: `build.gradle.kts:5`의 snapshot 플러그인 해석 실패이며, 외부 의존성 해석이 끝나지 않아 테스트 스위트 자체가 시작되지 못함
+- 재현성: 결정적
+- broader suite / full suite: 동일한 빌드 블로커 때문에 추가 실행은 실익이 낮아 미실행
 
 ## 3. Real `/news` Execution Path
-- 진입점은 `src/main/java/com/example/macronews/controller/NewsController.java:48-93`의 `NewsController.list()`다.
-- `list()`는 `resolveStatus()`, `resolveSort()`, `resolvePage()`로 요청 파라미터를 정규화한 뒤 `safeGetRecentNews()`로 목록을 읽는다.
-- `safeGetRecentNews()`는 `NewsQueryService.getRecentNews(status, sort)`를 호출하고, `RuntimeException` 발생 시 빈 리스트로 대체한다.
-- `NewsQueryService.getRecentNews()`는 `loadCandidates(status)`를 통해 `NewsEventRepository.findTop20ByOrderByIngestedAtDesc()` 또는 `findByStatus(status)`를 읽고, `isDisplayEligible()` 필터와 정렬 후 `NewsListItemDto`로 변환한다.
-- `safeGetMarketSignalOverview()`는 `NewsQueryService.getMarketSignalOverview(status, sort)`를 호출하며, 같은 repository-backed candidate set을 사용해 `MarketSignalOverviewDto`를 만든다.
-- `safeGetCurrentForecastSnapshot()`은 `MarketForecastQueryService.getCurrentSnapshot()`을 통해 `NewsAggregationService.getCurrentSnapshot()`으로 내려간다.
-- `NewsAggregationService.getCurrentSnapshot()`은 `NewsEventRepository.findByStatus(NewsStatus.ANALYZED)`에서 최근 분석 기사를 읽고, OpenAI 호출과 `MarketDataFacade`를 이용해 `MarketForecastSnapshotDto`를 생성한다.
-- `safeResolveFeaturedSummarySelection()`은 `MarketSummarySnapshotService.getLatestValidSummary() -> AiMarketSummaryService.getCurrentSummary() -> RecentMarketSummaryService.getCurrentSummary()` 순으로 읽고, 모두 실패하면 article fallback으로 돌아간다.
-- `NewsController.list()`는 최종적으로 `src/main/resources/templates/news/list.html`에 `newsItems`, `featuredNews`, `featuredStoredMarketSummary`, `featuredAiMarketSummary`, `featuredMarketSummary`, `marketForecastSnapshot`, `marketSignalOverview`를 주입한다.
-- 상세 경로는 `NewsController.detail()`(`src/main/java/com/example/macronews/controller/NewsController.java:157-195`)이며, `NewsQueryService.getNewsDetail(id)`가 비어 있으면 `/news`로 redirect한다.
-- provider layer는 `/news` request path에 직접 연결되지 않고, 배치 수집 경로인 `ScheduledNewsIngestionJob.ingestTopHeadlines()` -> `NewsIngestionServiceImpl.ingestTopHeadlines()` -> `NewsSourceProviderSelector.fetchTopHeadlines()`에서 사용된다.
-- `NewsSourceProviderSelector.fetchTopHeadlines()`는 configured provider들을 우선순위와 freshness bucket(`FRESH`, `SEMI_FRESH`)으로 나눠 호출하고, 실패한 provider는 catch 후 계속 진행한다.
-- 수집 결과는 `NewsIngestionServiceImpl.ingestExternalItem()`에서 `NewsEventRepository.save()`로 저장되며, 이 저장 데이터가 `/news` 목록의 입력이 된다.
-- 템플릿/구성 기반 동작은 `src/main/resources/application.yaml`의 `app.news.*`, `app.forecast.*`, `app.featured.market-summary.*` 설정에 의해 달라진다.
+- 진입 컨트롤러는 `src/main/java/com/example/macronews/controller/NewsController.java:49-86`의 `list(...)` 메서드입니다.
+- `list(...)`는 `NewsQueryService.getRecentNews(...)`, `NewsQueryService.getMarketSignalOverview(...)`, `MarketForecastQueryService.getCurrentSnapshot()`, `safeResolveFeaturedSummarySelection()`을 순서대로 호출합니다.
+- `safeGetRecentNews(...)` / `safeGetMarketSignalOverview(...)` / `safeGetCurrentForecastSnapshot()` / `safeResolveFeaturedSummarySelection()`은 각각 `RuntimeException`을 잡아서 빈 목록, 빈 오버뷰, `null`, article fallback으로 내려줍니다.
+- featured summary 우선순위는 `resolveFeaturedSummarySelection()` 내부에서 `MarketSummarySnapshotService.getLatestValidSummary()` -> `AiMarketSummaryService.getCurrentSummary()` -> `RecentMarketSummaryService.getCurrentSummary()` -> article fallback 순서입니다.
+- `NewsQueryService`는 `src/main/java/com/example/macronews/service/news/NewsQueryService.java:117-128,202-226`에서 `NewsEventRepository.findTop20ByOrderByIngestedAtDesc()` 또는 `findByStatus(...)`를 조회한 뒤 정렬/투영만 수행합니다.
+- `MarketForecastQueryService`는 `src/main/java/com/example/macronews/service/forecast/MarketForecastQueryService.java:17-40`에서 `NewsAggregationService.getCurrentSnapshot()`에 위임합니다.
+- `NewsAggregationService`는 `src/main/java/com/example/macronews/service/forecast/NewsAggregationService.java:98-146,152-264`에서 `NewsEventRepository.findByStatus(NewsStatus.ANALYZED)`로 뉴스 후보를 읽고, `ExternalApiUtils.callAPI(...)`로 OpenAI에 요청하며, `MarketDataFacade`로 시장 컨텍스트를 붙입니다.
+- `/news`에 직접 렌더링되는 뷰는 `news/list`이며, 상세 경로는 `news/detail`입니다. 상세 경로는 `NewsController.detail(...)`에서 `NewsQueryService.getNewsDetail(id)`를 조회한 뒤 Thymeleaf 모델을 채웁니다.
+- provider/write-side 지원 경로는 `src/main/java/com/example/macronews/config/ScheduledNewsIngestionJob.java:33-83` -> `NewsIngestionService.ingestTopHeadlines(...)` -> `NewsIngestionServiceImpl.loadScheduledHeadlineFeed(...)` -> `NewsSourceProviderSelector.fetchTopHeadlines(...)` -> 개별 provider(`NaverNewsSourceProvider`, `NewsApiServiceImpl`, `GNewsSourceProvider`) -> `NewsEventRepository.save(...)` 순서입니다.
+- 즉, `/news` 리스트 자체는 repository 읽기 경로이고, provider 계층은 ingestion 경로를 통해 저장된 뉴스 공급을 담당합니다.
 
 ## 4. Fail-open and Fallback Verification
-- `/news fail-open behavior`: **Confirmed from code**
-  - `NewsController.list()`가 `NewsQueryService`, `MarketForecastQueryService`, 요약 선택 로직을 각각 `RuntimeException`으로 감싸고 있다.
-  - 실패 시 빈 목록, `null` forecast snapshot, article fallback summary로 계속 렌더링한다.
-- provider fallback order: **Confirmed from code**
-  - `NewsSourceProviderSelector.currentPriority()`가 서울 시간대와 `app.ingestion.domestic-start-hour`, `app.ingestion.domestic-end-hour`로 domestic/foreign 우선순위를 정한다.
-  - `selectConfiguredProviders()`는 `supports(priority)`와 `isConfigured()`를 모두 만족하는 provider만 남긴다.
-  - `collectCandidates()`는 provider별 실패를 catch하고 다음 provider로 진행한다.
-- exception isolation: **Partially confirmed**
-  - provider 호출 예외는 selector에서 격리된다.
-  - request-time 예외는 `RuntimeException`만 방어하고 있으므로 `Error`나 아직 확인하지 못한 비동기 예외는 범위 밖이다.
-- timeout handling: **Not confirmed from code**
-  - `NewsController`, `NewsAggregationService`, `NewsSourceProviderSelector`, `NaverNewsSourceProvider`, `GNewsSourceProvider`, `NewsApiServiceImpl`에서 명시적 timeout/retry 설정은 확인되지 않았다.
-  - 실제 timeout 정책은 `ExternalApiUtils` 구현을 추가로 봐야 확정 가능하다.
-- whether NAVER failure can break the endpoint: **Confirmed from code**
-  - `/news` 목록은 NAVER provider를 직접 호출하지 않는다.
-  - NAVER provider가 실패해도 selector가 예외를 삼키고, 목록 화면은 repository-backed 데이터로 렌더링된다.
-- whether aggregation degrades gracefully: **Confirmed from code**
-  - `NewsAggregationService.getCurrentSnapshot()`은 뉴스 부족, OpenAI 미설정, 비정상 응답, 예외 발생 시 `Optional.empty()`를 반환한다.
-  - `MarketForecastQueryService`와 `NewsController.list()`는 그 결과를 `null` 또는 기본 화면으로 흡수한다.
+- `/news` fail-open behavior: 부분적으로 확인됨. `NewsController.list(...)`는 `safeGetRecentNews(...)`, `safeGetMarketSignalOverview(...)`, `safeGetCurrentForecastSnapshot()`, `safeResolveFeaturedSummarySelection()`에서 예외를 흡수합니다. 다만 `NewsController.detail(...)`은 동일한 안전 래퍼가 없고, public detail route 전체를 fail-open으로 보장하지는 않습니다.
+- provider fallback order: 코드에서 확인됨. `NewsSourceProviderSelector.fetchTopHeadlines(...)`는 국내 우선 시 NAVER를 먼저, 이후 foreign fallback을 사용하며, foreign 그룹에서는 `newsapi-global`을 `gnews-global`보다 먼저 처리합니다.
+- exception isolation: 부분적으로 확인됨. `NewsSourceProviderSelector.collectCandidates(...)`는 provider별 예외를 잡고 계속 진행합니다. `NewsAggregationService.generateCurrentSnapshot()`도 OpenAI 호출/파싱 실패를 잡아 `Optional.empty()`로 반환합니다. 다만 `ExternalApiUtils.callAPI()` 자체는 `.block()` 기반이라 장시간 지연에 대한 격리가 보이지 않습니다.
+- timeout handling: 코드에서 확인되지 않음. `src/main/java/com/example/macronews/util/ExternalApiUtils.java:27-57`에는 timeout 파라미터가 없고, `src/main/java/com/example/macronews/config/WebClientConfig.java:12-22`도 buffer size만 설정합니다.
+- whether NAVER failure can break the endpoint: 코드상 직접적으로는 아니오. `NaverNewsSourceProvider.fetchTopHeadlines(...)`는 비구성/HTTP 실패/파싱 실패 시 빈 리스트를 반환하고, selector는 provider 예외를 잡습니다. `/news` 리스트는 그 결과가 비어도 200으로 렌더링됩니다.
+- whether aggregation degrades gracefully: 부분적으로 확인됨. provider와 forecast/featured summary 경로는 빈 값으로 degrade합니다. 다만 detail route와 timeout 부재는 graceful degradation의 범위 밖입니다.
 
 ## 5. Production Blockers
-- **P1**
-  - issue: Spring Boot Gradle plugin `4.0.0-SNAPSHOT`을 현재 환경에서 해석하지 못해 테스트/검증이 시작되지 않는다.
-  - impact: `/news` 안정성 검증과 회귀 테스트가 모두 막혀 baseline을 고정할 수 없다.
-  - evidence: `./gradlew.bat ... test ...`가 `build.gradle.kts:3`의 플러그인 해석 단계에서 종료되었다.
-  - likely fix area: `build.gradle.kts`, plugin repository 접근성, 또는 resolvable build version 정리.
-- **P1**
-  - issue: `/news` 요청의 예외 경로를 실제 통합 테스트로 검증하지 못했다.
-  - impact: `NewsQueryService` 또는 summary 서비스가 runtime exception을 던질 때 public page fail-open 보장이 regress될 수 있다.
-  - evidence: `NewsControllerTest`는 happy path 모델 검증 위주이고, `PublicNewsAccessIntegrationTest`도 mock 기반 200 OK 확인에 머문다.
-  - likely fix area: `src/test/java/com/example/macronews/config/PublicNewsAccessIntegrationTest.java`, `src/test/java/com/example/macronews/controller/NewsControllerTest.java`.
-- **P2**
-  - issue: provider failure isolation의 부정형 테스트가 부족하다.
-  - impact: selector/provider fallback 순서 변경 시 한 provider 장애가 수집 전체를 막는 회귀를 놓칠 수 있다.
-  - evidence: `NewsSourceProviderSelectorTest`는 정상 fallback과 freshness/dedup 경로만 검증하고, provider가 exception을 던지는 경우는 다루지 않는다.
-  - likely fix area: `src/test/java/com/example/macronews/service/news/source/NewsSourceProviderSelectorTest.java`, `src/test/java/com/example/macronews/config/ScheduledNewsIngestionJobTest.java`.
+- P1
+  - issue: Gradle이 `org.springframework.boot:4.0.0-SNAPSHOT` 플러그인을 해석하지 못해 테스트와 검증이 시작되지 않음
+  - impact: 현재 상태에서는 reliability baseline을 CI 수준에서 재현할 수 없고, 어떤 변경도 검증되지 않음
+  - evidence: `build.gradle.kts:5,71` 및 `Plugin [id: 'org.springframework.boot', version: '4.0.0-SNAPSHOT'] was not found`
+  - likely fix area: build/plugin management, Spring Boot plugin version pinning 또는 저장소 접근성
+- P1
+  - issue: 외부 HTTP 호출에 명시적 timeout이 없음
+  - impact: NAVER, NewsAPI, GNews, OpenAI, market data 중 하나가 느리거나 멈추면 `/news` 리스트의 forecast/summary 경로와 ingestion worker가 장시간 블로킹될 수 있음
+  - evidence: `ExternalApiUtils.java:27-57`, `WebClientConfig.java:12-22`
+  - likely fix area: `WebClient` timeout 설정, `ExternalApiUtils` 호출 래퍼, 필요 시 circuit breaker
+- P2
+  - issue: public detail route(`/news/{id}`)는 list route처럼 안전 래퍼가 없음
+  - impact: repository나 view model 계산에서 예상치 못한 런타임이 나면 500으로 노출될 수 있음
+  - evidence: `NewsController.java:158-196`와 `GlobalExceptionHandler.java:90-115`
+  - likely fix area: `NewsController.detail(...)`의 defensive fallback 또는 detail service 경계의 예외 격리
+- P2
+  - issue: 실제 `/news` end-to-end reliability를 검증하는 통합 테스트가 부족함
+  - impact: provider fallback, repository read, forecast snapshot, Thymeleaf 렌더링의 조합 회귀를 놓치기 쉬움
+  - evidence: `PublicNewsAccessIntegrationTest.java:18-45`는 `NewsQueryService`와 `MarketForecastQueryService`를 mock 처리함
+  - likely fix area: 실제 Mongo/Testcontainers + 외부 HTTP mock server를 사용하는 `/news` 통합 테스트
 
 ## 6. Documentation Mismatch
-- README.md는 현재 테스트 상황을 “실패하고 있다”는 식으로 단정하지만, 이번 baseline에서 실제로 확인된 것은 테스트 실패가 아니라 Gradle plugin resolution 실패였다.
-- README.md와 PROJECT_BRIEF.md는 `/news` 공용 페이지의 fail-open 성격을 강조하지만, 코드상 request-time 방어는 `NewsController.list()` 내부의 `RuntimeException` 범위에 한정된다.
-- provider fallback은 request path가 아니라 ingestion/scheduler path에서 일어난다. 문서가 이를 `/news` 직접 보장으로 읽히게 만들면 과장이다.
-- PROJECT_BRIEF.md는 최소 required indicators로 `USD/KRW`, `US 10Y Treasury Yield`, `DXY`, `WTI/Brent`, `KOSPI`를 제시하지만, `NewsAggregationService.resolveMarketContext()`는 현재 `USD/KRW`, `Gold`, `WTI`, `Brent`, `KOSPI`만 주입한다. `DXY`와 `US 10Y Treasury Yield`는 아직 구현되지 않았다.
-- 그 외 핵심 제품 범위(뉴스 해석, 시장 요약, snapshot/forecast 보조 기능)는 코드와 대체로 일치한다.
+- README.md는 “현재 저장소 기준으로 일부 테스트는 실패하고 있습니다”라고 적지만, 이번 baseline에서는 테스트 실패가 아니라 Gradle snapshot 플러그인 해석 실패로 테스트가 시작조차 되지 않았습니다. 즉 테스트 불안정성 설명이 실제 실패 양상보다 좁고, 원인이 다릅니다. (`README.md:185`)
+- README.md와 PROJECT_BRIEF.md는 공통적으로 public pages fail gracefully / `/news` must not fail hard를 강조하지만, 코드상 그 보장은 `NewsController.list(...)` 중심이고 `NewsController.detail(...)`까지 동일하게 적용되지는 않습니다. (`README.md:225`, `PROJECT_BRIEF.md:152,159`, `NewsController.java:49-86,158-196`)
+- README.md의 “fail-open 방향으로 보강되었다”는 표현은 list route와 일부 optional dependency에 대해서는 맞지만, timeout 부재와 detail route의 예외 격리 부족까지 포함하면 아직 전면적 보장이라고 보기 어렵습니다. (`README.md:185,225`)
+- AGENTS.md는 현재 코드 상태와 충돌하는 실질적 기능 서술을 거의 하지 않아서, 의미 있는 mismatch는 보이지 않았습니다.
 
 ## 7. Recommended Next Implementation Order
-1. `/news` list fail-open 통합 테스트 추가
-   - why it matters: public page의 가장 중요한 안정성 보장을 실제로 검증해야 한다.
-   - target files/classes: `src/test/java/com/example/macronews/config/PublicNewsAccessIntegrationTest.java`, `src/test/java/com/example/macronews/controller/NewsControllerTest.java`, `src/main/java/com/example/macronews/controller/NewsController.java`.
-   - required test coverage: `NewsQueryService`/`MarketForecastQueryService`/summary 서비스가 예외를 던져도 `/news`가 200으로 렌더링되고 fallback model이 유지되는지.
-   - risk level: 높음
-2. provider exception fallback 테스트 추가
-   - why it matters: 한 provider 장애가 수집 전체를 깨지 않는다는 보장이 필요하다.
-   - target files/classes: `src/test/java/com/example/macronews/service/news/source/NewsSourceProviderSelectorTest.java`, `src/test/java/com/example/macronews/config/ScheduledNewsIngestionJobTest.java`.
-   - required test coverage: preferred provider가 `RuntimeException`을 던져도 다음 provider가 선택되고 batch ingestion이 계속되는지.
-   - risk level: 중간
-3. NAVER/GNews 장애 경로 회귀 테스트 보강
-   - why it matters: 외부 API 장애와 파싱 실패는 가장 빈번한 운영 리스크다.
-   - target files/classes: `src/test/java/com/example/macronews/service/news/source/NaverNewsSourceProviderTest.java`, `src/test/java/com/example/macronews/service/news/source/GNewsSourceProviderTest.java`, `src/test/java/com/example/macronews/service/news/NewsApiServiceImplTest.java`.
-   - required test coverage: 5xx, 빈 body, malformed JSON, stale data, semi-fresh fallback이 모두 의도대로 empty/fallback 처리되는지.
-   - risk level: 중간
-4. Gradle plugin resolution 문제 정리
-   - why it matters: 검증이 막힌 상태에서는 baseline도, 회귀 확인도 불가능하다.
-   - target files/classes: `build.gradle.kts`, 필요 시 `settings.gradle.kts`.
-   - required test coverage: `./gradlew test`가 실제 테스트 디스커버리 단계까지 진입하는지.
-   - risk level: 높음
+1. 빌드 플러그인 해석 문제를 먼저 해소한다.
+   - 왜 중요한가: 테스트와 검증이 시작되지 않으면 어떤 reliability 작업도 재현 불가능하다.
+   - target files/classes: `build.gradle.kts`, 필요 시 plugin management 설정
+   - required test coverage: `./gradlew test`가 실제로 시작되는지, 최소한 `NewsControllerTest`와 `NewsSourceProviderSelectorTest`가 실행되는지 확인
+   - risk level: High
+2. 외부 HTTP timeout을 명시적으로 추가한다.
+   - 왜 중요한가: 느린 provider/OpenAI 호출이 `/news`와 ingestion worker를 블로킹하는 가장 큰 운영 리스크다.
+   - target files/classes: `src/main/java/com/example/macronews/util/ExternalApiUtils.java`, `src/main/java/com/example/macronews/config/WebClientConfig.java`, 필요 시 `application.yaml`
+   - required test coverage: timeout/slow-response 시 `ExternalApiUtils`가 빠르게 실패-open하는지, `NewsAggregationServiceTest`와 provider tests가 지연 실패를 흡수하는지
+   - risk level: High
+3. `/news/{id}` detail 경로에도 fail-open 경계를 추가한다.
+   - 왜 중요한가: public route 전체를 reliability 대상이라고 보면 list만 안전한 것은 부족하다.
+   - target files/classes: `src/main/java/com/example/macronews/controller/NewsController.java`
+   - required test coverage: `NewsControllerTest`에 detail service exception, invalid model data, missing id 케이스 추가
+   - risk level: Medium
+4. 실제 `/news` 통합 테스트를 보강한다.
+   - 왜 중요한가: 현재 공개 접근 테스트는 mock 기반이라 provider fallback과 repository read path를 함께 검증하지 못한다.
+   - target files/classes: `src/test/java/com/example/macronews/config/PublicNewsAccessIntegrationTest.java`, 신규 integration test
+   - required test coverage: Mongo-backed list render, provider failure 시 empty/partial feed, forecast snapshot absence 시 fallback render
+   - risk level: Medium
