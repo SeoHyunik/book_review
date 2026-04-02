@@ -266,12 +266,13 @@ public class NewsAggregationService {
     private String resolveMarketContext() {
         try {
             List<String> lines = new ArrayList<>();
-            FxSnapshotDto fxSnapshot = marketDataFacade.getUsdKrw().orElse(null);
-            GoldSnapshotDto goldSnapshot = marketDataFacade.getGold().orElse(null);
-            OilSnapshotDto oilSnapshot = marketDataFacade.getOil().orElse(null);
-            IndexSnapshotDto kospiSnapshot = marketDataFacade.getKospi().orElse(null);
-            Us10ySnapshotDto us10ySnapshot = marketDataFacade.getUs10y().orElse(null);
-            DxySnapshotDto dxySnapshot = marketDataFacade.getDxy().orElse(null);
+            MarketDataFacade.MarketDataSnapshot marketDataSnapshot = marketDataFacade.getCurrentMarketSnapshot();
+            FxSnapshotDto fxSnapshot = marketDataSnapshot.usdKrw().orElse(null);
+            GoldSnapshotDto goldSnapshot = marketDataSnapshot.gold().orElse(null);
+            OilSnapshotDto oilSnapshot = marketDataSnapshot.oil().orElse(null);
+            IndexSnapshotDto kospiSnapshot = marketDataSnapshot.kospi().orElse(null);
+            Us10ySnapshotDto us10ySnapshot = marketDataSnapshot.us10y().orElse(null);
+            DxySnapshotDto dxySnapshot = marketDataSnapshot.dxy().orElse(null);
 
             if (fxSnapshot != null) {
                 lines.add("- USD/KRW: " + formatDecimal(fxSnapshot.rate()));

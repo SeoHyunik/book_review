@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -86,8 +87,8 @@ class NewsAggregationServiceTest {
                   ]
                 }
                 """.getBytes(StandardCharsets.UTF_8)));
-        lenient().when(marketDataFacade.getUs10y()).thenReturn(java.util.Optional.empty());
-        lenient().when(marketDataFacade.getDxy()).thenReturn(java.util.Optional.empty());
+        lenient().when(marketDataFacade.getCurrentMarketSnapshot())
+                .thenReturn(MarketDataFacade.MarketDataSnapshot.empty());
     }
 
     @Test
@@ -140,12 +141,8 @@ class NewsAggregationServiceTest {
     void getCurrentSnapshot_usesNewsOnlyPayloadWhenAllMarketDataMissing() throws Exception {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(recentNews());
-        given(marketDataFacade.getUsdKrw()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getOil()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getKospi()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getUs10y()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getDxy()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getCurrentMarketSnapshot())
+                .willReturn(MarketDataFacade.MarketDataSnapshot.empty());
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
                 .willReturn(successfulForecastResponse());
 
@@ -165,28 +162,25 @@ class NewsAggregationServiceTest {
     void getCurrentSnapshot_appendsOnlyAvailableMarketValues() throws Exception {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(recentNews());
-        given(marketDataFacade.getUsdKrw())
-                .willReturn(java.util.Optional.of(new FxSnapshotDto("USD", "KRW", 1350.2d, Instant.now())));
-        given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getOil())
-                .willReturn(java.util.Optional.of(new OilSnapshotDto(78.3d, null, Instant.now())));
-        given(marketDataFacade.getKospi())
-                .willReturn(java.util.Optional.of(new IndexSnapshotDto("KOSPI", 2685.4d, Instant.now())));
-        given(marketDataFacade.getUs10y())
-                .willReturn(java.util.Optional.of(new Us10ySnapshotDto(
-                        4.21d,
-                        Instant.parse("2026-03-17T00:00:00Z").atZone(java.time.ZoneOffset.UTC).toLocalDate(),
-                        "FRED",
-                        "DGS10"
-                )));
-        given(marketDataFacade.getDxy())
-                .willReturn(java.util.Optional.of(new DxySnapshotDto(
-                        103.45d,
-                        Instant.parse("2026-03-17T00:00:00Z"),
-                        "TWELVE_DATA_SYNTHETIC",
-                        "ICE_DXY_BASKET",
-                        true
-                )));
+        given(marketDataFacade.getCurrentMarketSnapshot())
+                .willReturn(marketSnapshot(
+                        Optional.of(new FxSnapshotDto("USD", "KRW", 1350.2d, Instant.now())),
+                        Optional.empty(),
+                        Optional.of(new OilSnapshotDto(78.3d, null, Instant.now())),
+                        Optional.of(new IndexSnapshotDto("KOSPI", 2685.4d, Instant.now())),
+                        Optional.of(new Us10ySnapshotDto(
+                                4.21d,
+                                Instant.parse("2026-03-17T00:00:00Z").atZone(java.time.ZoneOffset.UTC).toLocalDate(),
+                                "FRED",
+                                "DGS10"
+                        )),
+                        Optional.of(new DxySnapshotDto(
+                                103.45d,
+                                Instant.parse("2026-03-17T00:00:00Z"),
+                                "TWELVE_DATA_SYNTHETIC",
+                                "ICE_DXY_BASKET",
+                                true
+                        ))));
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
                 .willReturn(successfulForecastResponse());
 
@@ -222,12 +216,8 @@ class NewsAggregationServiceTest {
     void givenTimeoutResponse_whenGetCurrentSnapshot_thenReturnEmptySnapshot() {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(recentNews());
-        given(marketDataFacade.getUsdKrw()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getOil()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getKospi()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getUs10y()).willReturn(java.util.Optional.empty());
-        given(marketDataFacade.getDxy()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getCurrentMarketSnapshot())
+                .willReturn(MarketDataFacade.MarketDataSnapshot.empty());
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
                 .willReturn(new ExternalApiResult(504, "External API request timed out"));
 
@@ -240,7 +230,7 @@ class NewsAggregationServiceTest {
     void getCurrentSnapshot_continuesWhenMarketDataFacadeThrows() throws Exception {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(recentNews());
-        given(marketDataFacade.getUsdKrw()).willThrow(new RuntimeException("market api down"));
+        given(marketDataFacade.getCurrentMarketSnapshot()).willThrow(new RuntimeException("market api down"));
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
                 .willReturn(successfulForecastResponse());
 
@@ -273,6 +263,16 @@ class NewsAggregationServiceTest {
                   ]
                 }
                 """);
+    }
+
+    private MarketDataFacade.MarketDataSnapshot marketSnapshot(
+            Optional<FxSnapshotDto> usdKrw,
+            Optional<GoldSnapshotDto> gold,
+            Optional<OilSnapshotDto> oil,
+            Optional<IndexSnapshotDto> kospi,
+            Optional<Us10ySnapshotDto> us10y,
+            Optional<DxySnapshotDto> dxy) {
+        return new MarketDataFacade.MarketDataSnapshot(usdKrw, gold, oil, kospi, us10y, dxy);
     }
 
     private NewsEvent newsEvent(String id, String title) {

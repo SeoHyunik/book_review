@@ -55,6 +55,23 @@ class ExternalApiUtilsTest {
     }
 
     @Test
+    void givenSuccessfulResponse_whenCallApiAsync_thenReturnResult() {
+        mockWebServer.enqueue(new MockResponse().setResponseCode(200).setBody("ok"));
+
+        ExternalApiRequest request = new ExternalApiRequest(
+                HttpMethod.GET,
+                null,
+                mockWebServer.url("/async").toString(),
+                null);
+
+        ExternalApiResult response = externalApiUtils.callAPIAsync(request).block();
+
+        assertThat(response).isNotNull();
+        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.body()).isEqualTo("ok");
+    }
+
+    @Test
     void givenNeverRespondingExternalApi_whenCallApi_thenReturnGatewayTimeout() {
         externalApiUtils = new ExternalApiUtils(
                 WebClient.builder().exchangeFunction(request -> Mono.never()));

@@ -32,6 +32,10 @@ public class ExternalApiUtils {
     private Duration timeout = DEFAULT_TIMEOUT;
 
     public ExternalApiResult callAPI(ExternalApiRequest request) {
+        return callAPIAsync(request).block();
+    }
+
+    public Mono<ExternalApiResult> callAPIAsync(ExternalApiRequest request) {
         Assert.notNull(request, "External API request must not be null");
         Assert.notNull(request.method(), "HTTP method must not be null");
         Assert.hasText(request.url(), "Request URL must not be blank");
@@ -41,39 +45,38 @@ public class ExternalApiUtils {
         log.info("[HTTP] Calling external API: method={}, url={}, headers={}", request.method(),
                 sanitizeUrl(request.url()), sanitizedHeaders);
 
-        try {
-            return webClientBuilder
-                    .build()
-                    .method(request.method())
-                    .uri(request.url())
-                    .headers(httpHeaders -> httpHeaders.addAll(headers))
-                    .bodyValue(request.body() != null ? request.body() : "")
-                    .exchangeToMono(response -> {
-                        int statusCode = response.statusCode().value();
-                        return response.bodyToMono(String.class)
-                                .defaultIfEmpty("")
-                                .map(body -> new ExternalApiResult(statusCode, body));
-                    })
-                    .timeout(resolveTimeout())
-                    .onErrorResume(TimeoutException.class, ex -> {
-                        Duration resolvedTimeout = resolveTimeout();
-                        log.warn("[HTTP] External API request timed out after {}: method={}, url={}",
-                                resolvedTimeout, request.method(), sanitizeUrl(request.url()));
-                        return Mono.just(new ExternalApiResult(
-                                HttpStatus.GATEWAY_TIMEOUT.value(),
-                                "External API request timed out after " + resolvedTimeout));
-                    })
-                    .block();
-        } catch (WebClientResponseException ex) {
-            log.warn("[HTTP] External API responded with status={} bodyLength={}",
-                    ex.getStatusCode().value(),
-                    ex.getResponseBodyAsString() != null ? ex.getResponseBodyAsString().length()
-                            : 0);
-            return new ExternalApiResult(ex.getStatusCode().value(), ex.getResponseBodyAsString());
-        } catch (WebClientRequestException ex) {
-            log.warn("[HTTP] External API request failed: {}", ex.getMessage());
-            return new ExternalApiResult(HttpStatus.SERVICE_UNAVAILABLE.value(), ex.getMessage());
-        }
+        return Mono.defer(() -> webClientBuilder
+                .build()
+                .method(request.method())
+                .uri(request.url())
+                .headers(httpHeaders -> httpHeaders.addAll(headers))
+                .bodyValue(request.body() != null ? request.body() : "")
+                .exchangeToMono(response -> {
+                    int statusCode = response.statusCode().value();
+                    return response.bodyToMono(String.class)
+                            .defaultIfEmpty("")
+                            .map(body -> new ExternalApiResult(statusCode, body));
+                })
+                .timeout(resolveTimeout())
+                .onErrorResume(TimeoutException.class, ex -> {
+                    Duration resolvedTimeout = resolveTimeout();
+                    log.warn("[HTTP] External API request timed out after {}: method={}, url={}",
+                            resolvedTimeout, request.method(), sanitizeUrl(request.url()));
+                    return Mono.just(new ExternalApiResult(
+                            HttpStatus.GATEWAY_TIMEOUT.value(),
+                            "External API request timed out after " + resolvedTimeout));
+                })
+                .onErrorResume(WebClientResponseException.class, ex -> {
+                    log.warn("[HTTP] External API responded with status={} bodyLength={}",
+                            ex.getStatusCode().value(),
+                            ex.getResponseBodyAsString() != null ? ex.getResponseBodyAsString().length()
+                                    : 0);
+                    return Mono.just(new ExternalApiResult(ex.getStatusCode().value(), ex.getResponseBodyAsString()));
+                })
+                .onErrorResume(WebClientRequestException.class, ex -> {
+                    log.warn("[HTTP] External API request failed: {}", ex.getMessage());
+                    return Mono.just(new ExternalApiResult(HttpStatus.SERVICE_UNAVAILABLE.value(), ex.getMessage()));
+                }));
     }
 
     private Duration resolveTimeout() {

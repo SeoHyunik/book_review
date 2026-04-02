@@ -377,3 +377,43 @@
   - no new service layer or repository method was introduced
   - the implementation stays on the existing news query path and uses the shared layout
   - the security change is limited to the single new public route
+
+## 17. Step 10 Reactive Phase 1 Result
+- what changed
+  - added `ExternalApiUtils.callAPIAsync(...)` as a non-breaking async overload and kept `ExternalApiUtils.callAPI(...)` as a sync wrapper over the async path
+  - added parallel market-data fan-out inside `MarketDataFacade.getCurrentMarketSnapshot()` using `Mono.zip` and bounded-elastic scheduling
+  - updated `NewsAggregationService.resolveMarketContext()` to use the new aggregated market-data snapshot instead of six serial facade calls
+  - kept controller signatures, repository access, and provider contracts unchanged
+- async methods added
+  - `ExternalApiUtils.callAPIAsync(...)`
+  - `MarketDataFacade.getCurrentMarketSnapshot()`
+  - `MarketDataFacade.loadAsync(...)` internal helper
+- files changed
+  - `src/main/java/com/example/macronews/util/ExternalApiUtils.java`
+  - `src/main/java/com/example/macronews/service/market/MarketDataFacade.java`
+  - `src/main/java/com/example/macronews/service/forecast/NewsAggregationService.java`
+  - `src/test/java/com/example/macronews/util/ExternalApiUtilsTest.java`
+  - `src/test/java/com/example/macronews/service/market/MarketDataFacadeTest.java`
+  - `src/test/java/com/example/macronews/service/forecast/NewsAggregationServiceTest.java`
+  - `docs/reports/reliability-baseline-step1.md`
+- whether market-data parallelization is active
+  - yes
+  - USD/KRW, Gold, Oil, KOSPI, US10Y, and DXY are now collected in parallel inside `MarketDataFacade`
+  - `NewsAggregationService` now consumes a single market snapshot instead of calling each provider sequentially
+- fail-open and timeout behavior
+  - preserved
+  - `ExternalApiUtils` still converts timeouts into a 504-style fallback result
+  - market-data aggregation returns an empty snapshot when a provider or the fan-out path fails
+  - `NewsAggregationService` still falls back to news-only payloads when market context cannot be built
+- test results
+  - `ExternalApiUtilsTest`: PASS
+  - `MarketDataFacadeTest`: PASS
+  - `NewsAggregationServiceTest`: PASS
+  - `AiMarketSummaryServiceTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - `MarketProviderParsingTest`: PASS
+- notes
+  - no controller migration to WebFlux was attempted
+  - no repository change was made
+  - no provider implementation was rewritten
