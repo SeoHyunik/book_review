@@ -20,11 +20,13 @@ import com.example.macronews.service.news.RecentMarketSummaryService;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.DxySnapshotDto;
+import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.domain.ImpactDirection;
 import com.example.macronews.domain.MarketMood;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -76,6 +78,7 @@ class PublicNewsAccessIntegrationTest {
         given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
         given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
         given(marketDataFacade.getDxy()).willReturn(Optional.empty());
+        given(marketDataFacade.getUs10y()).willReturn(Optional.empty());
     }
 
     @Test
@@ -177,6 +180,55 @@ class PublicNewsAccessIntegrationTest {
     }
 
     @Test
+    void givenRatesTopic_whenRequest_thenReturnOk() throws Exception {
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(ratesNewsItem()));
+        given(marketDataFacade.getUs10y())
+                .willReturn(Optional.of(new Us10ySnapshotDto(
+                        4.21d,
+                        LocalDate.parse("2026-03-17"),
+                        "FRED",
+                        "DGS10"
+                )));
+        given(marketForecastQueryService.getCurrentSnapshot())
+                .willReturn(Optional.of(new MarketForecastSnapshotDto(
+                        MarketMood.CLOUD,
+                        "Rates stay elevated",
+                        "Rates stay elevated",
+                        "Bond yields remain the key macro anchor.",
+                        "Bond yields remain the key macro anchor.",
+                        List.of("Rates"),
+                        List.of("topic-2"),
+                        List.of("Treasury yields climb after rate expectations shift"),
+                        Map.of(),
+                        Instant.parse("2026-03-17T03:00:00Z").toString(),
+                        1
+                )));
+
+        mockMvc.perform(get("/topic/rates"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("topic/rates"))
+                .andExpect(model().attribute("ratesNewsItems", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(model().attribute("pageTitleKey", "page.topic.rates.title"))
+                .andExpect(model().attribute("pageDescriptionKey", "page.topic.rates.description"));
+    }
+
+    @Test
+    void givenNoRatesData_whenRequest_thenRenderEmpty() throws Exception {
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of());
+        given(marketDataFacade.getUs10y()).willReturn(Optional.empty());
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+
+        mockMvc.perform(get("/topic/rates"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("topic/rates"))
+                .andExpect(model().attribute("ratesNewsItems", List.of()))
+                .andExpect(model().attribute("us10ySnapshot", org.hamcrest.Matchers.nullValue()))
+                .andExpect(model().attribute("forecastSnapshot", org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
     void givenArchiveRequest_whenCalled_thenReturnPage() throws Exception {
         given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of(archiveNewsItem()));
@@ -236,6 +288,25 @@ class PublicNewsAccessIntegrationTest {
                 "Rates unchanged",
                 "Policy remains steady.",
                 8
+        );
+    }
+
+    private NewsListItemDto ratesNewsItem() {
+        return new NewsListItemDto(
+                "topic-2",
+                "Treasury yields climb after rate expectations shift",
+                "Treasury yields climb after rate expectations shift",
+                "Reuters",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse("2026-03-17T02:35:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.NEGATIVE,
+                "Rates UP",
+                "Bond market pricing turns more cautious.",
+                11
         );
     }
 }

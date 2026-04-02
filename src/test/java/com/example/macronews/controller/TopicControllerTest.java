@@ -13,6 +13,7 @@ import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.DxySnapshotDto;
+import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.repository.UserRepository;
 import com.example.macronews.service.forecast.MarketForecastQueryService;
 import com.example.macronews.service.market.MarketDataFacade;
@@ -67,6 +68,7 @@ class TopicControllerTest {
         given(marketSummarySnapshotService.getLatestValidSummary()).willReturn(Optional.empty());
         given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
         given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        given(marketDataFacade.getUs10y()).willReturn(Optional.empty());
     }
 
     @Test
@@ -150,6 +152,75 @@ class TopicControllerTest {
                 .andExpect(view().name("topic/dollar"))
                 .andExpect(model().attribute("dollarNewsItems", List.of()))
                 .andExpect(model().attribute("dxySnapshot", org.hamcrest.Matchers.nullValue()))
+                .andExpect(model().attribute("forecastSnapshot", org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @DisplayName("givenTopicRequest_whenRates_thenReturnPage")
+    void givenTopicRequest_whenRates_thenReturnPage() throws Exception {
+        NewsListItemDto related = new NewsListItemDto(
+                "news-3",
+                "Treasury yields climb after rate expectations shift",
+                "Treasury yields climb after rate expectations shift",
+                "Reuters",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse("2026-03-17T02:35:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.NEGATIVE,
+                "Rates UP",
+                "Bond market pricing turns more cautious.",
+                11
+        );
+        Us10ySnapshotDto us10ySnapshot = new Us10ySnapshotDto(
+                4.21d,
+                java.time.LocalDate.parse("2026-03-17"),
+                "FRED",
+                "DGS10"
+        );
+        MarketForecastSnapshotDto forecastSnapshot = new MarketForecastSnapshotDto(
+                MarketMood.CLOUD,
+                "Rates remain elevated",
+                "Rates remain elevated",
+                "Bond yields are still anchoring the macro backdrop.",
+                "Bond yields are still anchoring the macro backdrop.",
+                List.of("Rates", "Treasury"),
+                List.of("news-3"),
+                List.of("Treasury yields climb after rate expectations shift"),
+                Map.of(),
+                Instant.parse("2026-03-17T03:00:00Z").toString(),
+                1
+        );
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(related));
+        given(marketDataFacade.getUs10y()).willReturn(Optional.of(us10ySnapshot));
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.of(forecastSnapshot));
+
+        mockMvc.perform(get("/topic/rates"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("topic/rates"))
+                .andExpect(model().attribute("ratesNewsItems", List.of(related)))
+                .andExpect(model().attribute("us10ySnapshot", us10ySnapshot))
+                .andExpect(model().attribute("forecastSnapshot", forecastSnapshot))
+                .andExpect(model().attribute("pageTitleKey", "page.topic.rates.title"))
+                .andExpect(model().attribute("pageDescriptionKey", "page.topic.rates.description"));
+    }
+
+    @Test
+    @DisplayName("givenNoRatesData_whenRates_thenStillRender")
+    void givenNoRatesData_whenRates_thenStillRender() throws Exception {
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of());
+        given(marketDataFacade.getUs10y()).willReturn(Optional.empty());
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+
+        mockMvc.perform(get("/topic/rates"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("topic/rates"))
+                .andExpect(model().attribute("ratesNewsItems", List.of()))
+                .andExpect(model().attribute("us10ySnapshot", org.hamcrest.Matchers.nullValue()))
                 .andExpect(model().attribute("forecastSnapshot", org.hamcrest.Matchers.nullValue()));
     }
 }

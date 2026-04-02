@@ -3,6 +3,7 @@ package com.example.macronews.controller;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.DxySnapshotDto;
+import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.service.forecast.MarketForecastQueryService;
 import com.example.macronews.service.market.MarketDataFacade;
@@ -25,8 +26,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class TopicController {
 
     private static final int MAX_TOPIC_NEWS_ITEMS = 5;
-    private static final String PAGE_TITLE_KEY = "page.topic.dollar.title";
-    private static final String PAGE_DESCRIPTION_KEY = "page.topic.dollar.description";
+    private static final String DOLLAR_PAGE_TITLE_KEY = "page.topic.dollar.title";
+    private static final String DOLLAR_PAGE_DESCRIPTION_KEY = "page.topic.dollar.description";
+    private static final String RATES_PAGE_TITLE_KEY = "page.topic.rates.title";
+    private static final String RATES_PAGE_DESCRIPTION_KEY = "page.topic.rates.description";
     private static final List<String> DOLLAR_KEYWORDS = List.of(
             "usd",
             "dollar",
@@ -38,6 +41,23 @@ public class TopicController {
             "fed",
             "fomc",
             "rate"
+    );
+    private static final List<String> RATES_KEYWORDS = List.of(
+            "rates",
+            "yield",
+            "yields",
+            "treasury",
+            "treasuries",
+            "bond",
+            "bonds",
+            "fed",
+            "fomc",
+            "powell",
+            "policy",
+            "interest rate",
+            "rate decision",
+            "rate hike",
+            "rate cut"
     );
 
     private final NewsQueryService newsQueryService;
@@ -54,22 +74,48 @@ public class TopicController {
         model.addAttribute("topicNewsCount", dollarNewsItems.size());
         model.addAttribute("dxySnapshot", dxySnapshot);
         model.addAttribute("forecastSnapshot", forecastSnapshot);
-        model.addAttribute("pageTitleKey", PAGE_TITLE_KEY);
-        model.addAttribute("pageDescriptionKey", PAGE_DESCRIPTION_KEY);
-        model.addAttribute("ogTitleKey", PAGE_TITLE_KEY);
-        model.addAttribute("ogDescriptionKey", PAGE_DESCRIPTION_KEY);
+        model.addAttribute("pageTitleKey", DOLLAR_PAGE_TITLE_KEY);
+        model.addAttribute("pageDescriptionKey", DOLLAR_PAGE_DESCRIPTION_KEY);
+        model.addAttribute("ogTitleKey", DOLLAR_PAGE_TITLE_KEY);
+        model.addAttribute("ogDescriptionKey", DOLLAR_PAGE_DESCRIPTION_KEY);
         model.addAttribute("ogUrl", "/topic/dollar");
         return "topic/dollar";
     }
 
+    @GetMapping("/rates")
+    public String rates(Model model) {
+        List<NewsListItemDto> ratesNewsItems = safeGetRatesNews();
+        Us10ySnapshotDto us10ySnapshot = safeGetUs10ySnapshot();
+        MarketForecastSnapshotDto forecastSnapshot = safeGetForecastSnapshot();
+
+        model.addAttribute("ratesNewsItems", ratesNewsItems);
+        model.addAttribute("topicNewsCount", ratesNewsItems.size());
+        model.addAttribute("us10ySnapshot", us10ySnapshot);
+        model.addAttribute("forecastSnapshot", forecastSnapshot);
+        model.addAttribute("pageTitleKey", RATES_PAGE_TITLE_KEY);
+        model.addAttribute("pageDescriptionKey", RATES_PAGE_DESCRIPTION_KEY);
+        model.addAttribute("ogTitleKey", RATES_PAGE_TITLE_KEY);
+        model.addAttribute("ogDescriptionKey", RATES_PAGE_DESCRIPTION_KEY);
+        model.addAttribute("ogUrl", "/topic/rates");
+        return "topic/rates";
+    }
+
     private List<NewsListItemDto> safeGetDollarNews() {
+        return safeGetRelatedNews("dollar", DOLLAR_KEYWORDS);
+    }
+
+    private List<NewsListItemDto> safeGetRatesNews() {
+        return safeGetRelatedNews("rates", RATES_KEYWORDS);
+    }
+
+    private List<NewsListItemDto> safeGetRelatedNews(String topicName, List<String> keywords) {
         try {
             return newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC).stream()
-                    .filter(this::isDollarRelated)
+                    .filter(item -> matchesTopicKeywords(item, keywords))
                     .limit(MAX_TOPIC_NEWS_ITEMS)
                     .toList();
         } catch (RuntimeException ex) {
-            log.warn("Rendering /topic/dollar without related news due to query failure", ex);
+            log.warn("Rendering /topic/{} without related news due to query failure", topicName, ex);
             return List.of();
         }
     }
@@ -83,6 +129,15 @@ public class TopicController {
         }
     }
 
+    private Us10ySnapshotDto safeGetUs10ySnapshot() {
+        try {
+            return marketDataFacade.getUs10y().orElse(null);
+        } catch (RuntimeException ex) {
+            log.warn("Rendering /topic/rates without US10Y snapshot due to market data failure", ex);
+            return null;
+        }
+    }
+
     private MarketForecastSnapshotDto safeGetForecastSnapshot() {
         try {
             return marketForecastQueryService.getCurrentSnapshot().orElse(null);
@@ -92,23 +147,23 @@ public class TopicController {
         }
     }
 
-    private boolean isDollarRelated(NewsListItemDto item) {
+    private boolean matchesTopicKeywords(NewsListItemDto item, List<String> keywords) {
         if (item == null) {
             return false;
         }
-        return containsDollarKeyword(item.title())
-                || containsDollarKeyword(item.displayTitle())
-                || containsDollarKeyword(item.source())
-                || containsDollarKeyword(item.macroSummary())
-                || containsDollarKeyword(item.interpretationSummary());
+        return containsTopicKeyword(item.title(), keywords)
+                || containsTopicKeyword(item.displayTitle(), keywords)
+                || containsTopicKeyword(item.source(), keywords)
+                || containsTopicKeyword(item.macroSummary(), keywords)
+                || containsTopicKeyword(item.interpretationSummary(), keywords);
     }
 
-    private boolean containsDollarKeyword(String value) {
+    private boolean containsTopicKeyword(String value, List<String> keywords) {
         if (!StringUtils.hasText(value)) {
             return false;
         }
         String normalized = value.toLowerCase(Locale.ROOT);
-        for (String keyword : DOLLAR_KEYWORDS) {
+        for (String keyword : keywords) {
             if (normalized.contains(keyword)) {
                 return true;
             }

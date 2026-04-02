@@ -724,3 +724,26 @@
   - `NewsControllerTest`: PASS
   - `PublicNewsAccessIntegrationTest`: PASS
   - `NewsQueryServiceTest`: PASS
+
+## 27. Step 20 Rates Topic Page Result
+
+- what page was added
+  - `GET /topic/rates` renders a minimal SEO topic page for rates, yields, and Treasury-related news
+  - the page follows the existing `/topic/dollar` pattern but is purpose-built for rates
+- reused data sources/services
+  - `NewsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC)`
+  - `MarketDataFacade.getUs10y()`
+  - `MarketForecastQueryService.getCurrentSnapshot()`
+  - existing `NewsListItemDto` article links and the shared topic layout pattern
+- why the implementation was minimal
+  - no general topic framework was introduced
+  - no pagination or filtering UI was added
+  - only one new route, one new template, and a small topic filter extension were added
+- fail-open behavior
+  - the page renders safely when rates-related news is absent
+  - the page renders safely when US 10Y data is absent
+  - the page renders safely when forecast data is absent
+- test results
+  - `TopicControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - `NewsControllerTest`: PASS
