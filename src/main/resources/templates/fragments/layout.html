@@ -49,6 +49,7 @@
         <div class="collapse navbar-collapse" id="nav">
             <ul class="navbar-nav ms-auto gap-lg-2 align-items-lg-center">
                 <li class="nav-item"><a class="nav-link" th:href="@{/news}" th:text="#{nav.news}">News</a></li>
+                <li class="nav-item"><a class="nav-link" th:href="@{/archive}" th:text="#{nav.archive}">Archive</a></li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
                     <a class="nav-link" th:href="@{/admin/news/manual}" th:text="#{nav.admin.manual}">Admin Manual</a>
                 </li>

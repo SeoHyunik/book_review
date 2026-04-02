@@ -702,3 +702,25 @@
   - renamed behavior tests to clearer BDD-style method names
   - kept timeout coverage explicit in `ExternalApiUtilsTest`
   - verified the full regression suite after the compatibility fix
+
+## 26. Step 19 Archive Page Result
+
+- what page was added
+  - `GET /archive` renders a simple historical archive page for recent analyzed news
+  - the page uses the existing `archive/list` Thymeleaf template and stays crawlable through a stable root route
+- reused data sources/services
+  - `NewsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC)`
+  - existing archive template metadata keys from the message bundle
+  - existing `NewsListItemDto` list rendering and `/news/{id}` article links
+- why the implementation was minimal
+  - the archive page reused the existing query and template structure
+  - only one root navigation link and one focused controller test were added
+  - no pagination, filtering UI, or new service layer were introduced
+- fail-open behavior
+  - archive lookup failures return an empty list instead of surfacing a public 500
+  - the template already renders an empty archive state safely
+- test results
+  - `ArchiveControllerTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - `NewsQueryServiceTest`: PASS
