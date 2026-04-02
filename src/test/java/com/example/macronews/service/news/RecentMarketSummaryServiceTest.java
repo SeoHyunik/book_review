@@ -48,6 +48,10 @@ class RecentMarketSummaryServiceTest {
 
     private RecentMarketSummaryService recentMarketSummaryService;
     private FeaturedMarketSummaryPolicyProperties policyProperties;
+    private MarketSentimentAggregator marketSentimentAggregator;
+    private MarketPriceAdjustmentPolicy marketPriceAdjustmentPolicy;
+    private MarketDriverExtractor marketDriverExtractor;
+    private MarketSummaryComposer marketSummaryComposer;
 
     @BeforeEach
     void setUp() {
@@ -56,10 +60,18 @@ class RecentMarketSummaryServiceTest {
         policyProperties.setWindowHours(3);
         policyProperties.setMaxItems(10);
         policyProperties.setMinItems(3);
+        marketSentimentAggregator = new MarketSentimentAggregator();
+        marketPriceAdjustmentPolicy = new MarketPriceAdjustmentPolicy();
+        marketDriverExtractor = new MarketDriverExtractor();
+        marketSummaryComposer = new MarketSummaryComposer();
         recentMarketSummaryService = new RecentMarketSummaryService(
                 newsEventRepository,
                 marketDataFacade,
-                policyProperties
+                policyProperties,
+                marketSentimentAggregator,
+                marketPriceAdjustmentPolicy,
+                marketDriverExtractor,
+                marketSummaryComposer
         );
         ReflectionTestUtils.setField(recentMarketSummaryService, "clock",
                 Clock.fixed(Instant.parse("2026-03-17T03:00:00Z"), ZoneId.of("Asia/Seoul")));

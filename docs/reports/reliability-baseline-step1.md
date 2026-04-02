@@ -523,3 +523,38 @@
   - no controller changes were made
   - no public API drift was introduced
   - no architecture rewrite was attempted
+
+## 21. Step 14 RecentMarketSummary Refactor Result
+- extracted components
+  - `MarketSentimentAggregator`
+  - `MarketPriceAdjustmentPolicy`
+  - `MarketDriverExtractor`
+  - `MarketSummaryComposer`
+- responsibilities split
+  - sentiment aggregation and confidence calculation now live in `MarketSentimentAggregator`
+  - price-based confidence adjustment now lives in `MarketPriceAdjustmentPolicy`
+  - market and macro driver extraction now lives in `MarketDriverExtractor`
+  - summary headline and narrative composition now lives in `MarketSummaryComposer`
+  - `RecentMarketSummaryService` now coordinates loading, aggregation, adjustment, and DTO assembly
+- why this split is safe
+  - public service signatures and return types stayed unchanged
+  - summary rules, thresholds, and fail-open paths were moved without changing values
+  - controller and provider layers were untouched
+  - repository access stayed in the service layer
+  - fallback behavior for missing or partial market data remained intact
+- readability improvements
+  - reduced the size of the service body by removing long condition trees and extraction loops
+  - separated price-adjustment branching from sentiment aggregation branching
+  - isolated summary text composition from signal math and driver counting
+  - kept imperative flow where it is clearer and used helpers only at the responsibility boundaries
+- test results
+  - `RecentMarketSummaryServiceTest`: PASS
+  - `AiMarketSummaryServiceTest`: PASS
+  - `MarketSummarySnapshotServiceTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+- notes
+  - no provider refactor was introduced
+  - no controller changes were made
+  - no reactive changes were introduced
+  - no policy redesign was attempted
