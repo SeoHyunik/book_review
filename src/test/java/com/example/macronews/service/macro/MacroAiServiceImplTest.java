@@ -3,6 +3,8 @@ package com.example.macronews.service.macro;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -11,8 +13,6 @@ import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
-import com.example.macronews.util.ExternalApiUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +28,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 class MacroAiServiceImplTest {
 
     @Mock
-    private ExternalApiUtils externalApiUtils;
+    private MacroAiPromptBuilder macroAiPromptBuilder;
+
+    @Mock
+    private MacroAiClient macroAiClient;
+
+    @Mock
+    private MacroAiResponseParser macroAiResponseParser;
 
     @Mock
     private NewsEventRepository newsEventRepository;
@@ -40,10 +46,18 @@ class MacroAiServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        macroAiService = new MacroAiServiceImpl(externalApiUtils, new ObjectMapper(), newsEventRepository, openAiUsageLoggingService);
+        macroAiService = new MacroAiServiceImpl(
+                macroAiPromptBuilder,
+                macroAiClient,
+                macroAiResponseParser,
+                newsEventRepository,
+                openAiUsageLoggingService
+        );
         ReflectionTestUtils.setField(macroAiService, "openAiApiKey", "test-key");
         ReflectionTestUtils.setField(macroAiService, "openAiUrl", "https://example.com/openai");
         ReflectionTestUtils.setField(macroAiService, "interpretationModel", "gpt-test");
+        ReflectionTestUtils.setField(macroAiService, "openAiMaxTokens", 800);
+        ReflectionTestUtils.setField(macroAiService, "openAiTemperature", 0.2d);
         ReflectionTestUtils.setField(macroAiService, "macroPromptFile", new ByteArrayResource((
                 "{\"messages\":[{\"role\":\"system\",\"content\":\"Return JSON\"},{\"role\":\"user\",\"template\":\"Title: {{title}}\"}]}")
                 .getBytes(StandardCharsets.UTF_8)));
@@ -53,7 +67,18 @@ class MacroAiServiceImplTest {
     @DisplayName("interpret should parse localized headlines and summaries when both are present")
     void interpret_parsesLocalizedSummaries() {
         String response = "{\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":80,\"total_tokens\":200},\"choices\":[{\"message\":{\"content\":\"{\\\"headlineKo\\\":\\\"Korean headline\\\",\\\"headlineEn\\\":\\\"English headline\\\",\\\"summaryKo\\\":\\\"Korean summary\\\",\\\"summaryEn\\\":\\\"English summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}";
-        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, response));
+        given(macroAiPromptBuilder.buildPayload(any(), any(), anyInt(), anyDouble(), any())).willReturn("payload");
+        given(macroAiClient.call(any(), any(), any())).willReturn(new ExternalApiResult(200, response));
+        given(macroAiResponseParser.parseAnalysisResult(any(), any())).willReturn(new com.example.macronews.domain.AnalysisResult(
+                "gpt-test",
+                Instant.parse("2026-03-10T10:00:00Z"),
+                "Korean headline",
+                "English headline",
+                "Korean summary",
+                "English summary",
+                java.util.List.of(),
+                java.util.List.of()
+        ));
 
         var result = macroAiService.interpret(sampleEvent());
 
@@ -69,8 +94,19 @@ class MacroAiServiceImplTest {
     @Test
     @DisplayName("interpret should allow one localized headline or summary to be missing")
     void interpret_allowsMissingLocalizedSummary() {
-        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200,
+        given(macroAiPromptBuilder.buildPayload(any(), any(), anyInt(), anyDouble(), any())).willReturn("payload");
+        given(macroAiClient.call(any(), any(), any())).willReturn(new ExternalApiResult(200,
                 "{\"choices\":[{\"message\":{\"content\":\"{\\\"headlineEn\\\":\\\"English only headline\\\",\\\"summaryEn\\\":\\\"English only summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}"));
+        given(macroAiResponseParser.parseAnalysisResult(any(), any())).willReturn(new com.example.macronews.domain.AnalysisResult(
+                "gpt-test",
+                Instant.parse("2026-03-10T10:00:00Z"),
+                null,
+                "English only headline",
+                null,
+                "English only summary",
+                java.util.List.of(),
+                java.util.List.of()
+        ));
 
         var result = macroAiService.interpret(sampleEvent());
 
@@ -85,7 +121,8 @@ class MacroAiServiceImplTest {
     void interpretAndSave_initialFailureInitializesRetryMetadata() {
         NewsEvent event = sampleEvent();
         given(newsEventRepository.findById("news-1")).willReturn(java.util.Optional.of(event));
-        given(externalApiUtils.callAPI(any())).willThrow(new IllegalStateException("boom"));
+        given(macroAiPromptBuilder.buildPayload(any(), any(), anyInt(), anyDouble(), any())).willReturn("payload");
+        given(macroAiClient.call(any(), any(), any())).willThrow(new IllegalStateException("boom"));
         given(newsEventRepository.save(any(NewsEvent.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         NewsEvent saved = macroAiService.interpretAndSave("news-1");

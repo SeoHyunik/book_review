@@ -599,3 +599,43 @@
   - no reactive expansion was introduced
   - no ingestion flow redesign was attempted
   - no dedup redesign was attempted
+
+## 23. Step 16 Macro AI Refactor Result
+- extracted components
+  - `MacroAiPromptBuilder`
+  - `MacroAiClient`
+  - `MacroAiResponseParser`
+- responsibilities split
+  - prompt template loading, placeholder substitution, and request payload assembly now live in `MacroAiPromptBuilder`
+  - OpenAI request headers and transport execution now live in `MacroAiClient`
+  - OpenAI response content extraction, JSON fallback parsing, and domain mapping now live in `MacroAiResponseParser`
+  - `MacroAiServiceImpl` now coordinates validation, prompt generation, OpenAI execution, usage logging, parsing, and fail-open save flow
+- why this split is safe
+  - public service method signatures stayed unchanged
+  - fail-open save semantics in `interpretAndSave()` stayed unchanged
+  - non-2xx OpenAI responses still fail the interpretation path
+  - invalid macro or market impact entries still skip instead of failing the whole parse
+  - the same prompt template placeholders and response field expectations were preserved
+- whether fail-open semantics were preserved
+  - yes, `extractJsonNode()` keeps the fallback substring parsing path
+  - yes, invalid direction and confidence values still fall back to neutral or default confidence
+  - yes, parsing failures still surface to `interpretAndSave()` and are stored as `FAILED`
+- readability improvements
+  - separated prompt construction from transport and parsing concerns
+  - removed a large mixed-responsibility method body from `MacroAiServiceImpl`
+  - kept orchestration linear and explicit
+  - avoided introducing broader AI architecture changes
+- test results
+  - `MacroAiServiceImplTest`: PASS
+  - `NewsIngestionServiceImplTest`: PASS
+  - `ScheduledNewsIngestionJobTest`: PASS
+  - `NewsAggregationServiceTest`: PASS
+  - `AiMarketSummaryServiceTest`: PASS
+  - `MarketForecastQueryServiceTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+- notes
+  - no provider refactor was introduced
+  - no reactive expansion was introduced
+  - no async pipeline redesign was attempted
+  - no architecture rewrite was attempted
