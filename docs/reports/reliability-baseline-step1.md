@@ -227,3 +227,36 @@
 - remaining reliability gaps
   - No direct `WebClient` usage was found outside `ExternalApiUtils`, so the timeout guard covers all current outbound HTTP callers.
   - If future code bypasses `ExternalApiUtils` and creates its own `WebClient`, it would need its own timeout policy.
+
+## 12. Step 6 /news Detail Reliability Result
+- analyzed detail-route risks
+  - `NewsController.detail(...)` called `NewsQueryService.getNewsDetail(id)` directly and then entered anonymous gate and model-population logic without a route-local fail-open boundary.
+  - `NewsQueryService.getNewsDetail(...)` is backed by `NewsEventRepository.findById(...)`, so a repository/runtime failure would have escaped to `GlobalExceptionHandler` and returned a public 500.
+  - `GlobalExceptionHandler.handleGeneralException(...)` is a JSON-style fallback, not a public HTML recovery path, so it did not satisfy the reliability goal for `/news/{id}`.
+  - detail model derivation itself is currently defensive, but any runtime exception from the gate service or future derived-data code would still have hard-failed the route before this step.
+- added test cases
+  - `givenAnonymousDetailGateFailure_whenDetail_thenRedirectToNewsList`
+  - `givenNewsDetailFailure_whenRequest_thenRedirectToList`
+- whether production code changed
+  - yes
+  - `NewsController.detail(...)` now wraps the detail flow in a narrow `RuntimeException` fail-open boundary and redirects to `/news` when detail loading or derived detail rendering fails.
+- exact files changed
+  - `src/main/java/com/example/macronews/controller/NewsController.java`
+  - `src/test/java/com/example/macronews/controller/NewsControllerTest.java`
+  - `src/test/java/com/example/macronews/config/PublicNewsAccessIntegrationTest.java`
+  - `docs/reports/reliability-baseline-step1.md`
+- why the chosen fix was minimal
+  - the defect is isolated to the public detail controller path, so the smallest safe change was to contain failures there instead of broadening service or global exception handling.
+  - list-route behavior was left untouched.
+  - no unrelated refactor or new abstraction was introduced.
+- executed commands
+  - `$env:GRADLE_USER_HOME="$PWD\.gradle-user"; .\gradlew.bat --no-daemon --no-configuration-cache --stacktrace test --tests com.example.macronews.controller.NewsControllerTest`
+  - `$env:GRADLE_USER_HOME="$PWD\.gradle-user"; .\gradlew.bat --no-daemon --no-configuration-cache --stacktrace test --tests com.example.macronews.config.PublicNewsAccessIntegrationTest`
+  - `$env:GRADLE_USER_HOME="$PWD\.gradle-user"; .\gradlew.bat --no-daemon --no-configuration-cache --stacktrace test --tests com.example.macronews.service.news.NewsQueryServiceTest`
+- final test results
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - `NewsQueryServiceTest`: PASS
+- remaining reliability gaps
+  - There is still no explicit test that injects malformed article-derived data into a real detail view object, but the controller-level fail-open boundary now prevents that class of failure from surfacing as a public 500 for the current implementation.
+  - If future detail-specific dependencies are added outside the controller boundary, they should be kept inside the same fail-open block or given their own defensive handling.

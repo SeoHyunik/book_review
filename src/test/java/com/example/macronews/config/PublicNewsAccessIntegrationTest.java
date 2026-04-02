@@ -4,6 +4,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -88,6 +89,17 @@ class PublicNewsAccessIntegrationTest {
         mockMvc.perform(get("/news/non-existent-id"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/news"));
+    }
+
+    @Test
+    void givenNewsDetailFailure_whenRequest_thenRedirectToList() throws Exception {
+        willThrow(new RuntimeException("detail lookup unavailable"))
+                .given(newsQueryService).getNewsDetail("failing-id");
+
+        mockMvc.perform(get("/news/failing-id"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/news"))
+                .andExpect(flash().attributeExists("errorMessage"));
     }
 
     @Test

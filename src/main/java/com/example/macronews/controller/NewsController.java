@@ -160,39 +160,45 @@ public class NewsController {
             HttpSession session,
             Model model,
             RedirectAttributes redirectAttributes) {
-        NewsDetailDto newsDetail = newsQueryService.getNewsDetail(id).orElse(null);
-        if (newsDetail == null) {
-            log.warn("News detail requested with invalid id={}", id);
-            redirectAttributes.addFlashAttribute("errorMessage", "News event not found.");
+        try {
+            NewsDetailDto newsDetail = newsQueryService.getNewsDetail(id).orElse(null);
+            if (newsDetail == null) {
+                log.warn("News detail requested with invalid id={}", id);
+                redirectAttributes.addFlashAttribute("errorMessage", "News event not found.");
+                return "redirect:/news";
+            }
+
+            if (isAnonymous(authentication) && !anonymousDetailViewGateService.canAccess(id, session)) {
+                redirectAttributes.addAttribute("continue", "/news/" + id);
+                redirectAttributes.addAttribute("gated", "1");
+                return "redirect:/login";
+            }
+            if (isAnonymous(authentication)) {
+                anonymousDetailViewGateService.recordAccess(id, session);
+            }
+
+            model.addAttribute("newsDetail", newsDetail);
+            String localizedTitle = resolveLocalizedDetailTitle(newsDetail);
+            String localizedSummary = resolveLocalizedInterpretationSummary(newsDetail, localizedTitle);
+            String originalArticleSummary = resolveOriginalArticleSummary(newsDetail, localizedTitle);
+            model.addAttribute("localizedDetailTitle", localizedTitle);
+            model.addAttribute("localizedInterpretationSummary", localizedSummary);
+            model.addAttribute("originalArticleSummary", originalArticleSummary);
+            model.addAttribute("pageTitle", localizedTitle == null ? "News Detail" : localizedTitle);
+            String description = localizedSummary == null || localizedSummary.isBlank()
+                    ? "Macro news detail and interpretation result."
+                    : localizedSummary;
+            model.addAttribute("pageDescription", description);
+            model.addAttribute("ogTitle", localizedTitle == null ? "News Detail" : localizedTitle);
+            model.addAttribute("ogDescription", description);
+            model.addAttribute("ogUrl", "/news/" + newsDetail.id());
+            log.debug("Rendering news detail page for id={}", id);
+            return "news/detail";
+        } catch (RuntimeException ex) {
+            log.warn("Rendering news detail failed for id={}, redirecting to list", id, ex);
+            redirectAttributes.addFlashAttribute("errorMessage", "News detail is temporarily unavailable.");
             return "redirect:/news";
         }
-
-        if (isAnonymous(authentication) && !anonymousDetailViewGateService.canAccess(id, session)) {
-            redirectAttributes.addAttribute("continue", "/news/" + id);
-            redirectAttributes.addAttribute("gated", "1");
-            return "redirect:/login";
-        }
-        if (isAnonymous(authentication)) {
-            anonymousDetailViewGateService.recordAccess(id, session);
-        }
-
-        model.addAttribute("newsDetail", newsDetail);
-        String localizedTitle = resolveLocalizedDetailTitle(newsDetail);
-        String localizedSummary = resolveLocalizedInterpretationSummary(newsDetail, localizedTitle);
-        String originalArticleSummary = resolveOriginalArticleSummary(newsDetail, localizedTitle);
-        model.addAttribute("localizedDetailTitle", localizedTitle);
-        model.addAttribute("localizedInterpretationSummary", localizedSummary);
-        model.addAttribute("originalArticleSummary", originalArticleSummary);
-        model.addAttribute("pageTitle", localizedTitle == null ? "News Detail" : localizedTitle);
-        String description = localizedSummary == null || localizedSummary.isBlank()
-                ? "Macro news detail and interpretation result."
-                : localizedSummary;
-        model.addAttribute("pageDescription", description);
-        model.addAttribute("ogTitle", localizedTitle == null ? "News Detail" : localizedTitle);
-        model.addAttribute("ogDescription", description);
-        model.addAttribute("ogUrl", "/news/" + newsDetail.id());
-        log.debug("Rendering news detail page for id={}", id);
-        return "news/detail";
     }
 
     private boolean isAnonymous(Authentication authentication) {

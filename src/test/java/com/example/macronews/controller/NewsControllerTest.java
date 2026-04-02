@@ -162,6 +162,55 @@ class NewsControllerTest {
     }
 
     @Test
+    @DisplayName("detail should redirect to the news list when detail lookup fails")
+    void givenDetailLookupFailure_whenDetail_thenRedirectToNewsList() {
+        willThrow(new RuntimeException("detail unavailable"))
+                .given(newsQueryService).getNewsDetail("news-error");
+
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        String viewName = newsController.detail(
+                "news-error",
+                null,
+                mock(HttpSession.class),
+                new ConcurrentModel(),
+                redirectAttributes);
+
+        assertThat(viewName).isEqualTo("redirect:/news");
+        assertThat(redirectAttributes.getFlashAttributes()).containsKey("errorMessage");
+    }
+
+    @Test
+    @DisplayName("detail should redirect to the news list when anonymous detail gating fails")
+    void givenAnonymousDetailGateFailure_whenDetail_thenRedirectToNewsList() {
+        NewsDetailDto detail = new NewsDetailDto(
+                "news-4",
+                "Fed keeps rates unchanged",
+                "Officials signaled a cautious stance while watching inflation data.",
+                "Reuters",
+                "https://example.com/news-4",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                NewsStatus.ANALYZED,
+                null
+        );
+        HttpSession session = mock(HttpSession.class);
+        given(newsQueryService.getNewsDetail("news-4")).willReturn(Optional.of(detail));
+        willThrow(new RuntimeException("gate unavailable"))
+                .given(anonymousDetailViewGateService)
+                .canAccess("news-4", session);
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+
+        String viewName = newsController.detail(
+                "news-4",
+                null,
+                session,
+                new ConcurrentModel(),
+                redirectAttributes);
+
+        assertThat(viewName).isEqualTo("redirect:/news");
+        assertThat(redirectAttributes.getFlashAttributes()).containsKey("errorMessage");
+    }
+
+    @Test
     @DisplayName("list should expose aggregated market forecast snapshot when present")
     void list_addsAggregatedSnapshotToModel() {
         MarketForecastSnapshotDto snapshot = new MarketForecastSnapshotDto(
