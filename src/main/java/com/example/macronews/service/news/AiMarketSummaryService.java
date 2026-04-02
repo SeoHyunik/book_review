@@ -42,6 +42,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @Service
 @RequiredArgsConstructor
@@ -117,8 +119,8 @@ public class AiMarketSummaryService {
     }
 
     public Optional<FeaturedMarketSummaryDto> generateCurrentSummary() {
-        List<NewsEvent> recentItems = recentMarketSummaryService.loadRecentAnalyzedNews(
-                resolveWindowHours(), resolveMaxItems());
+        SummaryPreparation preparation = loadSummaryPreparation();
+        List<NewsEvent> recentItems = preparation.recentItems();
         if (recentItems.size() < resolveMinItems()) {
             log.info("[MARKET_SUMMARY] skipped reason=insufficient-analyzed-news queryBasis=analysisResult.createdAt|ingestedAt size={} minItems={}",
                     recentItems.size(), resolveMinItems());
@@ -126,7 +128,7 @@ public class AiMarketSummaryService {
         }
 
         try {
-            Optional<MarketForecastSummaryHandoffDto> forecastHandoff = marketForecastQueryService.getCurrentSummaryHandoff();
+            Optional<MarketForecastSummaryHandoffDto> forecastHandoff = preparation.forecastHandoff();
             log.debug("[MARKET_SUMMARY] secondary-forecast-handoff available={}", forecastHandoff.isPresent());
             String payload = buildPayload(recentItems, forecastHandoff.orElse(null));
             HttpHeaders headers = new HttpHeaders();
@@ -153,6 +155,23 @@ public class AiMarketSummaryService {
         } catch (Exception ex) {
             log.warn("[MARKET_SUMMARY] synthesis failed", ex);
             return Optional.empty();
+        }
+    }
+
+    private SummaryPreparation loadSummaryPreparation() {
+        try {
+            SummaryPreparation preparation = Mono.zip(
+                            Mono.fromCallable(() -> recentMarketSummaryService.loadRecentAnalyzedNews(
+                                            resolveWindowHours(), resolveMaxItems()))
+                                    .subscribeOn(Schedulers.boundedElastic()),
+                            Mono.fromCallable(marketForecastQueryService::getCurrentSummaryHandoff)
+                                    .subscribeOn(Schedulers.boundedElastic()))
+                    .map(tuple -> new SummaryPreparation(tuple.getT1(), tuple.getT2()))
+                    .block();
+            return preparation == null ? SummaryPreparation.empty() : preparation;
+        } catch (RuntimeException ex) {
+            log.warn("[MARKET_SUMMARY] preparation failed", ex);
+            return SummaryPreparation.empty();
         }
     }
 
@@ -496,6 +515,15 @@ public class AiMarketSummaryService {
 
     private String defaultText(String value) {
         return value == null ? "" : value;
+    }
+
+    private record SummaryPreparation(
+            List<NewsEvent> recentItems,
+            Optional<MarketForecastSummaryHandoffDto> forecastHandoff) {
+
+        private static SummaryPreparation empty() {
+            return new SummaryPreparation(List.of(), Optional.empty());
+        }
     }
 
     private String truncate(String value, int maxLength) {

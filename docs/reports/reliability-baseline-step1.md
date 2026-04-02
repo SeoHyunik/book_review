@@ -417,3 +417,38 @@
   - no controller migration to WebFlux was attempted
   - no repository change was made
   - no provider implementation was rewritten
+
+## 18. Step 11 Reactive Phase 2 Result
+- what changed
+  - reduced serial waiting inside `AiMarketSummaryService.generateCurrentSummary()` by loading recent analyzed news and forecast handoff preparation in parallel
+  - reduced serial waiting inside `MarketForecastQueryService.getCurrentForecastDetail()` by loading related news items and the aggregated market snapshot in parallel
+  - reused the Phase 1 async-ready market snapshot path instead of reintroducing per-provider blocking calls
+  - preserved controller contracts, repository access, and all public service signatures
+- async/optimized paths used
+  - `AiMarketSummaryService` now prepares recent news and forecast handoff together through an internal `Mono.zip(...)` boundary
+  - `MarketForecastQueryService` now prepares related news and market snapshot together through an internal `Mono.zip(...)` boundary
+  - `NewsAggregationService` still consumes the Phase 1 aggregated market snapshot path for forecast context composition
+- files changed
+  - `src/main/java/com/example/macronews/service/news/AiMarketSummaryService.java`
+  - `src/main/java/com/example/macronews/service/forecast/NewsAggregationService.java`
+  - `src/main/java/com/example/macronews/service/forecast/MarketForecastQueryService.java`
+  - `src/test/java/com/example/macronews/service/news/AiMarketSummaryServiceTest.java`
+  - `src/test/java/com/example/macronews/service/forecast/MarketForecastQueryServiceTest.java`
+  - `docs/reports/reliability-baseline-step1.md`
+- whether summary/forecast serial waiting was reduced
+  - yes
+  - the summary path no longer waits for the forecast handoff after news loading completes
+  - the forecast detail path no longer waits for related news loading before starting market snapshot preparation
+  - fail-open fallback behavior remained unchanged
+- test results
+  - `AiMarketSummaryServiceTest`: PASS
+  - `NewsAggregationServiceTest`: PASS
+  - `RecentMarketSummaryServiceTest`: PASS
+  - `MarketSummarySnapshotServiceTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - `MarketForecastQueryServiceTest`: PASS
+- notes
+  - no WebFlux controller migration was attempted
+  - no repository change was made
+  - no provider rewrite was introduced

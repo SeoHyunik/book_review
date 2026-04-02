@@ -4,15 +4,14 @@ import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastDetailDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.forecast.MarketForecastSummaryHandoffDto;
-import com.example.macronews.dto.market.FxSnapshotDto;
-import com.example.macronews.dto.market.GoldSnapshotDto;
-import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.service.market.MarketDataFacade;
 import com.example.macronews.service.news.NewsQueryService;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @Service
 @RequiredArgsConstructor
@@ -32,11 +31,21 @@ public class MarketForecastQueryService {
 
     public Optional<MarketForecastDetailDto> getCurrentForecastDetail() {
         return getCurrentSnapshot().map(snapshot -> {
-            List<NewsListItemDto> relatedNewsItems = newsQueryService.getNewsItemsByIds(snapshot.relatedNewsIds());
-            FxSnapshotDto fxSnapshot = marketDataFacade.getUsdKrw().orElse(null);
-            GoldSnapshotDto goldSnapshot = marketDataFacade.getGold().orElse(null);
-            OilSnapshotDto oilSnapshot = marketDataFacade.getOil().orElse(null);
-            return new MarketForecastDetailDto(snapshot, relatedNewsItems, fxSnapshot, goldSnapshot, oilSnapshot);
+            DetailPreparation preparation = Mono.zip(
+                            Mono.fromCallable(() -> newsQueryService.getNewsItemsByIds(snapshot.relatedNewsIds()))
+                                    .subscribeOn(Schedulers.boundedElastic()),
+                            Mono.fromCallable(marketDataFacade::getCurrentMarketSnapshot)
+                                    .subscribeOn(Schedulers.boundedElastic()))
+                    .map(tuple -> new DetailPreparation(tuple.getT1(), tuple.getT2()))
+                    .block();
+            DetailPreparation resolvedPreparation = preparation == null ? DetailPreparation.empty() : preparation;
+            MarketDataFacade.MarketDataSnapshot marketSnapshot = resolvedPreparation.marketSnapshot();
+            return new MarketForecastDetailDto(
+                    snapshot,
+                    resolvedPreparation.relatedNewsItems(),
+                    marketSnapshot.usdKrw().orElse(null),
+                    marketSnapshot.gold().orElse(null),
+                    marketSnapshot.oil().orElse(null));
         });
     }
 
@@ -49,5 +58,14 @@ public class MarketForecastQueryService {
                 snapshot.analyzedNewsCount(),
                 snapshot.generatedAt()
         );
+    }
+
+    private record DetailPreparation(
+            List<NewsListItemDto> relatedNewsItems,
+            MarketDataFacade.MarketDataSnapshot marketSnapshot) {
+
+        private static DetailPreparation empty() {
+            return new DetailPreparation(List.of(), MarketDataFacade.MarketDataSnapshot.empty());
+        }
     }
 }

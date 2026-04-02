@@ -9,12 +9,16 @@ import com.example.macronews.domain.MarketMood;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
+import com.example.macronews.dto.market.DxySnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.dto.market.GoldSnapshotDto;
+import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
+import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.service.market.MarketDataFacade;
 import com.example.macronews.service.news.NewsQueryService;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,12 +63,18 @@ class MarketForecastQueryServiceTest {
         NewsListItemDto relatedNews = new NewsListItemDto(
                 "news-1", "KOSPI rises", "KOSPI rises", "Reuters", Instant.now(), Instant.now(), null, true, true,
                 ImpactDirection.UP, SignalSentiment.POSITIVE, "", "summary", 1);
+        MarketDataFacade.MarketDataSnapshot marketSnapshot = new MarketDataFacade.MarketDataSnapshot(
+                Optional.of(new FxSnapshotDto("USD", "KRW", 1330.0d, Instant.now())),
+                Optional.of(new GoldSnapshotDto("USD", 2000.0d, Instant.now())),
+                Optional.of(new OilSnapshotDto(78.1d, 82.4d, Instant.now())),
+                Optional.of(new IndexSnapshotDto("KOSPI", 2685.4d, Instant.now())),
+                Optional.of(new Us10ySnapshotDto(4.21d, LocalDate.parse("2026-03-17"), "FRED", "DGS10")),
+                Optional.of(new DxySnapshotDto(103.45d, Instant.now(), "TWELVE_DATA_SYNTHETIC", "ICE_DXY_BASKET", true))
+        );
 
         given(newsAggregationService.getCurrentSnapshot()).willReturn(Optional.of(snapshot));
         given(newsQueryService.getNewsItemsByIds(List.of("news-1"))).willReturn(List.of(relatedNews));
-        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1330.0d, Instant.now())));
-        given(marketDataFacade.getGold()).willReturn(Optional.of(new GoldSnapshotDto("USD", 2000.0d, Instant.now())));
-        given(marketDataFacade.getOil()).willReturn(Optional.of(new OilSnapshotDto(78.1d, 82.4d, Instant.now())));
+        given(marketDataFacade.getCurrentMarketSnapshot()).willReturn(marketSnapshot);
 
         var detail = marketForecastQueryService.getCurrentForecastDetail();
 

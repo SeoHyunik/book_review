@@ -50,6 +50,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 @Service
 @RequiredArgsConstructor
@@ -113,7 +115,8 @@ public class NewsAggregationService {
     }
 
     Optional<MarketForecastSnapshotDto> generateCurrentSnapshot() {
-        List<NewsEvent> candidates = loadRecentAnalyzedNews();
+        ForecastPreparation preparation = loadForecastPreparation();
+        List<NewsEvent> candidates = preparation.recentNews();
         if (candidates.size() < MIN_REQUIRED_NEWS_ITEMS) {
             log.info("[FORECAST] skipped reason=insufficient-news size={}", candidates.size());
             return Optional.empty();
@@ -124,7 +127,7 @@ public class NewsAggregationService {
         }
 
         try {
-            String marketContext = resolveMarketContext();
+            String marketContext = preparation.marketContext();
             String payload = buildPayload(candidates, marketContext);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -148,6 +151,22 @@ public class NewsAggregationService {
         } catch (Exception ex) {
             log.warn("[FORECAST] aggregation failed", ex);
             return Optional.empty();
+        }
+    }
+
+    private ForecastPreparation loadForecastPreparation() {
+        try {
+            ForecastPreparation preparation = Mono.zip(
+                            Mono.fromCallable(this::loadRecentAnalyzedNews)
+                                    .subscribeOn(Schedulers.boundedElastic()),
+                            Mono.fromCallable(this::resolveMarketContext)
+                                    .subscribeOn(Schedulers.boundedElastic()))
+                    .map(tuple -> new ForecastPreparation(tuple.getT1(), tuple.getT2()))
+                    .block();
+            return preparation == null ? ForecastPreparation.empty() : preparation;
+        } catch (RuntimeException ex) {
+            log.warn("[FORECAST] preparation failed", ex);
+            return ForecastPreparation.empty();
         }
     }
 
@@ -483,6 +502,13 @@ public class NewsAggregationService {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value : fallback;
+    }
+
+    private record ForecastPreparation(List<NewsEvent> recentNews, String marketContext) {
+
+        private static ForecastPreparation empty() {
+            return new ForecastPreparation(List.of(), "");
+        }
     }
 
     private record CachedSnapshot(Optional<MarketForecastSnapshotDto> snapshot, Instant createdAt) {
