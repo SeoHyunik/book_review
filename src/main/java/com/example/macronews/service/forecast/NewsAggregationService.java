@@ -12,9 +12,11 @@ import com.example.macronews.domain.OpenAiUsageFeatureType;
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
+import com.example.macronews.dto.market.DxySnapshotDto;
 import com.example.macronews.dto.market.GoldSnapshotDto;
 import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
+import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.market.MarketDataFacade;
@@ -268,6 +270,8 @@ public class NewsAggregationService {
             GoldSnapshotDto goldSnapshot = marketDataFacade.getGold().orElse(null);
             OilSnapshotDto oilSnapshot = marketDataFacade.getOil().orElse(null);
             IndexSnapshotDto kospiSnapshot = marketDataFacade.getKospi().orElse(null);
+            Us10ySnapshotDto us10ySnapshot = marketDataFacade.getUs10y().orElse(null);
+            DxySnapshotDto dxySnapshot = marketDataFacade.getDxy().orElse(null);
 
             if (fxSnapshot != null) {
                 lines.add("- USD/KRW: " + formatDecimal(fxSnapshot.rate()));
@@ -285,6 +289,17 @@ public class NewsAggregationService {
             }
             if (kospiSnapshot != null && kospiSnapshot.price() != null) {
                 lines.add("- KOSPI: " + formatDecimal(kospiSnapshot.price()));
+            }
+            if (us10ySnapshot != null) {
+                lines.add("- US 10Y: " + formatDecimal(us10ySnapshot.yield()) + "% ("
+                        + us10ySnapshot.source() + " " + us10ySnapshot.sourceSeries() + ")");
+            }
+            if (dxySnapshot != null) {
+                String sourceLabel = dxySnapshot.synthetic()
+                        ? dxySnapshot.source() + " synthetic"
+                        : dxySnapshot.source();
+                lines.add("- DXY: " + formatDecimal(dxySnapshot.value()) + " (" + sourceLabel
+                        + ", " + dxySnapshot.sourceSeries() + ")");
             }
 
             if (lines.isEmpty()) {
@@ -313,6 +328,13 @@ public class NewsAggregationService {
 
     private String formatDecimal(double value) {
         return String.format(Locale.ROOT, "%.1f", value);
+    }
+
+    private String formatDecimal(java.math.BigDecimal value) {
+        if (value == null) {
+            return "";
+        }
+        return value.stripTrailingZeros().toPlainString();
     }
 
     private List<Map<String, Object>> summarizeMacroImpacts(List<MacroImpact> impacts) {
@@ -470,5 +492,3 @@ public class NewsAggregationService {
         }
     }
 }
-
-

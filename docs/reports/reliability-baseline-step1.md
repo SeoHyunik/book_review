@@ -260,3 +260,60 @@
 - remaining reliability gaps
   - There is still no explicit test that injects malformed article-derived data into a real detail view object, but the controller-level fail-open boundary now prevents that class of failure from surfacing as a public 500 for the current implementation.
   - If future detail-specific dependencies are added outside the controller boundary, they should be kept inside the same fail-open block or given their own defensive handling.
+
+## 13. Step 7 Price-aware Data Integration
+- US 10Y source used
+  - FRED official API `fred/series/observations`
+  - Series ID `DGS10`
+  - Latest valid observation only, with `.` values skipped as absent data
+  - Source label `FRED`, source series `DGS10`
+- DXY source mode used
+  - Twelve Data symbol discovery is used first to verify a direct DXY symbol before reading a direct quote
+  - If no verified direct symbol is available, the provider falls back to a synthetic ICE-basis DXY computed from `EUR/USD`, `USD/JPY`, `GBP/USD`, `USD/CAD`, `USD/SEK`, and `USD/CHF`
+  - Synthetic source label `TWELVE_DATA_SYNTHETIC`, direct source label `TWELVE_DATA_DIRECT`
+  - Synthetic snapshots are marked with `synthetic=true`
+- exact files changed
+  - `src/main/java/com/example/macronews/dto/market/DxySnapshotDto.java`
+  - `src/main/java/com/example/macronews/dto/market/Us10ySnapshotDto.java`
+  - `src/main/java/com/example/macronews/service/market/DxyProvider.java`
+  - `src/main/java/com/example/macronews/service/market/FredUs10yProvider.java`
+  - `src/main/java/com/example/macronews/service/market/MarketDataFacade.java`
+  - `src/main/java/com/example/macronews/service/market/TwelveDataDxyProvider.java`
+  - `src/main/java/com/example/macronews/service/market/Us10yProvider.java`
+  - `src/main/java/com/example/macronews/service/forecast/NewsAggregationService.java`
+  - `src/main/java/com/example/macronews/service/news/RecentMarketSummaryService.java`
+  - `src/main/resources/application.yaml`
+  - `src/test/java/com/example/macronews/service/forecast/NewsAggregationServiceTest.java`
+  - `src/test/java/com/example/macronews/service/market/MarketPriceProvidersTest.java`
+  - `src/test/java/com/example/macronews/service/market/MarketProviderParsingTest.java`
+  - `src/test/java/com/example/macronews/service/news/RecentMarketSummaryServiceTest.java`
+- why the chosen approach was minimal and safe
+  - The new market inputs were added as separate providers behind the existing `MarketDataFacade`, so the existing architecture stayed intact.
+  - All external calls still flow through `ExternalApiUtils`, preserving the centralized timeout and fail-open path.
+  - The price-aware changes were limited to the two existing consumers that already build market context and confidence signals.
+  - No unrelated route, list, or summary flow was rewritten.
+- test cases added or updated
+  - `givenFREDObservations_whenGetUs10y_thenParseLatestValidObservation`
+  - `givenFredDotObservation_whenGetUs10y_thenReturnEmpty`
+  - `givenVerifiedDirectSymbol_whenGetDxy_thenUseDirectSymbolPath`
+  - `givenSyntheticFxQuotes_whenGetDxy_thenComputeSyntheticIndex`
+  - `givenMissingSyntheticComponent_whenGetDxy_thenReturnEmpty`
+  - `getCurrentSnapshot_appendsOnlyAvailableMarketValues`
+  - `getCurrentSummary_appliesLegacyPriceAwareConfidenceModifier`
+  - `getCurrentSummary_appliesDxyAndUs10yPriceAwareModifier`
+- executed commands
+  - `$env:GRADLE_USER_HOME="$PWD\.gradle-user"; .\gradlew.bat --no-daemon --no-configuration-cache --stacktrace test --tests com.example.macronews.service.market.MarketProviderParsingTest --tests com.example.macronews.service.market.MarketPriceProvidersTest`
+  - `$env:GRADLE_USER_HOME="$PWD\.gradle-user"; .\gradlew.bat --no-daemon --no-configuration-cache --stacktrace test --tests com.example.macronews.service.forecast.NewsAggregationServiceTest`
+  - `$env:GRADLE_USER_HOME="$PWD\.gradle-user"; .\gradlew.bat --no-daemon --no-configuration-cache --stacktrace test --tests com.example.macronews.service.news.AiMarketSummaryServiceTest`
+  - `$env:GRADLE_USER_HOME="$PWD\.gradle-user"; .\gradlew.bat --no-daemon --no-configuration-cache --stacktrace test --tests com.example.macronews.controller.NewsControllerTest`
+  - `$env:GRADLE_USER_HOME="$PWD\.gradle-user"; .\gradlew.bat --no-daemon --no-configuration-cache --stacktrace test --tests com.example.macronews.config.PublicNewsAccessIntegrationTest`
+- final test results
+  - `MarketProviderParsingTest`: PASS
+  - `MarketPriceProvidersTest`: PASS
+  - `NewsAggregationServiceTest`: PASS
+  - `AiMarketSummaryServiceTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+- remaining gaps
+  - DXY symbol discovery is verified through mocked Twelve Data responses, but production symbol availability still depends on the live vendor catalog.
+  - US 10Y remains an economic-data series rather than a tick-level market feed, so intraday precision is intentionally limited to the latest valid FRED observation.

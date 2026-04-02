@@ -1,14 +1,20 @@
 package com.example.macronews.service.market;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
+import com.example.macronews.dto.market.DxySnapshotDto;
+import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +34,8 @@ class MarketProviderParsingTest {
     private MetalPriceApiProvider metalPriceApiProvider;
     private OilPriceApiProvider oilPriceApiProvider;
     private TwelveDataIndexQuoteProvider twelveDataIndexQuoteProvider;
+    private FredUs10yProvider fredUs10yProvider;
+    private TwelveDataDxyProvider twelveDataDxyProvider;
 
     @BeforeEach
     void setUp() {
@@ -36,6 +44,8 @@ class MarketProviderParsingTest {
         metalPriceApiProvider = new MetalPriceApiProvider(externalApiUtils, objectMapper);
         oilPriceApiProvider = new OilPriceApiProvider(externalApiUtils, objectMapper);
         twelveDataIndexQuoteProvider = new TwelveDataIndexQuoteProvider(externalApiUtils, objectMapper);
+        fredUs10yProvider = new FredUs10yProvider(externalApiUtils, objectMapper);
+        twelveDataDxyProvider = new TwelveDataDxyProvider(externalApiUtils, objectMapper);
 
         ReflectionTestUtils.setField(exchangeRateApiProvider, "enabled", true);
         ReflectionTestUtils.setField(exchangeRateApiProvider, "baseUrl", "https://v6.exchangerate-api.com");
@@ -51,6 +61,13 @@ class MarketProviderParsingTest {
 
         ReflectionTestUtils.setField(twelveDataIndexQuoteProvider, "enabled", true);
         ReflectionTestUtils.setField(twelveDataIndexQuoteProvider, "apiKey", "index-key");
+
+        ReflectionTestUtils.setField(fredUs10yProvider, "enabled", true);
+        ReflectionTestUtils.setField(fredUs10yProvider, "baseUrl", "https://api.stlouisfed.org/fred");
+        ReflectionTestUtils.setField(fredUs10yProvider, "apiKey", "fred-key");
+
+        ReflectionTestUtils.setField(twelveDataDxyProvider, "enabled", true);
+        ReflectionTestUtils.setField(twelveDataDxyProvider, "apiKey", "dxy-key");
     }
 
     @Test
@@ -174,6 +191,119 @@ class MarketProviderParsingTest {
                 """));
 
         var snapshot = twelveDataIndexQuoteProvider.getQuote("KOSPI");
+
+        assertThat(snapshot).isEmpty();
+    }
+
+    @Test
+    @DisplayName("US 10Y provider should parse the latest valid FRED observation")
+    void getUs10y_parsesLatestValidObservation() {
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "observations": [
+                    {"date": "2026-03-17", "value": "."},
+                    {"date": "2026-03-16", "value": "4.27"}
+                  ]
+                }
+                """));
+
+        var snapshot = fredUs10yProvider.getUs10y();
+
+        assertThat(snapshot).isPresent();
+        assertThat(snapshot.get().yield()).isEqualTo(4.27d);
+        assertThat(snapshot.get().asOfDate()).isEqualTo(LocalDate.parse("2026-03-16"));
+        assertThat(snapshot.get().source()).isEqualTo("FRED");
+        assertThat(snapshot.get().sourceSeries()).isEqualTo("DGS10");
+    }
+
+    @Test
+    @DisplayName("US 10Y provider should fail open when only missing observations are returned")
+    void getUs10y_returnsEmptyWhenOnlyMissingObservationsExist() {
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "observations": [
+                    {"date": "2026-03-17", "value": "."},
+                    {"date": "2026-03-16", "value": "."}
+                  ]
+                }
+                """));
+
+        var snapshot = fredUs10yProvider.getUs10y();
+
+        assertThat(snapshot).isEmpty();
+    }
+
+    @Test
+    @DisplayName("DXY provider should use a verified direct symbol when Twelve Data discovers one")
+    void getDxy_usesVerifiedDirectSymbolWhenAvailable() {
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(
+                        new ExternalApiResult(200, """
+                                {
+                                  "data": [
+                                    {
+                                      "symbol": "DXY",
+                                      "instrument_name": "US Dollar Index",
+                                      "instrument_type": "Index"
+                                    }
+                                  ]
+                                }
+                                """),
+                        new ExternalApiResult(200, """
+                                {
+                                  "symbol": "DXY",
+                                  "price": "104.125",
+                                  "timestamp": "2026-03-17T03:00:00Z"
+                                }
+                                """));
+
+        var snapshot = twelveDataDxyProvider.getDxy();
+
+        assertThat(snapshot).isPresent();
+        assertThat(snapshot.get().value()).isEqualTo(104.125d);
+        assertThat(snapshot.get().asOfDateTime()).isEqualTo(Instant.parse("2026-03-17T03:00:00Z"));
+        assertThat(snapshot.get().source()).isEqualTo("TWELVE_DATA_DIRECT");
+        assertThat(snapshot.get().synthetic()).isFalse();
+        assertThat(snapshot.get().sourceSeries()).isEqualTo("DXY");
+    }
+
+    @Test
+    @DisplayName("DXY provider should compute the synthetic ICE basket when no direct symbol is verified")
+    void getDxy_computesSyntheticBasketWhenDirectSymbolMissing() {
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(
+                        new ExternalApiResult(200, "{\"data\": []}"),
+                        new ExternalApiResult(200, "{\"data\": []}"),
+                        new ExternalApiResult(200, "{\"data\": []}"),
+                        new ExternalApiResult(200, "{\"symbol\": \"EUR/USD\", \"price\": \"1.0800\", \"timestamp\": \"2026-03-17T03:00:00Z\"}"),
+                        new ExternalApiResult(200, "{\"symbol\": \"USD/JPY\", \"price\": \"149.50\", \"timestamp\": \"2026-03-17T02:59:00Z\"}"),
+                        new ExternalApiResult(200, "{\"symbol\": \"GBP/USD\", \"price\": \"1.2650\", \"timestamp\": \"2026-03-17T02:58:00Z\"}"),
+                        new ExternalApiResult(200, "{\"symbol\": \"USD/CAD\", \"price\": \"1.3550\", \"timestamp\": \"2026-03-17T02:57:00Z\"}"),
+                        new ExternalApiResult(200, "{\"symbol\": \"USD/SEK\", \"price\": \"10.1500\", \"timestamp\": \"2026-03-17T02:56:00Z\"}"),
+                        new ExternalApiResult(200, "{\"symbol\": \"USD/CHF\", \"price\": \"0.8850\", \"timestamp\": \"2026-03-17T02:55:00Z\"}")
+                );
+
+        var snapshot = twelveDataDxyProvider.getDxy();
+
+        assertThat(snapshot).isPresent();
+        assertThat(snapshot.get().synthetic()).isTrue();
+        assertThat(snapshot.get().source()).isEqualTo("TWELVE_DATA_SYNTHETIC");
+        assertThat(snapshot.get().sourceSeries()).isEqualTo("FX_BASKET_6");
+        assertThat(snapshot.get().asOfDateTime()).isEqualTo(Instant.parse("2026-03-17T02:55:00Z"));
+        assertThat(snapshot.get().value()).isCloseTo(103.97593505507736d, within(0.000001d));
+    }
+
+    @Test
+    @DisplayName("DXY provider should fail open when a basket component is unavailable")
+    void getDxy_returnsEmptyWhenBasketComponentIsUnavailable() {
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(
+                        new ExternalApiResult(200, "{\"data\": []}"),
+                        new ExternalApiResult(200, "{\"data\": []}"),
+                        new ExternalApiResult(200, "{\"data\": []}"),
+                        new ExternalApiResult(503, "service unavailable"));
+
+        var snapshot = twelveDataDxyProvider.getDxy();
 
         assertThat(snapshot).isEmpty();
     }

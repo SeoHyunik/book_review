@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -15,10 +16,12 @@ import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
+import com.example.macronews.dto.market.DxySnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.dto.market.GoldSnapshotDto;
 import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
+import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.market.MarketDataFacade;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
@@ -83,6 +86,8 @@ class NewsAggregationServiceTest {
                   ]
                 }
                 """.getBytes(StandardCharsets.UTF_8)));
+        lenient().when(marketDataFacade.getUs10y()).thenReturn(java.util.Optional.empty());
+        lenient().when(marketDataFacade.getDxy()).thenReturn(java.util.Optional.empty());
     }
 
     @Test
@@ -139,6 +144,8 @@ class NewsAggregationServiceTest {
         given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
         given(marketDataFacade.getOil()).willReturn(java.util.Optional.empty());
         given(marketDataFacade.getKospi()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getUs10y()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getDxy()).willReturn(java.util.Optional.empty());
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
                 .willReturn(successfulForecastResponse());
 
@@ -165,6 +172,21 @@ class NewsAggregationServiceTest {
                 .willReturn(java.util.Optional.of(new OilSnapshotDto(78.3d, null, Instant.now())));
         given(marketDataFacade.getKospi())
                 .willReturn(java.util.Optional.of(new IndexSnapshotDto("KOSPI", 2685.4d, Instant.now())));
+        given(marketDataFacade.getUs10y())
+                .willReturn(java.util.Optional.of(new Us10ySnapshotDto(
+                        4.21d,
+                        Instant.parse("2026-03-17T00:00:00Z").atZone(java.time.ZoneOffset.UTC).toLocalDate(),
+                        "FRED",
+                        "DGS10"
+                )));
+        given(marketDataFacade.getDxy())
+                .willReturn(java.util.Optional.of(new DxySnapshotDto(
+                        103.45d,
+                        Instant.parse("2026-03-17T00:00:00Z"),
+                        "TWELVE_DATA_SYNTHETIC",
+                        "ICE_DXY_BASKET",
+                        true
+                )));
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
                 .willReturn(successfulForecastResponse());
 
@@ -185,6 +207,8 @@ class NewsAggregationServiceTest {
         assertThat(userContent).contains("- USD/KRW: 1350.2");
         assertThat(userContent).contains("- WTI: 78.3");
         assertThat(userContent).contains("- KOSPI: 2685.4");
+        assertThat(userContent).contains("- US 10Y: 4.2% (FRED DGS10)");
+        assertThat(userContent).contains("- DXY: 103.5 (TWELVE_DATA_SYNTHETIC synthetic, ICE_DXY_BASKET)");
         assertThat(userContent).doesNotContain("- Gold:");
         assertThat(userContent).doesNotContain("- Brent:");
         verify(openAiUsageLoggingService).recordUsage(
@@ -202,6 +226,8 @@ class NewsAggregationServiceTest {
         given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
         given(marketDataFacade.getOil()).willReturn(java.util.Optional.empty());
         given(marketDataFacade.getKospi()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getUs10y()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getDxy()).willReturn(java.util.Optional.empty());
         given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
                 .willReturn(new ExternalApiResult(504, "External API request timed out"));
 

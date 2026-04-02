@@ -9,10 +9,12 @@ import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
+import com.example.macronews.dto.market.DxySnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.dto.market.GoldSnapshotDto;
 import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
+import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.market.MarketDataFacade;
 import java.time.Clock;
@@ -54,6 +56,10 @@ public class RecentMarketSummaryService {
     private static final double OIL_NEGATIVE_LEVEL = 85d;
     private static final double KOSPI_NEGATIVE_LEVEL = 2500d;
     private static final double KOSPI_POSITIVE_LEVEL = 2600d;
+    private static final double DXY_NEGATIVE_LEVEL = 104d;
+    private static final double DXY_POSITIVE_LEVEL = 102d;
+    private static final double US10Y_NEGATIVE_LEVEL = 4.4d;
+    private static final double US10Y_POSITIVE_LEVEL = 4.0d;
 
     private final NewsEventRepository newsEventRepository;
     private final MarketDataFacade marketDataFacade;
@@ -292,6 +298,8 @@ public class RecentMarketSummaryService {
             GoldSnapshotDto gold = marketDataFacade.getGold().orElse(null);
             OilSnapshotDto oil = marketDataFacade.getOil().orElse(null);
             IndexSnapshotDto kospi = marketDataFacade.getKospi().orElse(null);
+            DxySnapshotDto dxy = marketDataFacade.getDxy().orElse(null);
+            Us10ySnapshotDto us10y = marketDataFacade.getUs10y().orElse(null);
 
             int alignedSignals = 0;
 
@@ -311,11 +319,23 @@ public class RecentMarketSummaryService {
                 if (kospi != null && kospi.price() != null && kospi.price() <= KOSPI_NEGATIVE_LEVEL) {
                     alignedSignals++;
                 }
+                if (dxy != null && dxy.value() >= DXY_NEGATIVE_LEVEL) {
+                    alignedSignals++;
+                }
+                if (us10y != null && us10y.yield() >= US10Y_NEGATIVE_LEVEL) {
+                    alignedSignals++;
+                }
             } else if (dominantSentiment == SignalSentiment.POSITIVE) {
                 if (usdKrw != null && usdKrw.rate() <= USD_KRW_POSITIVE_LEVEL) {
                     alignedSignals++;
                 }
                 if (kospi != null && kospi.price() != null && kospi.price() >= KOSPI_POSITIVE_LEVEL) {
+                    alignedSignals++;
+                }
+                if (dxy != null && dxy.value() <= DXY_POSITIVE_LEVEL) {
+                    alignedSignals++;
+                }
+                if (us10y != null && us10y.yield() <= US10Y_POSITIVE_LEVEL) {
                     alignedSignals++;
                 }
             }

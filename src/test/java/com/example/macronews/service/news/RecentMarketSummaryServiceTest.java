@@ -13,14 +13,17 @@ import com.example.macronews.domain.MarketType;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
+import com.example.macronews.dto.market.DxySnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.dto.market.GoldSnapshotDto;
 import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
+import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.market.MarketDataFacade;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
@@ -58,6 +61,8 @@ class RecentMarketSummaryServiceTest {
         lenient().when(marketDataFacade.getGold()).thenReturn(Optional.empty());
         lenient().when(marketDataFacade.getOil()).thenReturn(Optional.empty());
         lenient().when(marketDataFacade.getKospi()).thenReturn(Optional.empty());
+        lenient().when(marketDataFacade.getDxy()).thenReturn(Optional.empty());
+        lenient().when(marketDataFacade.getUs10y()).thenReturn(Optional.empty());
     }
 
     @Test
@@ -314,6 +319,82 @@ class RecentMarketSummaryServiceTest {
         assertThat(result).isPresent();
         assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.POSITIVE);
         assertThat(result.get().confidence()).isGreaterThan(0.6933414141414143d);
+        assertThat(result.get().confidence()).isCloseTo(0.7533414141414143d, within(0.000001d));
+    }
+
+    @Test
+    @DisplayName("price-aware confidence modifier should also use DXY and US 10Y when they align")
+    void getCurrentSummary_appliesLegacyPriceAwareConfidenceModifier() {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.82d)),
+                                List.of()),
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.76d)),
+                                List.of()),
+                        analyzedNews("news-3", "2026-03-12T01:55:00Z", "2026-03-17T01:55:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.40d)),
+                                List.of())
+                ));
+        given(marketDataFacade.getDxy())
+                .willReturn(Optional.of(new DxySnapshotDto(
+                        101.4d,
+                        Instant.parse("2026-03-17T03:00:00Z"),
+                        "TWELVE_DATA_SYNTHETIC",
+                        "FX_BASKET_6",
+                        true
+                )));
+        given(marketDataFacade.getUs10y())
+                .willReturn(Optional.of(new Us10ySnapshotDto(
+                        3.9d,
+                        LocalDate.parse("2026-03-17"),
+                        "FRED",
+                        "DGS10"
+                )));
+
+        var result = recentMarketSummaryService.getCurrentSummary();
+
+        assertThat(result).isPresent();
+        assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.POSITIVE);
+        assertThat(result.get().confidence()).isCloseTo(0.7533414141414143d, within(0.000001d));
+    }
+
+    @Test
+    @DisplayName("price-aware confidence modifier should include DXY and US 10Y when aligned")
+    void getCurrentSummary_appliesDxyAndUs10yPriceAwareModifier() {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(
+                        analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.82d)),
+                                List.of()),
+                        analyzedNews("news-2", "2026-03-12T02:10:00Z", "2026-03-17T02:10:00Z",
+                                List.of(new MacroImpact(MacroVariable.USD, ImpactDirection.DOWN, 0.76d)),
+                                List.of()),
+                        analyzedNews("news-3", "2026-03-12T01:55:00Z", "2026-03-17T01:55:00Z",
+                                List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.40d)),
+                                List.of())
+                ));
+        given(marketDataFacade.getDxy())
+                .willReturn(Optional.of(new DxySnapshotDto(
+                        100.5d,
+                        Instant.parse("2026-03-17T03:00:00Z"),
+                        "TWELVE_DATA_SYNTHETIC",
+                        "FX_BASKET_6",
+                        true
+                )));
+        given(marketDataFacade.getUs10y())
+                .willReturn(Optional.of(new Us10ySnapshotDto(
+                        3.8d,
+                        LocalDate.parse("2026-03-17"),
+                        "FRED",
+                        "DGS10"
+                )));
+
+        var result = recentMarketSummaryService.getCurrentSummary();
+
+        assertThat(result).isPresent();
+        assertThat(result.get().dominantSentiment()).isEqualTo(SignalSentiment.POSITIVE);
         assertThat(result.get().confidence()).isCloseTo(0.7533414141414143d, within(0.000001d));
     }
 
