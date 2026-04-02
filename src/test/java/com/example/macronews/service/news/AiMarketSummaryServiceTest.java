@@ -168,6 +168,23 @@ class AiMarketSummaryServiceTest {
         verify(externalApiUtils, never()).callAPI(any());
     }
 
+    @Test
+    @DisplayName("getCurrentSummary should return empty when the OpenAI request times out")
+    void givenTimeoutResponse_whenGetCurrentSummary_thenReturnEmptySummary() {
+        given(recentMarketSummaryService.loadRecentAnalyzedNews(3, 10))
+                .willReturn(List.of(
+                        newsEvent("news-1", "2026-03-01T02:30:00Z", "2026-03-17T02:30:00Z"),
+                        newsEvent("news-2", "2026-03-02T02:30:00Z", "2026-03-17T02:20:00Z"),
+                        newsEvent("news-3", "2026-03-03T02:30:00Z", "2026-03-17T02:10:00Z")
+                ));
+        given(marketForecastQueryService.getCurrentSummaryHandoff()).willReturn(Optional.empty());
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(504, "External API request timed out"));
+
+        assertThat(aiMarketSummaryService.getCurrentSummary()).isEmpty();
+        verify(openAiUsageLoggingService, never()).recordUsage(any(), any(), any());
+    }
+
     private NewsEvent newsEvent(String id, String publishedAt, String analyzedAt) {
         return new NewsEvent(
                 id,

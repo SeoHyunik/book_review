@@ -4,9 +4,12 @@ import com.example.macronews.dto.request.ExternalApiRequest;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,7 +25,11 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class ExternalApiUtils {
 
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
+
     private final WebClient.Builder webClientBuilder;
+    @Value("${app.external-api.timeout:30s}")
+    private Duration timeout = DEFAULT_TIMEOUT;
 
     public ExternalApiResult callAPI(ExternalApiRequest request) {
         Assert.notNull(request, "External API request must not be null");
@@ -47,6 +54,15 @@ public class ExternalApiUtils {
                                 .defaultIfEmpty("")
                                 .map(body -> new ExternalApiResult(statusCode, body));
                     })
+                    .timeout(resolveTimeout())
+                    .onErrorResume(TimeoutException.class, ex -> {
+                        Duration resolvedTimeout = resolveTimeout();
+                        log.warn("[HTTP] External API request timed out after {}: method={}, url={}",
+                                resolvedTimeout, request.method(), sanitizeUrl(request.url()));
+                        return Mono.just(new ExternalApiResult(
+                                HttpStatus.GATEWAY_TIMEOUT.value(),
+                                "External API request timed out after " + resolvedTimeout));
+                    })
                     .block();
         } catch (WebClientResponseException ex) {
             log.warn("[HTTP] External API responded with status={} bodyLength={}",
@@ -58,6 +74,12 @@ public class ExternalApiUtils {
             log.warn("[HTTP] External API request failed: {}", ex.getMessage());
             return new ExternalApiResult(HttpStatus.SERVICE_UNAVAILABLE.value(), ex.getMessage());
         }
+    }
+
+    private Duration resolveTimeout() {
+        return timeout == null || timeout.isZero() || timeout.isNegative()
+                ? DEFAULT_TIMEOUT
+                : timeout;
     }
 
     public ExternalApiError parseErrorResponse(String body) {

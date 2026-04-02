@@ -190,6 +190,19 @@ class NewsApiServiceImplTest {
     }
 
     @Test
+    @DisplayName("fetchForeignTopHeadlines should return empty when external request times out")
+    void givenTimeoutResponse_whenFetchForeignTopHeadlines_thenReturnEmptyList() {
+        setUpDefaults();
+
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(504, "External API request timed out"));
+
+        var results = newsApiService.fetchForeignTopHeadlines(5);
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
     @DisplayName("semi-fresh bucket should allow controlled fallback global items")
     void fetchForeignTopHeadlines_allowsSemiFreshBucket() {
         setUpDefaults();

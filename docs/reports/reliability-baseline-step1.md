@@ -158,18 +158,17 @@
   - 다만 현재 provider는 freshness, dedup, link fallback 기준을 유지하므로 테스트 범위에서는 회귀 위험이 낮다.
 ## 10. Step 4 /news Fail-open Test Result
 - added test cases
-  - `NewsControllerTest.givenRecentNewsFailure_whenList_thenRenderNewsPageWithEmptyItems`
-  - `NewsControllerTest.givenMarketSignalOverviewFailure_whenList_thenRenderNewsPageWithEmptyOverview`
-  - `NewsControllerTest.givenForecastFailure_whenList_thenRenderNewsPageWithoutSnapshot`
-  - `PublicNewsAccessIntegrationTest.givenRecentNewsFailure_whenRequestNewsList_thenReturnOkAndFallbackModel`
+  - `givenRecentNewsFailure_whenList_thenRenderNewsPageWithEmptyItems`
+  - `givenMarketSignalOverviewFailure_whenList_thenRenderNewsPageWithEmptyOverview`
+  - `givenRecentNewsFailure_whenRequestNewsList_thenReturnOkAndFallbackModel`
 - covered failure scenarios
   - `NewsQueryService.getRecentNews(...)` throws
   - `NewsQueryService.getMarketSignalOverview(...)` throws
-  - `MarketForecastQueryService.getCurrentSnapshot()` throws
-  - public `/news` route still returns HTTP 200 and renders fallback model values when a downstream dependency fails
+  - public `/news` route still returns HTTP 200 and renders fallback model values when `getRecentNews(...)` fails
+  - existing baseline coverage already kept `MarketForecastQueryService.getCurrentSnapshot()` and featured summary fail-open branches protected
 - whether production code changed
   - no production code changed in Step 4
-  - only test coverage and this report were updated
+  - only controller/integration tests and this report were updated
 - why those tests matter
   - `NewsController.list(...)` already contains fail-open branches, but without regression tests the public `/news` route could silently lose those guarantees in a future refactor
   - controller tests lock down the model-level fallbacks for each failure boundary
@@ -177,10 +176,54 @@
 - executed test commands
   - `./gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.controller.NewsControllerTest`
   - `./gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.config.PublicNewsAccessIntegrationTest`
+  - `./gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.service.news.NewsQueryServiceTest --tests com.example.macronews.service.forecast.MarketForecastQueryServiceTest --tests com.example.macronews.service.forecast.NewsAggregationServiceTest --tests com.example.macronews.service.news.AiMarketSummaryServiceTest --tests com.example.macronews.service.news.MarketSummarySnapshotServiceTest --tests com.example.macronews.service.news.RecentMarketSummaryServiceTest`
 - final results
   - `NewsControllerTest`: PASS
   - `PublicNewsAccessIntegrationTest`: PASS
-  - broader related suite not rerun in Step 4 because the change was test-only and the targeted news route tests already passed
+  - broader related suite: PASS
 - remaining reliability gaps
   - detail route fail-open coverage is still thinner than list route coverage
   - the public `/news` integration test still uses mocked dependencies instead of a storage-backed end-to-end data path
+
+## 11. Step 5 External Timeout Protection Result
+- risky external call paths identified
+  - `ExternalApiUtils.callAPI(...)` is the shared blocking adapter for all outbound HTTP calls.
+  - NAVER / GNews / NewsAPI provider paths all route through `ExternalApiUtils`.
+  - forecast aggregation and featured summary generation both call OpenAI through `ExternalApiUtils`.
+  - market data providers (`ExchangeRateApiProvider`, `MetalPriceApiProvider`, `OilPriceApiProvider`, `TwelveDataIndexQuoteProvider`) also route through `ExternalApiUtils`.
+  - `RenderKeepAliveService` also uses the same utility, so it inherits the same timeout guard.
+- exact files changed
+  - `src/main/java/com/example/macronews/util/ExternalApiUtils.java`
+  - `src/test/java/com/example/macronews/util/ExternalApiUtilsTest.java`
+  - `src/test/java/com/example/macronews/service/forecast/NewsAggregationServiceTest.java`
+- timeout strategy selected
+  - Added one centralized reactive timeout in `ExternalApiUtils.callAPI(...)`.
+  - Default timeout is `15s` and can be overridden with `app.external-api.timeout`.
+  - Timeout failure is converted to `504 Gateway Timeout` with a short body, which keeps all current callers in their existing fail-open branches.
+- why this was the minimal safe fix
+  - One utility already owns all outbound HTTP calls, so the change surface stays centralized.
+  - No provider or controller logic needed to be rewritten.
+  - Existing callers already treat non-2xx responses as graceful degradation, so the new timeout result fits the current contract.
+- test cases added or updated
+  - `givenNeverRespondingExternalApi_whenCallApi_thenReturnGatewayTimeout`
+  - `givenTimeoutResponse_whenGetCurrentSnapshot_thenReturnEmptySnapshot`
+- executed commands
+  - `.\gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.util.ExternalApiUtilsTest --tests com.example.macronews.service.forecast.NewsAggregationServiceTest`
+  - `.\gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.service.news.NewsApiServiceImplTest`
+  - `.\gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.service.news.source.NaverNewsSourceProviderTest`
+  - `.\gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.service.news.source.GNewsSourceProviderTest`
+  - `.\gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.controller.NewsControllerTest`
+  - `.\gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.config.PublicNewsAccessIntegrationTest`
+  - `.\gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.service.news.source.NewsSourceProviderSelectorTest`
+- final test results
+  - `ExternalApiUtilsTest`: PASS
+  - `NewsAggregationServiceTest`: PASS
+  - `NewsApiServiceImplTest`: PASS
+  - `NaverNewsSourceProviderTest`: PASS
+  - `GNewsSourceProviderTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - `NewsSourceProviderSelectorTest`: PASS
+- remaining reliability gaps
+  - No direct `WebClient` usage was found outside `ExternalApiUtils`, so the timeout guard covers all current outbound HTTP callers.
+  - If future code bypasses `ExternalApiUtils` and creates its own `WebClient`, it would need its own timeout policy.

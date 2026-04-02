@@ -394,6 +394,66 @@ class NewsControllerTest {
     }
 
     @Test
+    @DisplayName("list should fail open when recent news lookup throws")
+    void givenRecentNewsFailure_whenList_thenRenderNewsPageWithEmptyItems() {
+        given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(new MarketSignalOverviewDto(List.of()));
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+        given(marketSummarySnapshotService.getLatestValidSummary()).willReturn(Optional.empty());
+        given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        willThrow(new RuntimeException("recent news unavailable"))
+                .given(newsQueryService).getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC);
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.list(null, null, null, model);
+
+        assertThat(viewName).isEqualTo("news/list");
+        assertThat(model.getAttribute("newsItems")).isEqualTo(List.of());
+        assertThat(model.getAttribute("featuredNews")).isNull();
+        assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("article");
+        assertThat(model.getAttribute("featuredSummaryMode")).isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("list should fail open when market signal overview lookup throws")
+    void givenMarketSignalOverviewFailure_whenList_thenRenderNewsPageWithEmptyOverview() {
+        NewsListItemDto newsItem = new NewsListItemDto(
+                "news-4",
+                "Market headline",
+                "Market headline",
+                "Reuters",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse("2026-03-17T02:35:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.POSITIVE,
+                "Headline",
+                "Interpretation",
+                10
+        );
+        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(newsItem));
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+        given(marketSummarySnapshotService.getLatestValidSummary()).willReturn(Optional.empty());
+        given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        willThrow(new RuntimeException("market signal unavailable"))
+                .given(newsQueryService).getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC);
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.list(null, null, null, model);
+
+        assertThat(viewName).isEqualTo("news/list");
+        assertThat(model.getAttribute("newsItems")).isEqualTo(List.of(newsItem));
+        assertThat(model.getAttribute("marketSignalOverview")).isEqualTo(new MarketSignalOverviewDto(List.of()));
+        assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("article");
+        assertThat(model.getAttribute("featuredSummaryMode")).isEqualTo(false);
+    }
+
+    @Test
     @DisplayName("list should fail open when market forecast lookup throws")
     void list_failsOpenWhenMarketForecastLookupThrows() {
         given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))

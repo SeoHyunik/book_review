@@ -87,4 +87,13 @@ class GNewsSourceProviderTest {
                 .extracting(ExternalNewsItem::url)
                 .containsExactly("https://gnews.example.com/2");
     }
+
+    @Test
+    @DisplayName("GNews provider should fail open when the external request times out")
+    void givenTimeoutResponse_whenFetchTopHeadlines_thenReturnEmptyList() {
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(504, "External API request timed out"));
+
+        assertThat(provider.fetchTopHeadlines(5)).isEmpty();
+    }
 }

@@ -194,6 +194,22 @@ class NewsAggregationServiceTest {
     }
 
     @Test
+    @DisplayName("getCurrentSnapshot should return empty when the OpenAI request times out")
+    void givenTimeoutResponse_whenGetCurrentSnapshot_thenReturnEmptySnapshot() {
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(recentNews());
+        given(marketDataFacade.getUsdKrw()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getGold()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getOil()).willReturn(java.util.Optional.empty());
+        given(marketDataFacade.getKospi()).willReturn(java.util.Optional.empty());
+        given(externalApiUtils.callAPI(any(ExternalApiRequest.class)))
+                .willReturn(new ExternalApiResult(504, "External API request timed out"));
+
+        assertThat(newsAggregationService.getCurrentSnapshot()).isEmpty();
+        verifyNoInteractions(openAiUsageLoggingService);
+    }
+
+    @Test
     @DisplayName("getCurrentSnapshot should fail open when marketDataFacade throws")
     void getCurrentSnapshot_continuesWhenMarketDataFacadeThrows() throws Exception {
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))

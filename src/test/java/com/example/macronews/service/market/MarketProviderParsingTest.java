@@ -73,6 +73,17 @@ class MarketProviderParsingTest {
     }
 
     @Test
+    @DisplayName("FX provider should fail open when the external request times out")
+    void givenTimeoutResponse_whenGetUsdKrw_thenReturnEmpty() {
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(504, "External API request timed out"));
+
+        var snapshot = exchangeRateApiProvider.getUsdKrw();
+
+        assertThat(snapshot).isEmpty();
+    }
+
+    @Test
     @DisplayName("Gold provider should normalize USD per ounce from mocked response")
     void getGold_parsesUsdPerOunce() {
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
