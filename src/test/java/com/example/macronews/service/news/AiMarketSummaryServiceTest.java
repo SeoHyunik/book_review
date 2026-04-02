@@ -16,6 +16,7 @@ import com.example.macronews.domain.MarketImpact;
 import com.example.macronews.domain.MarketType;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.SignalSentiment;
+import com.example.macronews.config.policy.FeaturedMarketSummaryPolicyProperties;
 import com.example.macronews.service.forecast.MarketForecastQueryService;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
@@ -52,25 +53,28 @@ class AiMarketSummaryServiceTest {
     private OpenAiUsageLoggingService openAiUsageLoggingService;
 
     private AiMarketSummaryService aiMarketSummaryService;
+    private FeaturedMarketSummaryPolicyProperties policyProperties;
 
     @BeforeEach
     void setUp() {
+        policyProperties = new FeaturedMarketSummaryPolicyProperties();
+        policyProperties.setAiEnabled(true);
+        policyProperties.setAiWindowHours(3);
+        policyProperties.setAiMaxItems(10);
+        policyProperties.setAiMinItems(3);
+        policyProperties.setAiMaxInputChars(12000);
+        policyProperties.setAiCacheMinutes(15);
         aiMarketSummaryService = new AiMarketSummaryService(
                 recentMarketSummaryService,
                 marketForecastQueryService,
                 externalApiUtils,
                 new ObjectMapper(),
-                openAiUsageLoggingService
+                openAiUsageLoggingService,
+                policyProperties
         );
         ReflectionTestUtils.setField(aiMarketSummaryService, "clock",
                 Clock.fixed(Instant.parse("2026-03-17T03:00:00Z"), ZoneId.of("Asia/Seoul")));
-        ReflectionTestUtils.setField(aiMarketSummaryService, "aiEnabled", true);
         ReflectionTestUtils.setField(aiMarketSummaryService, "aiModel", "gpt-4o-mini");
-        ReflectionTestUtils.setField(aiMarketSummaryService, "aiWindowHours", 3);
-        ReflectionTestUtils.setField(aiMarketSummaryService, "aiMaxItems", 10);
-        ReflectionTestUtils.setField(aiMarketSummaryService, "aiMinItems", 3);
-        ReflectionTestUtils.setField(aiMarketSummaryService, "aiMaxInputChars", 12000);
-        ReflectionTestUtils.setField(aiMarketSummaryService, "aiCacheMinutes", 15);
         ReflectionTestUtils.setField(aiMarketSummaryService, "openAiApiKey", "test-key");
         ReflectionTestUtils.setField(aiMarketSummaryService, "openAiUrl", "https://api.openai.com/v1/chat/completions");
         ReflectionTestUtils.setField(aiMarketSummaryService, "openAiMaxTokens", 800);
@@ -127,7 +131,7 @@ class AiMarketSummaryServiceTest {
     @Test
     @DisplayName("AI disabled should keep synthesized summary unavailable")
     void getCurrentSummary_returnsEmptyWhenAiDisabled() {
-        ReflectionTestUtils.setField(aiMarketSummaryService, "aiEnabled", false);
+        policyProperties.setAiEnabled(false);
 
         assertThat(aiMarketSummaryService.getCurrentSummary()).isEmpty();
         verify(externalApiUtils, never()).callAPI(any());

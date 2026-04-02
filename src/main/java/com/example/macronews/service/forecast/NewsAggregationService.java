@@ -18,6 +18,7 @@ import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.config.policy.ForecastPolicyProperties;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.market.MarketDataFacade;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
@@ -66,20 +67,9 @@ public class NewsAggregationService {
     private final ObjectMapper objectMapper;
     private final OpenAiUsageLoggingService openAiUsageLoggingService;
     private final MarketDataFacade marketDataFacade;
+    private final ForecastPolicyProperties policyProperties;
 
     private final AtomicReference<CachedSnapshot> cachedSnapshot = new AtomicReference<>();
-
-    @Value("${app.forecast.enabled:true}")
-    private boolean forecastEnabled;
-
-    @Value("${app.forecast.window-hours:3}")
-    private int windowHours;
-
-    @Value("${app.forecast.max-news-items:20}")
-    private int maxNewsItems;
-
-    @Value("${app.forecast.cache-minutes:15}")
-    private int cacheMinutes;
 
     @Value("${openai.api-key:}")
     private String openAiApiKey;
@@ -100,7 +90,7 @@ public class NewsAggregationService {
     private Resource forecastPromptFile;
 
     public Optional<MarketForecastSnapshotDto> getCurrentSnapshot() {
-        if (!forecastEnabled) {
+        if (!policyProperties.isEnabled()) {
             return Optional.empty();
         }
 
@@ -483,15 +473,15 @@ public class NewsAggregationService {
     }
 
     private int resolveWindowHours() {
-        return windowHours > 0 ? windowHours : 3;
+        return policyProperties.getWindowHours() > 0 ? policyProperties.getWindowHours() : 3;
     }
 
     private int resolveMaxNewsItems() {
-        return maxNewsItems > 0 ? maxNewsItems : 20;
+        return policyProperties.getMaxNewsItems() > 0 ? policyProperties.getMaxNewsItems() : 20;
     }
 
     private Duration resolveCacheDuration() {
-        return Duration.ofMinutes(cacheMinutes > 0 ? cacheMinutes : 15L);
+        return Duration.ofMinutes(policyProperties.getCacheMinutes() > 0 ? policyProperties.getCacheMinutes() : 15L);
     }
 
     private boolean isConfigured() {

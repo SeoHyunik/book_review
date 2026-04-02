@@ -452,3 +452,42 @@
   - no WebFlux controller migration was attempted
   - no repository change was made
   - no provider rewrite was introduced
+
+## 19. Step 12 Policy Externalization Result
+- what was externalized
+  - featured market summary policy values: enabled, window hours, max items, min items, AI enabled, AI window hours, AI max items, AI min items, AI max input chars, AI cache minutes
+  - forecast policy values: enabled, window hours, max news items, cache minutes
+- new configuration classes
+  - `com.example.macronews.config.policy.FeaturedMarketSummaryPolicyProperties`
+  - `com.example.macronews.config.policy.ForecastPolicyProperties`
+- files changed
+  - `src/main/java/com/example/macronews/MacroNewsApplication.java`
+  - `src/main/java/com/example/macronews/config/policy/FeaturedMarketSummaryPolicyProperties.java`
+  - `src/main/java/com/example/macronews/config/policy/ForecastPolicyProperties.java`
+  - `src/main/java/com/example/macronews/service/news/RecentMarketSummaryService.java`
+  - `src/main/java/com/example/macronews/service/news/AiMarketSummaryService.java`
+  - `src/main/java/com/example/macronews/service/forecast/NewsAggregationService.java`
+  - `src/test/java/com/example/macronews/service/news/RecentMarketSummaryServiceTest.java`
+  - `src/test/java/com/example/macronews/service/news/AiMarketSummaryServiceTest.java`
+  - `src/test/java/com/example/macronews/service/forecast/NewsAggregationServiceTest.java`
+- default-value compatibility status
+  - preserved
+  - the new typed properties keep the same defaults as the previous `@Value` annotations
+  - runtime fallback guards for invalid values remain in the service layer
+- small readability improvements
+  - yes
+  - replaced scattered `@Value` policy fields with typed configuration objects
+  - simplified the touched service constructors and test setup to use the same policy objects directly
+- test results
+  - `RecentMarketSummaryServiceTest`: PASS
+  - `NewsAggregationServiceTest`: PASS
+  - `AiMarketSummaryServiceTest`: PASS
+  - `MarketForecastQueryServiceTest`: PASS
+  - `MarketSummarySnapshotServiceTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+- notes
+  - no provider selector refactor was started
+  - no NewsQueryService decomposition was introduced
+  - no RecentMarketSummaryService decomposition beyond configuration wiring was introduced
+  - no reactive expansion was added in this step

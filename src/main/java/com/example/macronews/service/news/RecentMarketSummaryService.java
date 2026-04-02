@@ -8,6 +8,7 @@ import com.example.macronews.domain.MarketType;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
+import com.example.macronews.config.policy.FeaturedMarketSummaryPolicyProperties;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
 import com.example.macronews.dto.market.DxySnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
@@ -30,7 +31,6 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -63,23 +63,12 @@ public class RecentMarketSummaryService {
 
     private final NewsEventRepository newsEventRepository;
     private final MarketDataFacade marketDataFacade;
-
-    @Value("${app.featured.market-summary.enabled:true}")
-    private boolean enabled;
-
-    @Value("${app.featured.market-summary.window-hours:3}")
-    private int windowHours;
-
-    @Value("${app.featured.market-summary.max-items:10}")
-    private int maxItems;
-
-    @Value("${app.featured.market-summary.min-items:3}")
-    private int minItems;
+    private final FeaturedMarketSummaryPolicyProperties policyProperties;
 
     private Clock clock = DEFAULT_CLOCK;
 
     public Optional<FeaturedMarketSummaryDto> getCurrentSummary() {
-        if (!enabled) {
+        if (!policyProperties.isEnabled()) {
             return Optional.empty();
         }
 
@@ -533,15 +522,15 @@ public class RecentMarketSummaryService {
     }
 
     private int resolveWindowHours() {
-        return windowHours > 0 ? windowHours : 3;
+        return policyProperties.getWindowHours() > 0 ? policyProperties.getWindowHours() : 3;
     }
 
     private int resolveMaxItems() {
-        return maxItems > 0 ? maxItems : 10;
+        return policyProperties.getMaxItems() > 0 ? policyProperties.getMaxItems() : 10;
     }
 
     private int resolveMinItems() {
-        return Math.max(1, minItems);
+        return Math.max(1, policyProperties.getMinItems());
     }
 
     private record DriverCount(String chipLabel, String labelKo, String labelEn, int count) {

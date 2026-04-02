@@ -22,6 +22,7 @@ import com.example.macronews.dto.market.GoldSnapshotDto;
 import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.dto.market.Us10ySnapshotDto;
+import com.example.macronews.config.policy.ForecastPolicyProperties;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.market.MarketDataFacade;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
@@ -60,20 +61,23 @@ class NewsAggregationServiceTest {
     private MarketDataFacade marketDataFacade;
 
     private NewsAggregationService newsAggregationService;
+    private ForecastPolicyProperties policyProperties;
 
     @BeforeEach
     void setUp() {
+        policyProperties = new ForecastPolicyProperties();
+        policyProperties.setEnabled(true);
+        policyProperties.setWindowHours(3);
+        policyProperties.setMaxNewsItems(20);
+        policyProperties.setCacheMinutes(15);
         newsAggregationService = new NewsAggregationService(
                 newsEventRepository,
                 externalApiUtils,
                 new ObjectMapper(),
                 openAiUsageLoggingService,
-                marketDataFacade
+                marketDataFacade,
+                policyProperties
         );
-        ReflectionTestUtils.setField(newsAggregationService, "forecastEnabled", true);
-        ReflectionTestUtils.setField(newsAggregationService, "windowHours", 3);
-        ReflectionTestUtils.setField(newsAggregationService, "maxNewsItems", 20);
-        ReflectionTestUtils.setField(newsAggregationService, "cacheMinutes", 15);
         ReflectionTestUtils.setField(newsAggregationService, "openAiApiKey", "test-key");
         ReflectionTestUtils.setField(newsAggregationService, "openAiUrl", "https://api.openai.com/v1/chat/completions");
         ReflectionTestUtils.setField(newsAggregationService, "openAiModel", "gpt-4o-mini");

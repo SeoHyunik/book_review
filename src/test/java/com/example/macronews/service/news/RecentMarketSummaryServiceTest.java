@@ -13,6 +13,7 @@ import com.example.macronews.domain.MarketType;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
+import com.example.macronews.config.policy.FeaturedMarketSummaryPolicyProperties;
 import com.example.macronews.dto.market.DxySnapshotDto;
 import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.dto.market.GoldSnapshotDto;
@@ -31,7 +32,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -46,17 +46,23 @@ class RecentMarketSummaryServiceTest {
     @Mock
     private MarketDataFacade marketDataFacade;
 
-    @InjectMocks
     private RecentMarketSummaryService recentMarketSummaryService;
+    private FeaturedMarketSummaryPolicyProperties policyProperties;
 
     @BeforeEach
     void setUp() {
+        policyProperties = new FeaturedMarketSummaryPolicyProperties();
+        policyProperties.setEnabled(true);
+        policyProperties.setWindowHours(3);
+        policyProperties.setMaxItems(10);
+        policyProperties.setMinItems(3);
+        recentMarketSummaryService = new RecentMarketSummaryService(
+                newsEventRepository,
+                marketDataFacade,
+                policyProperties
+        );
         ReflectionTestUtils.setField(recentMarketSummaryService, "clock",
                 Clock.fixed(Instant.parse("2026-03-17T03:00:00Z"), ZoneId.of("Asia/Seoul")));
-        ReflectionTestUtils.setField(recentMarketSummaryService, "enabled", true);
-        ReflectionTestUtils.setField(recentMarketSummaryService, "windowHours", 3);
-        ReflectionTestUtils.setField(recentMarketSummaryService, "maxItems", 10);
-        ReflectionTestUtils.setField(recentMarketSummaryService, "minItems", 3);
         lenient().when(marketDataFacade.getUsdKrw()).thenReturn(Optional.empty());
         lenient().when(marketDataFacade.getGold()).thenReturn(Optional.empty());
         lenient().when(marketDataFacade.getOil()).thenReturn(Optional.empty());
@@ -104,7 +110,6 @@ class RecentMarketSummaryServiceTest {
                                 List.of(new MacroImpact(MacroVariable.OIL, ImpactDirection.UP, 0.7d)),
                                 List.of())
                 ));
-
         assertThat(recentMarketSummaryService.getCurrentSummary()).isEmpty();
     }
 
@@ -253,7 +258,7 @@ class RecentMarketSummaryServiceTest {
     @Test
     @DisplayName("recent summary should not apply crisis boost when negative sample size is too low")
     void getCurrentSummary_keepsBaseConfidenceForLowSampleNegativeSignals() {
-        ReflectionTestUtils.setField(recentMarketSummaryService, "minItems", 1);
+        policyProperties.setMinItems(1);
         given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
                 .willReturn(List.of(
                         analyzedNews("news-1", "2026-03-12T02:30:00Z", "2026-03-17T02:30:00Z",

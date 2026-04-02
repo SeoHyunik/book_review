@@ -11,6 +11,7 @@ import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.FeaturedMarketSummaryDto;
 import com.example.macronews.dto.forecast.MarketForecastSummaryHandoffDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.config.policy.FeaturedMarketSummaryPolicyProperties;
 import com.example.macronews.service.forecast.MarketForecastQueryService;
 import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
@@ -58,29 +59,14 @@ public class AiMarketSummaryService {
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
     private final OpenAiUsageLoggingService openAiUsageLoggingService;
+    private final FeaturedMarketSummaryPolicyProperties policyProperties;
 
     private final AtomicReference<CachedSummary> cachedSummary = new AtomicReference<>();
 
-    @Value("${app.featured.market-summary.ai-enabled:true}")
-    private boolean aiEnabled;
-
     @Value("${app.featured.market-summary.ai-model:gpt-4o-mini}")
     private String aiModel;
-
-    @Value("${app.featured.market-summary.ai-window-hours:3}")
-    private int aiWindowHours;
-
-    @Value("${app.featured.market-summary.ai-max-items:10}")
-    private int aiMaxItems;
-
-    @Value("${app.featured.market-summary.ai-min-items:3}")
-    private int aiMinItems;
-
     @Value("${app.featured.market-summary.ai-max-input-chars:12000}")
     private int aiMaxInputChars;
-
-    @Value("${app.featured.market-summary.ai-cache-minutes:15}")
-    private int aiCacheMinutes;
 
     @Value("${openai.api-key:}")
     private String openAiApiKey;
@@ -100,7 +86,7 @@ public class AiMarketSummaryService {
     private Clock clock = DEFAULT_CLOCK;
 
     public Optional<FeaturedMarketSummaryDto> getCurrentSummary() {
-        if (!aiEnabled) {
+        if (!policyProperties.isAiEnabled()) {
             return Optional.empty();
         }
         if (!isConfigured()) {
@@ -162,7 +148,7 @@ public class AiMarketSummaryService {
         try {
             SummaryPreparation preparation = Mono.zip(
                             Mono.fromCallable(() -> recentMarketSummaryService.loadRecentAnalyzedNews(
-                                            resolveWindowHours(), resolveMaxItems()))
+                                    resolveWindowHours(), resolveMaxItems()))
                                     .subscribeOn(Schedulers.boundedElastic()),
                             Mono.fromCallable(marketForecastQueryService::getCurrentSummaryHandoff)
                                     .subscribeOn(Schedulers.boundedElastic()))
@@ -548,23 +534,23 @@ public class AiMarketSummaryService {
     }
 
     private int resolveWindowHours() {
-        return aiWindowHours > 0 ? aiWindowHours : 3;
+        return policyProperties.getAiWindowHours() > 0 ? policyProperties.getAiWindowHours() : 3;
     }
 
     private int resolveMaxItems() {
-        return aiMaxItems > 0 ? aiMaxItems : 10;
+        return policyProperties.getAiMaxItems() > 0 ? policyProperties.getAiMaxItems() : 10;
     }
 
     private int resolveMinItems() {
-        return Math.max(1, aiMinItems);
+        return Math.max(1, policyProperties.getAiMinItems());
     }
 
     private int resolveMaxInputChars() {
-        return aiMaxInputChars > 0 ? aiMaxInputChars : 12000;
+        return policyProperties.getAiMaxInputChars() > 0 ? policyProperties.getAiMaxInputChars() : 12000;
     }
 
     private Duration resolveCacheDuration() {
-        return Duration.ofMinutes(aiCacheMinutes > 0 ? aiCacheMinutes : 15L);
+        return Duration.ofMinutes(policyProperties.getAiCacheMinutes() > 0 ? policyProperties.getAiCacheMinutes() : 15L);
     }
 
     private record CachedSummary(Optional<FeaturedMarketSummaryDto> summary, Instant createdAt) {
