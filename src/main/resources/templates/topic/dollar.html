@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{fragments/layout :: layout(~{::content})}">
+<th:block th:fragment="content">
+    <style>
+        .topic-hero {
+            background:
+                radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 30%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+            border: 1px solid color-mix(in srgb, var(--bs-border-color) 72%, transparent);
+            box-shadow: 0 1rem 2.2rem rgba(15, 23, 42, 0.06);
+        }
+
+        .topic-card {
+            border: 1px solid color-mix(in srgb, var(--bs-border-color) 72%, transparent);
+            box-shadow: 0 0.9rem 2rem rgba(15, 23, 42, 0.05);
+        }
+
+        .topic-kicker {
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: color-mix(in srgb, var(--bs-secondary-color) 88%, #243246);
+        }
+
+        .topic-heading {
+            font-size: clamp(1.7rem, 2.4vw, 2.4rem);
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+        }
+
+        .topic-summary {
+            max-width: 64ch;
+            color: color-mix(in srgb, var(--bs-secondary-color) 92%, #243246);
+            line-height: 1.7;
+        }
+
+        .topic-stat {
+            min-width: 10rem;
+            border-radius: 1rem;
+            padding: 0.9rem 1rem;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+
+        .topic-stat-label {
+            font-size: 0.78rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: color-mix(in srgb, var(--bs-secondary-color) 88%, #243246);
+            font-weight: 700;
+        }
+
+        .topic-stat-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--bs-body-color);
+        }
+
+        .topic-news-list .list-group-item {
+            border-color: color-mix(in srgb, var(--bs-border-color) 64%, transparent);
+        }
+
+        .topic-news-title {
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .topic-news-meta {
+            color: color-mix(in srgb, var(--bs-secondary-color) 88%, #243246);
+            font-size: 0.86rem;
+        }
+    </style>
+
+    <section class="card border-0 topic-hero mb-4">
+        <div class="card-body p-4 p-lg-5 d-flex flex-column gap-3">
+            <div class="topic-kicker" th:text="#{topic.dollar.kicker}">SEO Topic Page</div>
+            <div>
+                <h1 class="topic-heading fw-bold mb-2" th:text="#{topic.dollar.heading}">Dollar and USD Watch</h1>
+                <p class="topic-summary mb-0" th:text="#{topic.dollar.subheading}">
+                    Recent USD-related news, current DXY context, and the latest forecast snapshot in one place.
+                </p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge ui-pill rounded-pill bg-primary-subtle text-primary-emphasis">USD / Dollar</span>
+                <span class="badge ui-pill rounded-pill bg-secondary-subtle text-secondary-emphasis"
+                      th:text="#{topic.dollar.newsCount(${#lists.size(dollarNewsItems)})}">0 matching articles</span>
+                <span class="badge ui-pill rounded-pill bg-info-subtle text-info-emphasis"
+                      th:if="${dxySnapshot != null}"
+                      th:text="${dxySnapshot.synthetic ? #messages.msg('topic.dollar.synthetic') : #messages.msg('topic.dollar.direct')}">DXY</span>
+                <span class="badge ui-pill rounded-pill bg-warning-subtle text-warning-emphasis"
+                      th:if="${forecastSnapshot != null and forecastSnapshot.mood != null}"
+                      th:text="${forecastSnapshot.mood.name()}">MOOD</span>
+            </div>
+            <div class="d-flex flex-wrap gap-3">
+                <div class="topic-stat">
+                    <div class="topic-stat-label" th:text="#{topic.dollar.dxySectionTitle}">Current DXY</div>
+                    <div class="topic-stat-value"
+                         th:if="${dxySnapshot != null}"
+                         th:text="${#numbers.formatDecimal(dxySnapshot.value, 1, 1) + ' / ' + dxySnapshot.source}">103.5</div>
+                    <div class="topic-stat-value text-secondary"
+                         th:if="${dxySnapshot == null}"
+                         th:text="#{topic.dollar.dxyEmpty}">
+                        Unavailable
+                    </div>
+                </div>
+                <div class="topic-stat">
+                    <div class="topic-stat-label" th:text="#{topic.dollar.forecastSectionTitle}">Forecast</div>
+                    <div class="topic-stat-value"
+                         th:if="${forecastSnapshot != null and forecastSnapshot.summaryEn != null and !#strings.isEmpty(forecastSnapshot.summaryEn)}"
+                         th:text="${forecastSnapshot.summaryEn}">Forecast summary</div>
+                    <div class="topic-stat-value text-secondary"
+                         th:if="${forecastSnapshot == null or forecastSnapshot.summaryEn == null or #strings.isEmpty(forecastSnapshot.summaryEn)}"
+                         th:text="#{topic.dollar.forecastEmpty}">
+                        Optional
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="card border-0 topic-card mb-4">
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <div class="topic-kicker mb-1" th:text="#{topic.dollar.dxySectionKicker}">Market Context</div>
+                    <h2 class="h5 fw-bold mb-0" th:text="#{topic.dollar.dxySectionTitle}">Current DXY Snapshot</h2>
+                </div>
+                <a class="btn btn-sm btn-outline-primary text-nowrap" th:href="@{/news}" th:text="#{news.detail.back}">Back to List</a>
+            </div>
+            <div th:if="${dxySnapshot != null}" class="d-flex flex-column gap-2">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <span class="badge ui-pill rounded-pill text-bg-primary"
+                          th:text="${dxySnapshot.synthetic ? #messages.msg('topic.dollar.synthetic') : #messages.msg('topic.dollar.direct')}">Direct</span>
+                    <span class="badge ui-pill rounded-pill bg-light text-body border"
+                          th:text="${dxySnapshot.sourceSeries}">Series</span>
+                    <span class="badge ui-pill rounded-pill bg-light text-body border"
+                          th:text="${@uiDateTimeFormatter.formatKst(dxySnapshot.asOfDateTime)}">Captured</span>
+                </div>
+                <div class="display-6 fw-bold mb-0" th:text="${#numbers.formatDecimal(dxySnapshot.value, 1, 1)}">103.5</div>
+                <p class="text-secondary mb-0" th:text="#{topic.dollar.dxyNote}">
+                    Dollar strength context is fail-open and optional. When DXY is unavailable, the page still renders.
+                </p>
+            </div>
+            <div class="text-secondary" th:if="${dxySnapshot == null}" th:text="#{topic.dollar.dxyEmpty}">
+                DXY snapshot is currently unavailable, but the topic page remains accessible.
+            </div>
+        </div>
+    </section>
+
+    <section class="card border-0 topic-card mb-4">
+        <div class="card-body p-4">
+            <div class="topic-kicker mb-1" th:text="#{topic.dollar.forecastSectionKicker}">Forecast Snapshot</div>
+            <h2 class="h5 fw-bold mb-3" th:text="#{topic.dollar.forecastSectionTitle}">Current Market Forecast</h2>
+            <div th:if="${forecastSnapshot != null}" class="d-flex flex-column gap-2">
+                <div class="d-flex flex-wrap gap-2">
+                    <span class="badge ui-pill rounded-pill bg-secondary-subtle text-secondary-emphasis"
+                          th:text="${forecastSnapshot.mood != null ? forecastSnapshot.mood.name() : 'NEUTRAL'}">NEUTRAL</span>
+                    <span class="badge ui-pill rounded-pill bg-light text-body border"
+                          th:text="${forecastSnapshot.analyzedNewsCount + ' analyzed news items'}">0 analyzed news items</span>
+                </div>
+                <div class="fw-semibold"
+                     th:text="${forecastSnapshot.headlineEn != null and !#strings.isEmpty(forecastSnapshot.headlineEn) ? forecastSnapshot.headlineEn : (forecastSnapshot.headlineKo != null and !#strings.isEmpty(forecastSnapshot.headlineKo) ? forecastSnapshot.headlineKo : 'Forecast snapshot')}">
+                    Forecast headline
+                </div>
+                <p class="topic-summary mb-0"
+                   th:text="${forecastSnapshot.summaryEn != null and !#strings.isEmpty(forecastSnapshot.summaryEn) ? forecastSnapshot.summaryEn : (forecastSnapshot.summaryKo != null and !#strings.isEmpty(forecastSnapshot.summaryKo) ? forecastSnapshot.summaryKo : #messages.msg('topic.dollar.forecastEmpty'))}">
+                    Forecast summary
+                </p>
+                <div class="d-flex flex-wrap gap-2" th:if="${forecastSnapshot.keyDrivers != null and !#lists.isEmpty(forecastSnapshot.keyDrivers)}">
+                    <span class="badge ui-pill rounded-pill bg-primary-subtle text-primary-emphasis"
+                          th:each="driver : ${forecastSnapshot.keyDrivers}"
+                          th:text="${driver}">Driver</span>
+                </div>
+            </div>
+            <div class="text-secondary" th:if="${forecastSnapshot == null}" th:text="#{topic.dollar.forecastEmpty}">
+                Forecast snapshot is not available right now, but the topic page still renders.
+            </div>
+        </div>
+    </section>
+
+    <section class="card border-0 topic-card">
+        <div class="card-body p-4">
+            <div class="topic-kicker mb-1" th:text="#{topic.dollar.newsSectionKicker}">Recent News</div>
+            <h2 class="h5 fw-bold mb-3" th:text="#{topic.dollar.newsSectionTitle}">USD-related Articles</h2>
+            <div class="list-group list-group-flush topic-news-list"
+                 th:if="${dollarNewsItems != null and !#lists.isEmpty(dollarNewsItems)}">
+                <a class="list-group-item list-group-item-action px-0"
+                   th:each="news : ${dollarNewsItems}"
+                   th:href="@{'/news/' + ${news.id}}">
+                    <div class="topic-news-title mb-1"
+                         th:text="${news.displayTitle != null and !#strings.isEmpty(news.displayTitle) ? news.displayTitle : (news.title ?: #messages.msg('news.untitled'))}">News title</div>
+                    <div class="topic-news-meta">
+                        <span th:text="${news.source ?: '-'}">Source</span>
+                        <span class="mx-2">&middot;</span>
+                        <span th:text="${@uiDateTimeFormatter.formatKst(news.publishedAt)}">Published</span>
+                    </div>
+                </a>
+            </div>
+            <div class="text-secondary" th:if="${dollarNewsItems == null or #lists.isEmpty(dollarNewsItems)}" th:text="#{topic.dollar.newsEmpty}">
+                No recent USD-related articles were found, but the topic entry page still renders safely.
+            </div>
+        </div>
+    </section>
+</th:block>
+</html>

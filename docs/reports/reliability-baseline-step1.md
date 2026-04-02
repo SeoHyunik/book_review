@@ -317,3 +317,33 @@
 - remaining gaps
   - DXY symbol discovery is verified through mocked Twelve Data responses, but production symbol availability still depends on the live vendor catalog.
   - US 10Y remains an economic-data series rather than a tick-level market feed, so intraday precision is intentionally limited to the latest valid FRED observation.
+
+## 14. Step 8 SEO Entry Page
+- what was added
+  - added a single public SEO topic page at `/topic/dollar`
+  - added `TopicController.dollar()` to assemble existing news, DXY, and forecast context
+  - added `templates/topic/dollar.html` with title, meta description, heading structure, and a simple three-part layout
+  - allowed anonymous access to exactly `GET /topic/dollar` in `SecurityConfig`
+- data sources used
+  - recent USD-related news from `NewsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC)` with lightweight keyword filtering in the controller
+  - current DXY snapshot from `MarketDataFacade.getDxy()`
+  - current forecast snapshot from `MarketForecastQueryService.getCurrentSnapshot()`
+- why minimal
+  - reused existing controller/service/data paths instead of adding a new service layer
+  - kept the topic page limited to one route and one template
+  - preserved fail-open behavior by rendering the page even when DXY or forecast data is absent
+  - avoided broad security or navigation changes by permitting only the single public topic path
+- test results
+  - `TopicControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - `NewsControllerTest`: PASS
+- exact files changed
+  - `src/main/java/com/example/macronews/config/SecurityConfig.java`
+  - `src/main/java/com/example/macronews/controller/TopicController.java`
+  - `src/main/resources/templates/topic/dollar.html`
+  - `src/test/java/com/example/macronews/config/PublicNewsAccessIntegrationTest.java`
+  - `src/test/java/com/example/macronews/controller/TopicControllerTest.java`
+  - `docs/reports/reliability-baseline-step1.md`
+- remaining gaps
+  - the page intentionally uses simple keyword-based relevance filtering rather than a dedicated topic ranking service
+  - the page depends on existing market and forecast providers, so the displayed context remains optional and fail-open by design
