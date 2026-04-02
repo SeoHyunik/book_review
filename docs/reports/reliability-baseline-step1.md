@@ -347,3 +347,33 @@
 - remaining gaps
   - the page intentionally uses simple keyword-based relevance filtering rather than a dedicated topic ranking service
   - the page depends on existing market and forecast providers, so the displayed context remains optional and fail-open by design
+
+## 15. Step 9 Archive Page
+- added page
+  - added a single public archive page at `/archive`
+  - added `ArchiveController.list()` to render recent analyzed news in reverse chronological order
+  - added `templates/archive/list.html` with a simple title, date, and internal detail link list
+  - allowed anonymous access to exactly `GET /archive` in `SecurityConfig`
+- reused data source
+  - reused `NewsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC)`
+  - reused the existing `NewsListItemDto` model and global layout fragment
+  - kept the page fail-open by rendering an empty list when the query fails
+- test results
+  - `givenArchiveRequest_whenCalled_thenReturnPage`: PASS
+  - `givenNoNews_whenArchive_thenRenderEmpty`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+- exact files changed
+  - `src/main/java/com/example/macronews/config/SecurityConfig.java`
+  - `src/main/java/com/example/macronews/controller/ArchiveController.java`
+  - `src/main/resources/messages.properties`
+  - `src/main/resources/messages_en.properties`
+  - `src/main/resources/messages_ko.properties`
+  - `src/main/resources/templates/archive/list.html`
+  - `src/test/java/com/example/macronews/config/PublicNewsAccessIntegrationTest.java`
+  - `docs/reports/reliability-baseline-step1.md`
+- why minimal
+  - no pagination or filtering was added
+  - no new service layer or repository method was introduced
+  - the implementation stays on the existing news query path and uses the shared layout
+  - the security change is limited to the single new public route

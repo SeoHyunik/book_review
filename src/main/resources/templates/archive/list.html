@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:replace="~{fragments/layout :: layout(~{::main})}">
+<main>
+    <section class="hero-card card border-0 shadow-sm mb-4">
+        <div class="card-body p-4 p-lg-5">
+            <div class="topic-kicker mb-2" th:text="#{archive.kicker}">Archive</div>
+            <h1 class="topic-heading fw-bold mb-2" th:text="#{archive.heading}">Archive</h1>
+            <p class="topic-summary mb-0" th:text="#{archive.subheading}">
+                Browse recent analyzed macro news in reverse chronological order.
+            </p>
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm">
+        <div class="card-body p-4 p-lg-5">
+            <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
+                <div>
+                    <div class="topic-kicker mb-1" th:text="#{archive.sectionKicker}">Recent items</div>
+                    <h2 class="h5 fw-bold mb-0" th:text="#{archive.sectionTitle}">Recent analyzed news</h2>
+                </div>
+                <span class="badge rounded-pill text-bg-light" th:text="#{archive.count(${archiveCount})}">0 items</span>
+            </div>
+
+            <div class="list-group list-group-flush" th:if="${archiveItems != null and !#lists.isEmpty(archiveItems)}">
+                <a class="list-group-item list-group-item-action py-3 px-0"
+                   th:each="news : ${archiveItems}"
+                   th:href="@{/news/{id}(id=${news.id})}">
+                    <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                        <div>
+                            <div class="fw-semibold" th:text="${news.displayTitle != null and !#strings.isEmpty(news.displayTitle) ? news.displayTitle : (news.title ?: #messages.msg('news.untitled'))}">
+                                Archive title
+                            </div>
+                            <div class="small text-secondary" th:text="${news.source}">Source</div>
+                        </div>
+                        <div class="small text-secondary text-md-end text-nowrap"
+                             th:text="${@uiDateTimeFormatter.formatKst(news.publishedAt)}">
+                            Published
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="text-secondary" th:if="${archiveItems == null or #lists.isEmpty(archiveItems)}" th:text="#{archive.empty}">
+                No archived news is available right now.
+            </div>
+        </div>
+    </section>
+</main>
+</html>

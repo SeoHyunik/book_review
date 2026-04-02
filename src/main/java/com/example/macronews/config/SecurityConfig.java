@@ -63,6 +63,8 @@ public class SecurityConfig {
                             .permitAll()
                             .requestMatchers(HttpMethod.GET, "/topic/dollar")
                             .permitAll()
+                            .requestMatchers(HttpMethod.GET, "/archive")
+                            .permitAll()
                             .requestMatchers("/admin/**")
                             .hasRole("ADMIN")
                             .requestMatchers("/api/**")

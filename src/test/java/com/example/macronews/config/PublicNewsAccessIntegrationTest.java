@@ -176,6 +176,31 @@ class PublicNewsAccessIntegrationTest {
                 .andExpect(model().attribute("forecastSnapshot", org.hamcrest.Matchers.nullValue()));
     }
 
+    @Test
+    void givenArchiveRequest_whenCalled_thenReturnPage() throws Exception {
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(archiveNewsItem()));
+
+        mockMvc.perform(get("/archive"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("archive/list"))
+                .andExpect(model().attribute("archiveItems", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(model().attribute("pageTitleKey", "page.archive.title"))
+                .andExpect(model().attribute("pageDescriptionKey", "page.archive.description"));
+    }
+
+    @Test
+    void givenNoNews_whenArchive_thenRenderEmpty() throws Exception {
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of());
+
+        mockMvc.perform(get("/archive"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("archive/list"))
+                .andExpect(model().attribute("archiveItems", List.of()))
+                .andExpect(model().attribute("archiveCount", 0));
+    }
+
     private NewsListItemDto dollarNewsItem() {
         return new NewsListItemDto(
                 "topic-1",
@@ -192,6 +217,25 @@ class PublicNewsAccessIntegrationTest {
                 "USD DOWN",
                 "Dollar pressure is easing as yields soften.",
                 12
+        );
+    }
+
+    private NewsListItemDto archiveNewsItem() {
+        return new NewsListItemDto(
+                "archive-1",
+                "Fed keeps rates unchanged",
+                "Fed keeps rates unchanged",
+                "Reuters",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse("2026-03-17T02:35:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.NEUTRAL,
+                SignalSentiment.NEUTRAL,
+                "Rates unchanged",
+                "Policy remains steady.",
+                8
         );
     }
 }
