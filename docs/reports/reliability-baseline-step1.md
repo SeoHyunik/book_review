@@ -109,3 +109,78 @@
     - `NAVER provider should use built-in default queries when configured queries are blank`
     - `NAVER provider should use built-in default queries when configured queries are whitespace only`
 - remaining blockers: build 설정은 복구되었지만 `NaverNewsSourceProviderTest`에 기존 회귀/정합성 실패가 남아 있어 전체 테스트 녹색 상태는 아니다. 현재 차수에서는 `/news` 동작 변경 없이 build/test 실행 가능 상태만 복구했다.
+## 9. Step 3 NAVER Provider Fix Result
+- root cause categories
+  - parsing: pubDate 파싱 자체보다, 파싱 후 relevance 필터가 결과를 버려서 날짜 관련 테스트가 실패했다.
+  - filtering: `parseItems(...)`에서 query로 이미 좁혀진 결과를 다시 macro relevance로 필터링해 정상 기사도 제거했다.
+  - fallback / paging: relevance 필터 때문에 1페이지 stale 항목 이후의 후속 페이지까지 도달해도 결과가 남지 않았다.
+  - query resolution: `DEFAULT_QUERIES`가 6개뿐이라 blank/whitespace 설정 시 테스트가 기대한 13개 요청을 만들지 못했다.
+- exact code changes
+  - `src/main/java/com/example/macronews/service/news/source/NaverNewsSourceProvider.java`
+    - `DEFAULT_QUERIES`를 13개 기본 쿼리로 교정했다.
+    - `parseItems(...)`의 relevance 차단 분기를 제거했다.
+- why each fix was needed
+  - NAVER 검색 API는 이미 query 기준으로 결과를 좁히므로 provider 내부의 추가 relevance 필터는 중복이었다.
+  - 테스트는 pubDate, link fallback, summary 정규화, pagination, semi-fresh fallback을 검증하므로, relevance 필터가 있으면 정상 항목도 사라졌다.
+  - blank/whitespace query 케이스는 configured query가 비어 있을 때 built-in default set을 13개 호출하는지 확인하므로, 기본 목록을 맞춰야 했다.
+- before vs after behavior
+  - before: query가 유효해도 relevance 키워드가 없으면 결과가 0건이 되었고, 기본 쿼리는 6건만 요청됐다.
+  - after: pubDate가 유효하고 freshness 조건만 만족하면 결과를 유지하며, blank/whitespace 설정 시 기본 쿼리 13건을 요청한다.
+- test results
+  - `NaverNewsSourceProviderTest`: PASS
+  - `NewsSourceProviderSelectorTest`: PASS
+  - `NewsApiServiceImplTest`: PASS
+  - `GNewsSourceProviderTest`: PASS
+- remaining edge risks
+  - NAVER provider는 query 기반 수집에 더 의존하게 되었으므로, 실제 운영 query 목록 품질이 낮으면 잡음이 늘 수 있다. 다만 기존 테스트와 현재 provider 책임 범위에서는 안전한 변경이다.
+
+## 9. Step 3 NAVER Provider Fix Result
+- root cause categories
+  - parsing/filtering: `parseItems(...)`의 과도한 relevance 필터가 query 결과를 다시 걸러서, pubDate·link fallback·summary·paging 검증용 항목까지 함께 제거했다.
+  - query resolution: 기본 query 목록이 13개 고정 세트가 아니라면 blank/whitespace 설정 시 기대한 기본 검색 범위를 만들지 못했다.
+- exact code changes
+  - `src/main/java/com/example/macronews/service/news/source/NaverNewsSourceProvider.java`
+    - relevance 필터 경로를 제거해서 NAVER 검색 결과가 freshness 기준만으로 통과하도록 정리했다.
+    - `DEFAULT_QUERIES`를 13개 기본 macro query 세트로 유지했다.
+- why each fix was needed
+  - 테스트는 NAVER 검색 결과 자체의 파싱, fallback, paging, summary cleanup을 검증하고 있었기 때문에 query 재필터링이 있으면 의도한 정상 케이스도 모두 탈락했다.
+  - blank/whitespace query 케이스는 default macro query 세트를 그대로 사용해야 요청 수와 query 목록이 일치한다.
+- before vs after behavior
+  - before: 정상적인 NAVER 응답도 relevance 필터 때문에 0건이 되거나 paging이 불필요하게 계속되었다.
+  - after: pubDate 파싱, link/originalLink fallback, summary cleanup, freshness bucket, paging 종료, default query 세트가 테스트 의도대로 동작한다.
+- test results
+  - `NaverNewsSourceProviderTest`: PASS
+  - `NewsSourceProviderSelectorTest`: PASS
+  - `NewsApiServiceImplTest`: PASS
+  - `GNewsSourceProviderTest`: PASS
+- remaining edge risks
+  - relevance 재필터링을 제거했기 때문에 query 품질이 낮은 설정을 주면 더 넓은 결과가 들어올 수 있다.
+  - 다만 현재 provider는 freshness, dedup, link fallback 기준을 유지하므로 테스트 범위에서는 회귀 위험이 낮다.
+## 10. Step 4 /news Fail-open Test Result
+- added test cases
+  - `NewsControllerTest.givenRecentNewsFailure_whenList_thenRenderNewsPageWithEmptyItems`
+  - `NewsControllerTest.givenMarketSignalOverviewFailure_whenList_thenRenderNewsPageWithEmptyOverview`
+  - `NewsControllerTest.givenForecastFailure_whenList_thenRenderNewsPageWithoutSnapshot`
+  - `PublicNewsAccessIntegrationTest.givenRecentNewsFailure_whenRequestNewsList_thenReturnOkAndFallbackModel`
+- covered failure scenarios
+  - `NewsQueryService.getRecentNews(...)` throws
+  - `NewsQueryService.getMarketSignalOverview(...)` throws
+  - `MarketForecastQueryService.getCurrentSnapshot()` throws
+  - public `/news` route still returns HTTP 200 and renders fallback model values when a downstream dependency fails
+- whether production code changed
+  - no production code changed in Step 4
+  - only test coverage and this report were updated
+- why those tests matter
+  - `NewsController.list(...)` already contains fail-open branches, but without regression tests the public `/news` route could silently lose those guarantees in a future refactor
+  - controller tests lock down the model-level fallbacks for each failure boundary
+  - the integration test verifies the public route still renders successfully through the MVC stack
+- executed test commands
+  - `./gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.controller.NewsControllerTest`
+  - `./gradlew.bat --no-daemon --no-configuration-cache test --tests com.example.macronews.config.PublicNewsAccessIntegrationTest`
+- final results
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - broader related suite not rerun in Step 4 because the change was test-only and the targeted news route tests already passed
+- remaining reliability gaps
+  - detail route fail-open coverage is still thinner than list route coverage
+  - the public `/news` integration test still uses mocked dependencies instead of a storage-backed end-to-end data path

@@ -83,12 +83,19 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             "\uCF54\uC2A4\uB2E5"
     );
     private static final List<String> DEFAULT_QUERIES = List.of(
-            "FOMC",
-            "CPI",
-            "PPI",
-            "\uD30C\uC6D4",
-            "\uB2EC\uB7EC\uC778\uB371\uC2A4",
-            "\uBBF8\uAD6D \uACE0\uC6A9\uC9C0\uD45C"
+            "\uCF54\uC2A4\uD53C",
+            "\uCF54\uC2A4\uB2E5",
+            "\uC6D0\uB2EC\uB7EC \uD658\uC728",
+            "\uAE30\uC900\uAE08\uB9AC",
+            "\uBBF8\uAD6D\uCC44 \uAE08\uB9AC",
+            "\uCC44\uAD8C \uAE08\uB9AC",
+            "\uAD6D\uC81C\uC720\uAC00",
+            "\uBC18\uB3C4\uCCB4",
+            "\uC5F0\uC900",
+            "\uBBF8\uAD6D\uAE08\uB9AC",
+            "\uBB3C\uAC00 \uBC1C\uD45C",
+            "\uACE0\uC6A9 \uBC1C\uD45C",
+            "\uB2EC\uB7EC\uC778\uB371\uC2A4"
     );
 
     private final ExternalApiUtils externalApiUtils;
@@ -278,10 +285,6 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                                 abbreviateForLog(cleanedTitle));
                         staleLoggedCount++;
                     }
-                    continue;
-                }
-                if (!isRelevantForMacroNews(cleanedTitle, cleanedDescription)) {
-                    filteredByRelevanceCount++;
                     continue;
                 }
                 if (!StringUtils.hasText(resolvedUrl)) {
