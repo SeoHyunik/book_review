@@ -491,3 +491,35 @@
   - no NewsQueryService decomposition was introduced
   - no RecentMarketSummaryService decomposition beyond configuration wiring was introduced
   - no reactive expansion was added in this step
+
+## 20. Step 13 NewsQueryService Refactor Result
+- extracted components
+  - `NewsEligibilityEvaluator`
+  - `NewsScoringPolicy`
+  - `NewsTranslationSelector`
+  - `NewsDtoMapper`
+- responsibilities split
+  - eligibility rules now live in `NewsEligibilityEvaluator`
+  - ranking and market-signal scoring now live in `NewsScoringPolicy`
+  - locale-aware headline and summary selection now live in `NewsTranslationSelector`
+  - DTO mapping for list/detail and status counting now live in `NewsDtoMapper`
+  - `NewsQueryService` now orchestrates repository reads, filtering, sorting, and DTO assembly
+- why this split is safe
+  - public method signatures and return types stayed the same
+  - repository access stayed in `NewsQueryService`
+  - scoring and translation decisions were moved without changing rules or thresholds
+  - controller and provider layers were untouched
+  - fail-open behavior for empty inputs and missing analysis remained unchanged
+- readability improvements
+  - reduced the size of the main service class by moving long scoring and translation blocks out
+  - removed deeply nested scoring and locale-selection logic from the service body
+  - kept imperative flow where it is clearer and used helpers only where the responsibility boundary was obvious
+- test results
+  - `NewsQueryServiceTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+- notes
+  - no provider refactor was introduced
+  - no controller changes were made
+  - no public API drift was introduced
+  - no architecture rewrite was attempted

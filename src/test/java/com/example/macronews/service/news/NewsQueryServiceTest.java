@@ -25,7 +25,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -39,11 +38,20 @@ class NewsQueryServiceTest {
     @Mock
     private NewsEventRepository newsEventRepository;
 
-    @InjectMocks
     private NewsQueryService newsQueryService;
 
     @BeforeEach
     void setUp() {
+        NewsEligibilityEvaluator eligibilityEvaluator = new NewsEligibilityEvaluator();
+        NewsScoringPolicy scoringPolicy = new NewsScoringPolicy();
+        NewsTranslationSelector translationSelector = new NewsTranslationSelector();
+        NewsDtoMapper newsDtoMapper = new NewsDtoMapper(scoringPolicy, translationSelector);
+        newsQueryService = new NewsQueryService(
+                newsEventRepository,
+                eligibilityEvaluator,
+                scoringPolicy,
+                newsDtoMapper
+        );
         newsQueryService.setClock(Clock.fixed(FIXED_NOW, ZoneOffset.UTC));
     }
 
