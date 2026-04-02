@@ -747,3 +747,27 @@
   - `TopicControllerTest`: PASS
   - `PublicNewsAccessIntegrationTest`: PASS
   - `NewsControllerTest`: PASS
+
+## 28. Step 21 Topic Composition Refactor Result
+
+- extracted components
+  - `TopicPageDataAssembler`
+  - `TopicKeywordPolicy`
+  - `TopicPageData`
+- what logic moved out of controller
+  - topic-specific keyword filtering for dollar and rates pages
+  - fail-open loading of topic news, DXY, US 10Y, and forecast data
+  - page model composition and SEO metadata assembly
+- why this split is safe
+  - the controller now only routes and delegates
+  - the same services, same query order, and same fallback behavior are still used
+  - template contracts and route paths stayed unchanged
+  - topic-specific rules remain explicit instead of being hidden behind a generic engine
+- whether visible behavior stayed the same
+  - `/topic/dollar` still renders the same page with the same data shape
+  - `/topic/rates` still renders the same page with the same data shape
+  - empty states and market-data fallbacks still render safely
+- test results
+  - `TopicControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - `NewsControllerTest`: PASS
