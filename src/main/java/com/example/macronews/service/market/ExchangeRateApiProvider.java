@@ -4,6 +4,7 @@ import com.example.macronews.dto.market.FxSnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
@@ -69,9 +70,10 @@ public class ExchangeRateApiProvider implements ExchangeRateProvider {
             if (Double.isNaN(rate)) {
                 return Optional.empty();
             }
-            Instant capturedAt = root.has("time_last_update_unix")
-                    ? Instant.ofEpochSecond(root.path("time_last_update_unix").asLong())
-                    : Instant.now();
+            Instant capturedAt = ExternalResponseValueParser.readInstant(root, "time_last_update_unix");
+            if (capturedAt == null) {
+                capturedAt = Instant.now();
+            }
             return Optional.of(new FxSnapshotDto("USD", "KRW", rate, capturedAt));
         } catch (Exception ex) {
             log.warn("[FX] failed to parse response", ex);

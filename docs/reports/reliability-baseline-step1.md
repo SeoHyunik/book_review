@@ -639,3 +639,48 @@
   - no reactive expansion was introduced
   - no async pipeline redesign was attempted
   - no architecture rewrite was attempted
+
+## 24. Step 17 Shared External Parsing Refactor Result
+- extracted helpers/components
+  - `ExternalResponseTextNormalizer`
+  - `ExternalResponseValueParser`
+- what logic was shared
+  - generic default-text fallback handling across news and market providers
+  - lower-case normalization used by DXY and Naver-style candidate checks
+  - URL normalization used for Naver-style dedup keys
+  - ISO instant parsing used by GNews and NewsAPI
+  - fallback date parsing for Naver pubDate formats
+  - JSON-node numeric and instant extraction used by market providers
+  - basic ISO date parsing used by the KOSPI public-data response
+  - LocalDate parsing used by the FRED US10Y observation date
+- what logic deliberately remained provider-specific
+  - Naver relevance filtering, description decoding, and dedup key ranking
+  - GNews request URL construction and API-key sanitization
+  - NewsAPI keyword filtering, rate-limit cycle tracking, and article merge ordering
+  - TwelveData DXY direct-symbol discovery and synthetic basket composition
+  - TwelveData KOSPI public-data fallback versus legacy quote selection
+  - provider-specific fallback selection, freshness windows, and fail-open branching
+- why this split is safe
+  - public method signatures stayed unchanged
+  - provider-specific rules were not flattened into shared logic
+  - shared helpers only cover repeated low-level parsing primitives
+  - parse failures still return empty results or null-like fallbacks exactly as before
+  - provider-level business decisions and fallback branches still live in each provider
+- readability improvements
+  - reduced repeated `defaultText`, `parseInstant`, `readDouble`, and `readInstant` code across providers
+  - kept domain-specific branches local so each provider remains readable
+  - avoided introducing a large universal parsing utility
+- test results
+  - `NaverNewsSourceProviderTest`: PASS
+  - `GNewsSourceProviderTest`: PASS
+  - `NewsApiServiceImplTest`: PASS
+  - `MarketProviderParsingTest`: PASS
+  - `NewsSourceProviderSelectorTest`: PASS
+  - `NewsAggregationServiceTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+- notes
+  - no provider architecture redesign was introduced
+  - no reactive expansion was introduced
+  - no controller changes were made
+  - no repository changes were made

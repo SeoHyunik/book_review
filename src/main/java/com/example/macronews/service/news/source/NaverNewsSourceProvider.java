@@ -4,6 +4,8 @@ import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.example.macronews.util.external.ExternalResponseTextNormalizer;
+import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -267,7 +269,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                         fallbackLink
                 );
                 String rawPubDate = item.path("pubDate").asText("");
-                Instant publishedAt = parsePubDate(rawPubDate);
+                Instant publishedAt = ExternalResponseValueParser.parseInstant(
+                        rawPubDate, NAVER_PUB_DATE_FORMATTER, NAVER_PUB_DATE_FALLBACK_FORMATTERS);
                 String resolvedUrl = StringUtils.hasText(originalLink) ? originalLink : fallbackLink;
                 String dedupTitle = normalizeTitle(cleanedTitle);
                 if (StringUtils.hasText(rawPubDate) && publishedAt == null) {
@@ -297,9 +300,9 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 ExternalNewsItem mappedItem = new ExternalNewsItem(
                         resolveExternalId(resolvedUrl, dedupTitle, rawPubDate),
                         "NAVER",
-                        defaultText(cleanedTitle, "Untitled"),
-                        defaultText(cleanedDescription, ""),
-                        defaultText(resolvedUrl, ""),
+                        ExternalResponseTextNormalizer.defaultText(cleanedTitle, "Untitled"),
+                        ExternalResponseTextNormalizer.defaultText(cleanedDescription, ""),
+                        ExternalResponseTextNormalizer.defaultText(resolvedUrl, ""),
                         publishedAt
                 );
                 mapped.add(new NaverCandidate(mappedItem, originalLink, fallbackLink, dedupTitle));
@@ -347,7 +350,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     }
 
     private String resolveDedupKey(NaverCandidate candidate) {
-        String normalizedOriginalLink = normalizeUrl(candidate.originalLink());
+        String normalizedOriginalLink = ExternalResponseTextNormalizer.normalizeUrl(candidate.originalLink());
         if (StringUtils.hasText(normalizedOriginalLink)) {
             return normalizedOriginalLink;
         }
@@ -355,7 +358,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         if (StringUtils.hasText(normalizedTitle)) {
             return normalizedTitle;
         }
-        String normalizedFallbackLink = normalizeUrl(candidate.fallbackLink());
+        String normalizedFallbackLink = ExternalResponseTextNormalizer.normalizeUrl(candidate.fallbackLink());
         if (StringUtils.hasText(normalizedFallbackLink)) {
             return normalizedFallbackLink;
         }
@@ -368,25 +371,6 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         }
         String stripped = value.replaceAll("(?i)</?b>", "");
         return HtmlUtils.htmlUnescape(stripped).trim();
-    }
-
-    private Instant parsePubDate(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        String trimmed = value.trim();
-        try {
-            return ZonedDateTime.parse(trimmed, NAVER_PUB_DATE_FORMATTER).toInstant();
-        } catch (Exception ex) {
-        }
-        for (DateTimeFormatter formatter : NAVER_PUB_DATE_FALLBACK_FORMATTERS) {
-            try {
-                return ZonedDateTime.parse(trimmed, formatter).toInstant();
-            } catch (Exception ex) {
-                // Continue to the next safe fallback formatter.
-            }
-        }
-        return null;
     }
 
     private boolean isFreshEnough(Instant publishedAt, long allowedMaxAgeHours) {
@@ -432,42 +416,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         if (title == null) {
             return "";
         }
-        return title.trim()
+        return ExternalResponseTextNormalizer.normalizeLowerCase(title.trim())
                 .replaceAll("\\[(?:\\uC18D\\uBCF4|(?i:breaking))]", " ")
                 .replace(KOREAN_BREAKING_MARKER, " ")
                 .replaceAll("(?i)\\bbreaking\\b", " ")
                 .replaceAll("\\s+", " ")
-                .trim()
-                .toLowerCase(Locale.ROOT);
-    }
-
-    private String normalizeUrl(String value) {
-        if (!StringUtils.hasText(value)) {
-            return "";
-        }
-        String trimmed = value.trim();
-        try {
-            URI uri = URI.create(trimmed);
-            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-            String path = uri.getPath() == null ? "" : uri.getPath();
-            if (path.endsWith("/") && path.length() > 1) {
-                path = path.substring(0, path.length() - 1);
-            }
-            if (!StringUtils.hasText(host)) {
-                return trimmed;
-            }
-            if (!StringUtils.hasText(scheme)) {
-                return host + path;
-            }
-            return scheme + "://" + host + path;
-        } catch (IllegalArgumentException ex) {
-            return trimmed;
-        }
-    }
-
-    private String defaultText(String value, String fallback) {
-        return StringUtils.hasText(value) ? value : fallback;
+                .trim();
     }
 
     private boolean hasClientId() {

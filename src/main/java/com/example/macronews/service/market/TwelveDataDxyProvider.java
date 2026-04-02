@@ -4,6 +4,8 @@ import com.example.macronews.dto.market.DxySnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.example.macronews.util.external.ExternalResponseTextNormalizer;
+import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
@@ -85,17 +87,17 @@ public class TwelveDataDxyProvider implements DxyProvider {
     Optional<DxySnapshotDto> parseQuoteSnapshot(String body, boolean synthetic, String sourceSeries) {
         try {
             JsonNode root = objectMapper.readTree(body);
-            Double value = readDouble(root, "price");
+            Double value = ExternalResponseValueParser.readDouble(root, "price");
             if (value == null) {
-                value = readDouble(root, "close");
+                value = ExternalResponseValueParser.readDouble(root, "close");
             }
             if (value == null || value <= 0d) {
                 return Optional.empty();
             }
 
-            Instant capturedAt = readInstant(root, "timestamp");
+            Instant capturedAt = ExternalResponseValueParser.readInstant(root, "timestamp");
             if (capturedAt == null) {
-                capturedAt = readInstant(root, "datetime");
+                capturedAt = ExternalResponseValueParser.readInstant(root, "datetime");
             }
             if (capturedAt == null) {
                 return Optional.empty();
@@ -233,9 +235,9 @@ public class TwelveDataDxyProvider implements DxyProvider {
         if (candidate == null || !candidate.isObject()) {
             return false;
         }
-        String symbol = normalize(candidate.path("symbol").asText(""));
-        String name = normalize(candidate.path("instrument_name").asText(""));
-        String type = normalize(candidate.path("instrument_type").asText(""));
+        String symbol = ExternalResponseTextNormalizer.normalizeLowerCase(candidate.path("symbol").asText(""));
+        String name = ExternalResponseTextNormalizer.normalizeLowerCase(candidate.path("instrument_name").asText(""));
+        String type = ExternalResponseTextNormalizer.normalizeLowerCase(candidate.path("instrument_type").asText(""));
         return "dxy".equals(symbol)
                 || name.contains("dollar index")
                 || name.contains("u.s. dollar index")
@@ -256,53 +258,6 @@ public class TwelveDataDxyProvider implements DxyProvider {
             case "USD/CHF" -> USD_CHF_EXPONENT;
             default -> Double.NaN;
         };
-    }
-
-    private Double readDouble(JsonNode node, String field) {
-        if (node == null || !node.has(field) || node.path(field).isNull()) {
-            return null;
-        }
-        JsonNode value = node.path(field);
-        if (value.isNumber()) {
-            return value.asDouble();
-        }
-        String text = value.asText("");
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-        try {
-            return Double.parseDouble(text.trim());
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private Instant readInstant(JsonNode node, String field) {
-        if (node == null || !node.has(field) || node.path(field).isNull()) {
-            return null;
-        }
-        JsonNode value = node.path(field);
-        if (value.isNumber()) {
-            return Instant.ofEpochSecond(value.asLong());
-        }
-        String text = value.asText("");
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-        try {
-            return Instant.parse(text.trim());
-        } catch (Exception ignored) {
-            try {
-                return LocalDateTime.parse(text.trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                        .toInstant(ZoneOffset.UTC);
-            } catch (Exception ex) {
-                return null;
-            }
-        }
-    }
-
-    private String normalize(String value) {
-        return value == null ? "" : value.trim().toLowerCase();
     }
 
     private record FxPairQuote(String symbol, Instant capturedAt, double value, double exponent) {

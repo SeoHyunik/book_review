@@ -4,6 +4,8 @@ import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.example.macronews.util.external.ExternalResponseTextNormalizer;
+import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
@@ -137,7 +139,7 @@ public class GNewsSourceProvider implements NewsSourceProvider {
                 String title = article.path("title").asText("");
                 String description = article.path("description").asText("");
                 String url = article.path("url").asText("");
-                Instant publishedAt = parseInstant(article.path("publishedAt").asText(""));
+                Instant publishedAt = ExternalResponseValueParser.parseInstant(article.path("publishedAt").asText(""));
                 if (publishedAt == null) {
                     skippedNullPublishedAt++;
                     continue;
@@ -148,13 +150,15 @@ public class GNewsSourceProvider implements NewsSourceProvider {
                 }
                 String externalId = StringUtils.hasText(url)
                         ? url
-                        : (defaultText(source, "GNews") + "|" + defaultText(title, "Untitled") + "|" + publishedAt);
+                        : (ExternalResponseTextNormalizer.defaultText(source, "GNews")
+                        + "|" + ExternalResponseTextNormalizer.defaultText(title, "Untitled")
+                        + "|" + publishedAt);
                 mapped.add(new ExternalNewsItem(
                         externalId,
-                        defaultText(source, "GNews"),
-                        defaultText(title, "Untitled"),
-                        defaultText(description, ""),
-                        defaultText(url, ""),
+                        ExternalResponseTextNormalizer.defaultText(source, "GNews"),
+                        ExternalResponseTextNormalizer.defaultText(title, "Untitled"),
+                        ExternalResponseTextNormalizer.defaultText(description, ""),
+                        ExternalResponseTextNormalizer.defaultText(url, ""),
                         publishedAt
                 ));
             }
@@ -179,23 +183,8 @@ public class GNewsSourceProvider implements NewsSourceProvider {
         return Instant.now(clock).minus(Duration.ofHours(hours));
     }
 
-    private Instant parseInstant(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return Instant.parse(value);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private String defaultText(String value, String fallback) {
-        return StringUtils.hasText(value) ? value : fallback;
-    }
-
     private String normalizeConfiguredBaseUrl(String configuredBaseUrl) {
-        String trimmed = defaultText(configuredBaseUrl, "https://gnews.io/api/v4/search").trim();
+        String trimmed = ExternalResponseTextNormalizer.defaultText(configuredBaseUrl, "https://gnews.io/api/v4/search").trim();
         if (trimmed.endsWith("/")) {
             trimmed = trimmed.substring(0, trimmed.length() - 1);
         }

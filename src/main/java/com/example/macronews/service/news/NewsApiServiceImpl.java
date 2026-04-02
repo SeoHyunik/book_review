@@ -7,6 +7,8 @@ import com.example.macronews.service.news.source.NewsFeedPriority;
 import com.example.macronews.service.news.source.NewsSourceProvider;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.example.macronews.util.external.ExternalResponseTextNormalizer;
+import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
@@ -281,7 +283,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
                 String summary = article.path("description").asText("");
                 String url = article.path("url").asText("");
                 String publishedAt = article.path("publishedAt").asText("");
-                Instant publishedInstant = parseInstant(publishedAt);
+                Instant publishedInstant = ExternalResponseValueParser.parseInstant(publishedAt);
 
                 if (publishedInstant == null) {
                     skippedNullPublishedAt++;
@@ -301,10 +303,10 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
                 mapped.add(new ExternalNewsItem(
                         externalId,
-                        defaultText(source, "External NewsAPI"),
-                        defaultText(title, "Untitled"),
-                        defaultText(summary, ""),
-                        defaultText(url, ""),
+                        ExternalResponseTextNormalizer.defaultText(source, "External NewsAPI"),
+                        ExternalResponseTextNormalizer.defaultText(title, "Untitled"),
+                        ExternalResponseTextNormalizer.defaultText(summary, ""),
+                        ExternalResponseTextNormalizer.defaultText(url, ""),
                         publishedInstant
                 ));
             }
@@ -343,7 +345,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
     }
 
     private List<String> resolveFilterKeywords() {
-        String rawKeywords = defaultText(filterKeywords, "");
+        String rawKeywords = ExternalResponseTextNormalizer.defaultText(filterKeywords, "");
         if (rawKeywords.equals(cachedFilterKeywordSource)) {
             return cachedFilterKeywords;
         }
@@ -384,7 +386,8 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
             return true;
         }
 
-        String combinedText = (defaultText(title, "") + " " + defaultText(summary, ""))
+        String combinedText = (ExternalResponseTextNormalizer.defaultText(title, "") + " "
+                + ExternalResponseTextNormalizer.defaultText(summary, ""))
                 .toLowerCase(Locale.ROOT);
         return resolvedFilterKeywords.stream().anyMatch(combinedText::contains);
     }
@@ -396,22 +399,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         if (StringUtils.hasText(item.url())) {
             return item.url();
         }
-        return defaultText(item.externalId(), "");
-    }
-
-    private Instant parseInstant(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return Instant.parse(value);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private String defaultText(String value, String fallback) {
-        return StringUtils.hasText(value) ? value : fallback;
+        return ExternalResponseTextNormalizer.defaultText(item.externalId(), "");
     }
 
     private String resolveRequestFamily(String url) {

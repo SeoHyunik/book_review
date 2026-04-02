@@ -4,6 +4,7 @@ import com.example.macronews.dto.market.GoldSnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
@@ -77,9 +78,10 @@ public class MetalPriceApiProvider implements GoldPriceProvider {
                 return Optional.empty();
             }
             double usdPerOunce = 1d / xauRate;
-            Instant capturedAt = root.has("timestamp")
-                    ? Instant.ofEpochSecond(root.path("timestamp").asLong())
-                    : Instant.now();
+            Instant capturedAt = ExternalResponseValueParser.readInstant(root, "timestamp");
+            if (capturedAt == null) {
+                capturedAt = Instant.now();
+            }
             String baseCurrency = root.path("base").asText("USD");
             return Optional.of(new GoldSnapshotDto(baseCurrency, usdPerOunce, capturedAt));
         } catch (Exception ex) {

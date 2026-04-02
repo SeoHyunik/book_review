@@ -4,6 +4,7 @@ import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
@@ -67,11 +68,11 @@ public class OilPriceApiProvider implements OilPriceProvider {
                 data = root;
             }
 
-            Double wti = readDouble(data, "wti");
-            Double brent = readDouble(data, "brent");
-            Instant capturedAt = readInstant(data, "timestamp");
+            Double wti = ExternalResponseValueParser.readDouble(data, "wti");
+            Double brent = ExternalResponseValueParser.readDouble(data, "brent");
+            Instant capturedAt = ExternalResponseValueParser.readInstant(data, "timestamp");
             if (capturedAt == null) {
-                capturedAt = readInstant(data, "created_at");
+                capturedAt = ExternalResponseValueParser.readInstant(data, "created_at");
             }
             if (capturedAt == null) {
                 capturedAt = Instant.now();
@@ -86,37 +87,4 @@ public class OilPriceApiProvider implements OilPriceProvider {
         }
     }
 
-    private Double readDouble(JsonNode node, String field) {
-        if (!node.has(field) || node.path(field).isNull()) {
-            return null;
-        }
-        JsonNode value = node.path(field);
-        if (value.isNumber()) {
-            return value.asDouble();
-        }
-        try {
-            return Double.parseDouble(value.asText());
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private Instant readInstant(JsonNode node, String field) {
-        if (!node.has(field)) {
-            return null;
-        }
-        JsonNode value = node.path(field);
-        if (value.isNumber()) {
-            return Instant.ofEpochSecond(value.asLong());
-        }
-        String text = value.asText("");
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-        try {
-            return Instant.parse(text);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
 }

@@ -4,6 +4,7 @@ import com.example.macronews.dto.market.IndexSnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
@@ -108,14 +109,14 @@ public class TwelveDataIndexQuoteProvider implements IndexQuoteProvider {
                 return Optional.empty();
             }
 
-            Double price = readDouble(item, "clpr");
+            Double price = ExternalResponseValueParser.readDouble(item, "clpr");
             if (price == null) {
                 return Optional.empty();
             }
 
             String label = item.path("idxNm").asText("");
             String symbol = StringUtils.hasText(label) ? label : KOSPI_SYMBOL;
-            Instant capturedAt = readBasicDate(item, "basDt");
+            Instant capturedAt = ExternalResponseValueParser.readBasicIsoDate(item, "basDt", KOREA_ZONE);
             if (capturedAt == null) {
                 capturedAt = Instant.now();
             }
@@ -133,9 +134,9 @@ public class TwelveDataIndexQuoteProvider implements IndexQuoteProvider {
                 return Optional.empty();
             }
 
-            Double price = readDouble(root, "price");
+            Double price = ExternalResponseValueParser.readDouble(root, "price");
             if (price == null) {
-                price = readDouble(root, "close");
+                price = ExternalResponseValueParser.readDouble(root, "close");
             }
             if (price == null) {
                 return Optional.empty();
@@ -143,9 +144,9 @@ public class TwelveDataIndexQuoteProvider implements IndexQuoteProvider {
 
             String responseSymbol = root.path("symbol").asText("");
             String symbol = StringUtils.hasText(responseSymbol) ? responseSymbol : requestedSymbol;
-            Instant capturedAt = readInstant(root, "timestamp");
+            Instant capturedAt = ExternalResponseValueParser.readInstant(root, "timestamp");
             if (capturedAt == null) {
-                capturedAt = readInstant(root, "datetime");
+                capturedAt = ExternalResponseValueParser.readInstant(root, "datetime");
             }
             if (capturedAt == null) {
                 capturedAt = Instant.now();
@@ -164,60 +165,6 @@ public class TwelveDataIndexQuoteProvider implements IndexQuoteProvider {
             return itemNode.size() > 0 ? itemNode.get(0) : null;
         }
         return itemNode;
-    }
-
-    private Double readDouble(JsonNode node, String field) {
-        if (!node.has(field) || node.path(field).isNull()) {
-            return null;
-        }
-        JsonNode value = node.path(field);
-        if (value.isNumber()) {
-            return value.asDouble();
-        }
-        String text = value.asText("");
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-        try {
-            return Double.parseDouble(text);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private Instant readInstant(JsonNode node, String field) {
-        if (!node.has(field) || node.path(field).isNull()) {
-            return null;
-        }
-        JsonNode value = node.path(field);
-        if (value.isNumber()) {
-            return Instant.ofEpochSecond(value.asLong());
-        }
-        String text = value.asText("");
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-        try {
-            return Instant.parse(text);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private Instant readBasicDate(JsonNode node, String field) {
-        if (!node.has(field) || node.path(field).isNull()) {
-            return null;
-        }
-        String text = node.path(field).asText("");
-        if (!StringUtils.hasText(text)) {
-            return null;
-        }
-        try {
-            LocalDate date = LocalDate.parse(text, DateTimeFormatter.BASIC_ISO_DATE);
-            return date.atStartOfDay(KOREA_ZONE).toInstant();
-        } catch (Exception ex) {
-            return null;
-        }
     }
 
     private boolean isKospiSymbol(String symbol) {

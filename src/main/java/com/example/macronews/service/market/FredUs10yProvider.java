@@ -4,6 +4,7 @@ import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
@@ -84,8 +85,8 @@ public class FredUs10yProvider implements Us10yProvider {
                     continue;
                 }
 
-                Double yield = parseDouble(valueText);
-                LocalDate asOfDate = parseDate(observation.path("date").asText(""));
+                Double yield = ExternalResponseValueParser.readDouble(observation, "value");
+                LocalDate asOfDate = ExternalResponseValueParser.parseLocalDate(observation.path("date").asText(""));
                 if (yield == null || asOfDate == null) {
                     continue;
                 }
@@ -99,22 +100,4 @@ public class FredUs10yProvider implements Us10yProvider {
         }
     }
 
-    private Double parseDouble(String valueText) {
-        try {
-            return Double.parseDouble(valueText.trim());
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    private LocalDate parseDate(String valueText) {
-        if (!StringUtils.hasText(valueText)) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(valueText.trim());
-        } catch (Exception ex) {
-            return null;
-        }
-    }
 }
