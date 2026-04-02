@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import java.lang.reflect.Method;
 import java.io.IOException;
-import java.time.Duration;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterAll;
@@ -75,7 +74,7 @@ class ExternalApiUtilsTest {
     void givenNeverRespondingExternalApi_whenCallApi_thenReturnGatewayTimeout() {
         externalApiUtils = new ExternalApiUtils(
                 WebClient.builder().exchangeFunction(request -> Mono.never()));
-        ReflectionTestUtils.setField(externalApiUtils, "timeout", Duration.ofMillis(50));
+        ReflectionTestUtils.setField(externalApiUtils, "timeout", "50ms");
 
         ExternalApiRequest request = new ExternalApiRequest(
                 HttpMethod.GET,

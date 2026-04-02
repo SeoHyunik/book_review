@@ -65,7 +65,7 @@ class MacroAiServiceImplTest {
 
     @Test
     @DisplayName("interpret should parse localized headlines and summaries when both are present")
-    void interpret_parsesLocalizedSummaries() {
+    void givenLocalizedSummaries_whenInterpret_thenParsesLocalizedSummaries() {
         String response = "{\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":80,\"total_tokens\":200},\"choices\":[{\"message\":{\"content\":\"{\\\"headlineKo\\\":\\\"Korean headline\\\",\\\"headlineEn\\\":\\\"English headline\\\",\\\"summaryKo\\\":\\\"Korean summary\\\",\\\"summaryEn\\\":\\\"English summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}";
         given(macroAiPromptBuilder.buildPayload(any(), any(), anyInt(), anyDouble(), any())).willReturn("payload");
         given(macroAiClient.call(any(), any(), any())).willReturn(new ExternalApiResult(200, response));
@@ -93,7 +93,7 @@ class MacroAiServiceImplTest {
 
     @Test
     @DisplayName("interpret should allow one localized headline or summary to be missing")
-    void interpret_allowsMissingLocalizedSummary() {
+    void givenMissingLocalizedFields_whenInterpret_thenAllowsMissingLocalizedSummary() {
         given(macroAiPromptBuilder.buildPayload(any(), any(), anyInt(), anyDouble(), any())).willReturn("payload");
         given(macroAiClient.call(any(), any(), any())).willReturn(new ExternalApiResult(200,
                 "{\"choices\":[{\"message\":{\"content\":\"{\\\"headlineEn\\\":\\\"English only headline\\\",\\\"summaryEn\\\":\\\"English only summary\\\",\\\"macroImpacts\\\":[],\\\"marketImpacts\\\":[]}\"}}]}"));
@@ -118,7 +118,7 @@ class MacroAiServiceImplTest {
 
     @Test
     @DisplayName("interpretAndSave should initialize retry metadata on initial failure")
-    void interpretAndSave_initialFailureInitializesRetryMetadata() {
+    void givenInterpretationFailure_whenInterpretAndSave_thenInitializesRetryMetadata() {
         NewsEvent event = sampleEvent();
         given(newsEventRepository.findById("news-1")).willReturn(java.util.Optional.of(event));
         given(macroAiPromptBuilder.buildPayload(any(), any(), anyInt(), anyDouble(), any())).willReturn("payload");

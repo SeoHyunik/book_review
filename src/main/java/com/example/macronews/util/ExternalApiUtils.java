@@ -9,6 +9,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.convert.DurationStyle;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -29,7 +30,7 @@ public class ExternalApiUtils {
 
     private final WebClient.Builder webClientBuilder;
     @Value("${app.external-api.timeout:30s}")
-    private Duration timeout = DEFAULT_TIMEOUT;
+    private String timeout = "30s";
 
     public ExternalApiResult callAPI(ExternalApiRequest request) {
         return callAPIAsync(request).block();
@@ -80,9 +81,14 @@ public class ExternalApiUtils {
     }
 
     private Duration resolveTimeout() {
-        return timeout == null || timeout.isZero() || timeout.isNegative()
-                ? DEFAULT_TIMEOUT
-                : timeout;
+        try {
+            Duration resolvedTimeout = DurationStyle.detectAndParse(timeout);
+            return resolvedTimeout == null || resolvedTimeout.isZero() || resolvedTimeout.isNegative()
+                    ? DEFAULT_TIMEOUT
+                    : resolvedTimeout;
+        } catch (Exception ex) {
+            return DEFAULT_TIMEOUT;
+        }
     }
 
     public ExternalApiError parseErrorResponse(String body) {

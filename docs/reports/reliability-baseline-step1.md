@@ -684,3 +684,21 @@
   - no reactive expansion was introduced
   - no controller changes were made
   - no repository changes were made
+
+## 25. Step 18 Codebase Polishing Result
+
+- what was standardized
+  - test method names were aligned to given-when-then style in `MacroAiServiceImplTest`
+  - timeout configuration handling in `ExternalApiUtils` was normalized to a string-based binding path with explicit duration parsing fallback
+  - unused imports left behind by earlier refactors were removed from provider classes
+- where inconsistencies were fixed
+  - `src/test/java/com/example/macronews/service/macro/MacroAiServiceImplTest.java`
+  - `src/main/java/com/example/macronews/util/ExternalApiUtils.java`
+  - `src/test/java/com/example/macronews/util/ExternalApiUtilsTest.java`
+  - `src/main/java/com/example/macronews/service/news/source/NaverNewsSourceProvider.java`
+  - `src/main/java/com/example/macronews/service/market/TwelveDataIndexQuoteProvider.java`
+  - `src/main/java/com/example/macronews/service/market/TwelveDataDxyProvider.java`
+- test improvements
+  - renamed behavior tests to clearer BDD-style method names
+  - kept timeout coverage explicit in `ExternalApiUtilsTest`
+  - verified the full regression suite after the compatibility fix
