@@ -65,6 +65,8 @@ public class SecurityConfig {
                             .permitAll()
                             .requestMatchers(HttpMethod.GET, "/topic/rates")
                             .permitAll()
+                            .requestMatchers(HttpMethod.GET, "/topic/oil")
+                            .permitAll()
                             .requestMatchers(HttpMethod.GET, "/archive")
                             .permitAll()
                             .requestMatchers("/admin/**")

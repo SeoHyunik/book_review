@@ -13,6 +13,7 @@ import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.DxySnapshotDto;
+import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.repository.UserRepository;
 import com.example.macronews.service.forecast.MarketForecastQueryService;
@@ -69,6 +70,7 @@ class TopicControllerTest {
         given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
         given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
         given(marketDataFacade.getUs10y()).willReturn(Optional.empty());
+        given(marketDataFacade.getOil()).willReturn(Optional.empty());
     }
 
     @Test
@@ -221,6 +223,74 @@ class TopicControllerTest {
                 .andExpect(view().name("topic/rates"))
                 .andExpect(model().attribute("ratesNewsItems", List.of()))
                 .andExpect(model().attribute("us10ySnapshot", org.hamcrest.Matchers.nullValue()))
+                .andExpect(model().attribute("forecastSnapshot", org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @DisplayName("givenTopicRequest_whenOil_thenReturnPage")
+    void givenTopicRequest_whenOil_thenReturnPage() throws Exception {
+        NewsListItemDto related = new NewsListItemDto(
+                "news-4",
+                "Oil climbs as crude supply tightens",
+                "Oil climbs as crude supply tightens",
+                "Reuters",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse("2026-03-17T02:35:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.POSITIVE,
+                "Oil UP",
+                "Crude and energy pricing firm as supply tightens.",
+                10
+        );
+        OilSnapshotDto oilSnapshot = new OilSnapshotDto(
+                82.4d,
+                86.7d,
+                Instant.parse("2026-03-17T03:00:00Z")
+        );
+        MarketForecastSnapshotDto forecastSnapshot = new MarketForecastSnapshotDto(
+                MarketMood.CLOUD,
+                "Oil market remains firm",
+                "Oil market remains firm",
+                "Energy pricing continues to anchor macro attention.",
+                "Energy pricing continues to anchor macro attention.",
+                List.of("Oil"),
+                List.of("news-4"),
+                List.of("Oil climbs as crude supply tightens"),
+                Map.of(),
+                Instant.parse("2026-03-17T03:00:00Z").toString(),
+                1
+        );
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(related));
+        given(marketDataFacade.getOil()).willReturn(Optional.of(oilSnapshot));
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.of(forecastSnapshot));
+
+        mockMvc.perform(get("/topic/oil"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("topic/oil"))
+                .andExpect(model().attribute("oilNewsItems", List.of(related)))
+                .andExpect(model().attribute("oilSnapshot", oilSnapshot))
+                .andExpect(model().attribute("forecastSnapshot", forecastSnapshot))
+                .andExpect(model().attribute("pageTitleKey", "page.topic.oil.title"))
+                .andExpect(model().attribute("pageDescriptionKey", "page.topic.oil.description"));
+    }
+
+    @Test
+    @DisplayName("givenNoOilData_whenOil_thenStillRender")
+    void givenNoOilData_whenOil_thenStillRender() throws Exception {
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of());
+        given(marketDataFacade.getOil()).willReturn(Optional.empty());
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+
+        mockMvc.perform(get("/topic/oil"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("topic/oil"))
+                .andExpect(model().attribute("oilNewsItems", List.of()))
+                .andExpect(model().attribute("oilSnapshot", org.hamcrest.Matchers.nullValue()))
                 .andExpect(model().attribute("forecastSnapshot", org.hamcrest.Matchers.nullValue()));
     }
 }

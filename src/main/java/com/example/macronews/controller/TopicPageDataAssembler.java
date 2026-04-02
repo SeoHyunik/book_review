@@ -4,6 +4,7 @@ import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.DxySnapshotDto;
+import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.service.forecast.MarketForecastQueryService;
 import com.example.macronews.service.market.MarketDataFacade;
@@ -28,6 +29,8 @@ class TopicPageDataAssembler {
     private static final String DOLLAR_PAGE_DESCRIPTION_KEY = "page.topic.dollar.description";
     private static final String RATES_PAGE_TITLE_KEY = "page.topic.rates.title";
     private static final String RATES_PAGE_DESCRIPTION_KEY = "page.topic.rates.description";
+    private static final String OIL_PAGE_TITLE_KEY = "page.topic.oil.title";
+    private static final String OIL_PAGE_DESCRIPTION_KEY = "page.topic.oil.description";
 
     private final NewsQueryService newsQueryService;
     private final MarketDataFacade marketDataFacade;
@@ -70,6 +73,24 @@ class TopicPageDataAssembler {
         ));
     }
 
+    TopicPageData buildOilPageData() {
+        List<NewsListItemDto> oilNewsItems = safeGetRelatedNews("oil", topicKeywordPolicy::matchesOil);
+        OilSnapshotDto oilSnapshot = safeGetOilSnapshot("oil");
+        MarketForecastSnapshotDto forecastSnapshot = safeGetForecastSnapshot("oil");
+
+        return new TopicPageData("topic/oil", attributes(
+                "oilNewsItems", oilNewsItems,
+                "topicNewsCount", oilNewsItems.size(),
+                "oilSnapshot", oilSnapshot,
+                "forecastSnapshot", forecastSnapshot,
+                "pageTitleKey", OIL_PAGE_TITLE_KEY,
+                "pageDescriptionKey", OIL_PAGE_DESCRIPTION_KEY,
+                "ogTitleKey", OIL_PAGE_TITLE_KEY,
+                "ogDescriptionKey", OIL_PAGE_DESCRIPTION_KEY,
+                "ogUrl", "/topic/oil"
+        ));
+    }
+
     private List<NewsListItemDto> safeGetRelatedNews(String topicName, Predicate<NewsListItemDto> predicate) {
         try {
             return newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC).stream()
@@ -96,6 +117,15 @@ class TopicPageDataAssembler {
             return marketDataFacade.getUs10y().orElse(null);
         } catch (RuntimeException ex) {
             log.warn("Rendering /topic/{} without US10Y snapshot due to market data failure", topicName, ex);
+            return null;
+        }
+    }
+
+    private OilSnapshotDto safeGetOilSnapshot(String topicName) {
+        try {
+            return marketDataFacade.getOil().orElse(null);
+        } catch (RuntimeException ex) {
+            log.warn("Rendering /topic/{} without oil snapshot due to market data failure", topicName, ex);
             return null;
         }
     }

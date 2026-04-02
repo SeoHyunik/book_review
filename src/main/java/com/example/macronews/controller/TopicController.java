@@ -26,4 +26,11 @@ public class TopicController {
         pageData.applyTo(model);
         return pageData.viewName();
     }
+
+    @GetMapping("/oil")
+    public String oil(Model model) {
+        TopicPageData pageData = topicPageDataAssembler.buildOilPageData();
+        pageData.applyTo(model);
+        return pageData.viewName();
+    }
 }

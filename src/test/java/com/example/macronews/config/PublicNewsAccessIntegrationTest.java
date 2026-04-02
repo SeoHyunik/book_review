@@ -20,6 +20,7 @@ import com.example.macronews.service.news.RecentMarketSummaryService;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.DxySnapshotDto;
+import com.example.macronews.dto.market.OilSnapshotDto;
 import com.example.macronews.dto.market.Us10ySnapshotDto;
 import com.example.macronews.domain.ImpactDirection;
 import com.example.macronews.domain.MarketMood;
@@ -79,6 +80,7 @@ class PublicNewsAccessIntegrationTest {
         given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
         given(marketDataFacade.getDxy()).willReturn(Optional.empty());
         given(marketDataFacade.getUs10y()).willReturn(Optional.empty());
+        given(marketDataFacade.getOil()).willReturn(Optional.empty());
     }
 
     @Test
@@ -229,6 +231,54 @@ class PublicNewsAccessIntegrationTest {
     }
 
     @Test
+    void givenOilTopic_whenRequest_thenReturnOk() throws Exception {
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(oilNewsItem()));
+        given(marketDataFacade.getOil())
+                .willReturn(Optional.of(new OilSnapshotDto(
+                        82.4d,
+                        86.7d,
+                        Instant.parse("2026-03-17T03:00:00Z")
+                )));
+        given(marketForecastQueryService.getCurrentSnapshot())
+                .willReturn(Optional.of(new MarketForecastSnapshotDto(
+                        MarketMood.CLOUD,
+                        "Oil market remains firm",
+                        "Oil market remains firm",
+                        "Energy pricing continues to anchor macro attention.",
+                        "Energy pricing continues to anchor macro attention.",
+                        List.of("Oil"),
+                        List.of("topic-3"),
+                        List.of("Oil climbs as crude supply tightens"),
+                        Map.of(),
+                        Instant.parse("2026-03-17T03:00:00Z").toString(),
+                        1
+                )));
+
+        mockMvc.perform(get("/topic/oil"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("topic/oil"))
+                .andExpect(model().attribute("oilNewsItems", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(model().attribute("pageTitleKey", "page.topic.oil.title"))
+                .andExpect(model().attribute("pageDescriptionKey", "page.topic.oil.description"));
+    }
+
+    @Test
+    void givenNoOilData_whenRequest_thenRenderEmpty() throws Exception {
+        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of());
+        given(marketDataFacade.getOil()).willReturn(Optional.empty());
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+
+        mockMvc.perform(get("/topic/oil"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("topic/oil"))
+                .andExpect(model().attribute("oilNewsItems", List.of()))
+                .andExpect(model().attribute("oilSnapshot", org.hamcrest.Matchers.nullValue()))
+                .andExpect(model().attribute("forecastSnapshot", org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
     void givenArchiveRequest_whenCalled_thenReturnPage() throws Exception {
         given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of(archiveNewsItem()));
@@ -307,6 +357,25 @@ class PublicNewsAccessIntegrationTest {
                 "Rates UP",
                 "Bond market pricing turns more cautious.",
                 11
+        );
+    }
+
+    private NewsListItemDto oilNewsItem() {
+        return new NewsListItemDto(
+                "topic-3",
+                "Oil climbs as crude supply tightens",
+                "Oil climbs as crude supply tightens",
+                "Reuters",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse("2026-03-17T02:35:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.POSITIVE,
+                "Oil UP",
+                "Crude and energy pricing firm as supply tightens.",
+                10
         );
     }
 }

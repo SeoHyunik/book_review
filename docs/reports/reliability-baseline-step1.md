@@ -771,3 +771,26 @@
   - `TopicControllerTest`: PASS
   - `PublicNewsAccessIntegrationTest`: PASS
   - `NewsControllerTest`: PASS
+
+## 29. Step 22 Oil Topic Page Result
+
+- what page was added
+  - `GET /topic/oil` renders a minimal SEO topic page for oil, crude, WTI, Brent, and energy-related news
+  - the page follows the existing topic-page composition pattern and stays crawlable through a stable route
+- reused data sources/services
+  - `NewsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC)`
+  - `MarketDataFacade.getOil()`
+  - `MarketForecastQueryService.getCurrentSnapshot()`
+  - shared `TopicPageDataAssembler`, `TopicKeywordPolicy`, and existing `/news/{id}` article links
+- why the implementation was minimal
+  - the existing topic-page composition structure was reused instead of adding a generic topic framework
+  - only one new topic route, one new template, one keyword extension, and one security rule were added
+  - the page keeps optional market context and optional forecast data without introducing pagination or filtering UI
+- fail-open behavior
+  - the page renders safely when oil-related news is absent
+  - the page renders safely when oil market data is absent
+  - the page renders safely when forecast data is absent
+- test results
+  - `TopicControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+  - `NewsControllerTest`: PASS

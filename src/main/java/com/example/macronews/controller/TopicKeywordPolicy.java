@@ -40,12 +40,27 @@ final class TopicKeywordPolicy {
             "rate cut"
     );
 
+    private static final List<String> OIL_KEYWORDS = List.of(
+            "oil",
+            "wti",
+            "brent",
+            "crude",
+            "energy",
+            "opec",
+            "production",
+            "supply"
+    );
+
     boolean matchesDollar(NewsListItemDto item) {
         return matchesKeywords(item, DOLLAR_KEYWORDS);
     }
 
     boolean matchesRates(NewsListItemDto item) {
         return matchesKeywords(item, RATES_KEYWORDS);
+    }
+
+    boolean matchesOil(NewsListItemDto item) {
+        return matchesKeywords(item, OIL_KEYWORDS);
     }
 
     private boolean matchesKeywords(NewsListItemDto item, List<String> keywords) {
