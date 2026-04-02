@@ -558,3 +558,44 @@
   - no controller changes were made
   - no reactive changes were introduced
   - no policy redesign was attempted
+
+## 22. Step 15 Provider Selector Refactor Result
+- extracted components
+  - `ProviderPriorityResolver`
+  - `ProviderEligibilityFilter`
+  - `ProviderRankingPolicy`
+- responsibilities split
+  - business-time priority and fallback priority resolution now live in `ProviderPriorityResolver`
+  - configured-provider filtering and provider list selection now live in `ProviderEligibilityFilter`
+  - provider ordering comparator now lives in `ProviderRankingPolicy`
+  - `NewsSourceProviderSelector` still owns provider invocation, dedup orchestration, and final result assembly
+- why this split is safe
+  - public method signatures and return types stayed unchanged
+  - provider implementations were not modified
+  - ingestion job flow and provider invocation order were preserved
+  - dedup orchestration and fallback execution paths remained in the selector
+  - fail-open behavior for empty provider sets and provider failures remained unchanged
+- whether ordering/fallback semantics were preserved
+  - yes, domestic-vs-foreign priority resolution is unchanged
+  - yes, provider ordering within each priority is unchanged
+  - yes, the fallback provider selection path is unchanged
+  - yes, fresh and semi-fresh candidate assembly still follow the same selector flow
+- readability improvements
+  - removed provider-order and business-time branching from the selector body
+  - isolated configuration-based filtering into a small helper with a single responsibility
+  - kept imperative orchestration in the selector where the control flow is easier to follow
+  - avoided unnecessary functional rewrites in the dedup and fetch loops
+- test results
+  - `NewsSourceProviderSelectorTest`: PASS
+  - `NaverNewsSourceProviderTest`: PASS
+  - `GNewsSourceProviderTest`: PASS
+  - `NewsApiServiceImplTest`: PASS
+  - `ScheduledNewsIngestionJobTest`: PASS
+  - `NewsIngestionServiceImplTest`: PASS
+  - `NewsControllerTest`: PASS
+  - `PublicNewsAccessIntegrationTest`: PASS
+- notes
+  - no provider rewrite was introduced
+  - no reactive expansion was introduced
+  - no ingestion flow redesign was attempted
+  - no dedup redesign was attempted

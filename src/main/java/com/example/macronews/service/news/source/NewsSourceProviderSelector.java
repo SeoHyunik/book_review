@@ -5,7 +5,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +31,9 @@ public class NewsSourceProviderSelector {
     private static final int DEFAULT_PREFERRED_SOURCE_BONUS_MINUTES = 15;
 
     private final List<NewsSourceProvider> providers;
+    private final ProviderPriorityResolver providerPriorityResolver = new ProviderPriorityResolver();
+    private final ProviderEligibilityFilter providerEligibilityFilter = new ProviderEligibilityFilter();
+    private final ProviderRankingPolicy providerRankingPolicy = new ProviderRankingPolicy();
 
     private Clock clock = DEFAULT_CLOCK;
 
@@ -53,9 +55,7 @@ public class NewsSourceProviderSelector {
     public List<ExternalNewsItem> fetchTopHeadlines(int limit) {
         int resolvedLimit = Math.max(limit, 1);
         NewsFeedPriority preferredPriority = currentPriority();
-        NewsFeedPriority fallbackPriority = preferredPriority == NewsFeedPriority.DOMESTIC
-                ? NewsFeedPriority.FOREIGN
-                : NewsFeedPriority.DOMESTIC;
+        NewsFeedPriority fallbackPriority = providerPriorityResolver.fallbackPriority(preferredPriority);
 
         List<NewsSourceProvider> preferredProviders = selectConfiguredProviders(preferredPriority);
         List<NewsSourceProvider> fallbackProviders = selectConfiguredProviders(fallbackPriority);
@@ -121,9 +121,7 @@ public class NewsSourceProviderSelector {
             return preferred;
         }
 
-        NewsFeedPriority fallbackPriority = preferredPriority == NewsFeedPriority.DOMESTIC
-                ? NewsFeedPriority.FOREIGN
-                : NewsFeedPriority.DOMESTIC;
+        NewsFeedPriority fallbackPriority = providerPriorityResolver.fallbackPriority(preferredPriority);
         Optional<NewsSourceProvider> fallback = selectConfiguredProvider(fallbackPriority);
         fallback.ifPresent(provider -> log.info(
                 "[NEWS-SOURCE] fallback provider selected={} preferredPriority={} fallbackPriority={}",
@@ -132,32 +130,19 @@ public class NewsSourceProviderSelector {
     }
 
     NewsFeedPriority currentPriority() {
-        return isDomesticWindow() ? NewsFeedPriority.DOMESTIC : NewsFeedPriority.FOREIGN;
+        return providerPriorityResolver.currentPriority(clock, businessTimezone, domesticStartHour, domesticEndHour);
     }
 
     boolean isDomesticWindow() {
-        int startHour = resolveHour(domesticStartHour, DEFAULT_DOMESTIC_START_HOUR);
-        int endHour = resolveHour(domesticEndHour, DEFAULT_DOMESTIC_END_HOUR);
-        int currentHour = ZonedDateTime.now(resolveBusinessClock()).getHour();
-
-        if (startHour <= endHour) {
-            return currentHour >= startHour && currentHour <= endHour;
-        }
-        return currentHour >= startHour || currentHour <= endHour;
+        return providerPriorityResolver.isDomesticWindow(clock, businessTimezone, domesticStartHour, domesticEndHour);
     }
 
     private Optional<NewsSourceProvider> selectConfiguredProvider(NewsFeedPriority priority) {
-        return selectConfiguredProviders(priority).stream()
-                .findFirst();
+        return providerEligibilityFilter.selectConfiguredProvider(providers, priority, providerRankingPolicy);
     }
 
     private List<NewsSourceProvider> selectConfiguredProviders(NewsFeedPriority priority) {
-        return providers.stream()
-                .filter(provider -> provider.supports(priority))
-                .filter(NewsSourceProvider::isConfigured)
-                .sorted(Comparator.comparingInt((NewsSourceProvider provider) -> providerOrder(priority, provider))
-                        .thenComparing(NewsSourceProvider::sourceCode))
-                .toList();
+        return providerEligibilityFilter.selectConfiguredProviders(providers, priority, providerRankingPolicy);
     }
 
     private List<String> summarizeProviders(List<NewsSourceProvider> selectedProviders) {
@@ -234,20 +219,6 @@ public class NewsSourceProviderSelector {
                 .toList();
     }
 
-    private int providerOrder(NewsFeedPriority priority, NewsSourceProvider provider) {
-        String code = provider.sourceCode();
-        if (priority == NewsFeedPriority.DOMESTIC) {
-            return "naver".equals(code) ? 0 : 10;
-        }
-        if ("newsapi-global".equals(code)) {
-            return 0;
-        }
-        if ("gnews-global".equals(code)) {
-            return 1;
-        }
-        return 10;
-    }
-
     private RankedNewsCandidate rank(ExternalNewsItem item, String sourceCode, boolean preferredSource) {
         Duration preferredBonus = preferredSource
                 ? Duration.ofMinutes(resolveBonus(preferredSourceBonusMinutes, DEFAULT_PREFERRED_SOURCE_BONUS_MINUTES))
@@ -308,22 +279,6 @@ public class NewsSourceProviderSelector {
 
     private int resolveBonus(int configuredValue, int fallbackValue) {
         return configuredValue >= 0 ? configuredValue : fallbackValue;
-    }
-
-    private int resolveHour(int configuredHour, int fallbackHour) {
-        return configuredHour >= 0 && configuredHour <= 23 ? configuredHour : fallbackHour;
-    }
-
-    private Clock resolveBusinessClock() {
-        return clock.withZone(resolveBusinessZone());
-    }
-
-    private ZoneId resolveBusinessZone() {
-        try {
-            return ZoneId.of(businessTimezone);
-        } catch (Exception ex) {
-            return DEFAULT_BUSINESS_ZONE;
-        }
     }
 
     private record RankedNewsCandidate(
