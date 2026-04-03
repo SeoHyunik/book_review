@@ -10,6 +10,7 @@ import com.example.macronews.repository.OpenAiUsageRecordRepository;
 import com.example.macronews.service.market.MarketDataFacade;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -44,6 +45,7 @@ public class OpenAiUsageReportService {
     private final OpenAiUsageRecordRepository openAiUsageRecordRepository;
     private final MarketDataFacade marketDataFacade;
     private final OpenAiPricingSnapshotLoader pricingSnapshotLoader;
+    private Clock clock = Clock.system(BUSINESS_ZONE);
 
     @Value("${openai.cost.krw-fallback-rate:1350.0}")
     private BigDecimal fallbackKrwRate;
@@ -63,7 +65,7 @@ public class OpenAiUsageReportService {
         BigDecimal exchangeRate = exchangeRateResolution.exchangeRate();
 
         int requestedPage = resolveRecentRecordPage(page);
-        Page<OpenAiUsageRecord> recentRecordPage = fetchRecentRecordPage(requestedPage);
+        Page<OpenAiUsageRecord> recentRecordPage = fetchTodayRecordPage(requestedPage);
         List<OpenAiUsageRecord> recentRecords = recentRecordPage.getContent();
         List<OpenAiUsageRecordViewDto> recentViews = recentRecords.stream()
                 .map(record -> toRecordView(record, exchangeRate))
@@ -113,18 +115,39 @@ public class OpenAiUsageReportService {
         return Math.max(page, 1);
     }
 
-    private Page<OpenAiUsageRecord> fetchRecentRecordPage(int page) {
-        Page<OpenAiUsageRecord> recentRecordPage = openAiUsageRecordRepository.findAllByOrderByTimestampDesc(
-                recentRecordPageable(page));
-        int totalPages = recentRecordPage.getTotalPages();
-        if (totalPages > 0 && page > totalPages) {
-            return openAiUsageRecordRepository.findAllByOrderByTimestampDesc(recentRecordPageable(totalPages));
-        }
-        return recentRecordPage;
+    private Page<OpenAiUsageRecord> fetchTodayRecordPage(int page) {
+        Instant todayStart = todayStartInstant();
+        List<OpenAiUsageRecord> todayRecords = openAiUsageRecordRepository
+                .findByTimestampGreaterThanEqualOrderByTimestampDesc(todayStart).stream()
+                .filter(record -> isOnOrAfterTodayStart(record, todayStart))
+                .toList();
+        int totalItems = todayRecords.size();
+        int totalPages = Math.max((int) Math.ceil((double) totalItems / RECENT_RECORD_PAGE_SIZE), 1);
+        int safePage = Math.min(Math.max(page, 1), totalPages);
+        int fromIndex = Math.min((safePage - 1) * RECENT_RECORD_PAGE_SIZE, totalItems);
+        int toIndex = Math.min(fromIndex + RECENT_RECORD_PAGE_SIZE, totalItems);
+        List<OpenAiUsageRecord> pageContent = todayRecords.subList(fromIndex, toIndex);
+        return new org.springframework.data.domain.PageImpl<>(
+                pageContent,
+                recentRecordPageable(safePage),
+                totalItems);
     }
 
     private PageRequest recentRecordPageable(int page) {
         return PageRequest.of(page - 1, RECENT_RECORD_PAGE_SIZE, Sort.by(Sort.Direction.DESC, "timestamp"));
+    }
+
+    private Instant todayStartInstant() {
+        return LocalDate.now(clock.withZone(BUSINESS_ZONE))
+                .atStartOfDay(BUSINESS_ZONE)
+                .toInstant();
+    }
+
+    private boolean isOnOrAfterTodayStart(OpenAiUsageRecord record, Instant todayStart) {
+        return record != null
+                && record.timestamp() != null
+                && todayStart != null
+                && !record.timestamp().isBefore(todayStart);
     }
 
     BigDecimal estimateUsdCost(OpenAiUsageRecord record) {
@@ -135,7 +158,7 @@ public class OpenAiUsageReportService {
     }
 
     private List<OpenAiUsageAggregateDto> buildDailyAggregates(List<OpenAiUsageRecord> records, BigDecimal exchangeRate) {
-        LocalDate cutoffDay = LocalDate.now(BUSINESS_ZONE).minusDays(Math.max(dailyDays, 1) - 1L);
+        LocalDate cutoffDay = LocalDate.now(clock.withZone(BUSINESS_ZONE)).minusDays(Math.max(dailyDays, 1) - 1L);
         Map<LocalDate, List<OpenAiUsageRecord>> grouped = records.stream()
                 .filter(record -> !record.timestamp().atZone(BUSINESS_ZONE).toLocalDate().isBefore(cutoffDay))
                 .collect(java.util.stream.Collectors.groupingBy(
@@ -148,7 +171,7 @@ public class OpenAiUsageReportService {
     }
 
     private List<OpenAiUsageAggregateDto> buildMonthlyAggregates(List<OpenAiUsageRecord> records, BigDecimal exchangeRate) {
-        YearMonth cutoffMonth = YearMonth.now(BUSINESS_ZONE).minusMonths(Math.max(monthlyMonths, 1) - 1L);
+        YearMonth cutoffMonth = YearMonth.now(clock.withZone(BUSINESS_ZONE)).minusMonths(Math.max(monthlyMonths, 1) - 1L);
         Map<YearMonth, List<OpenAiUsageRecord>> grouped = records.stream()
                 .filter(record -> !YearMonth.from(record.timestamp().atZone(BUSINESS_ZONE)).isBefore(cutoffMonth))
                 .collect(java.util.stream.Collectors.groupingBy(
