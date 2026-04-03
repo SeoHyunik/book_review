@@ -2,7 +2,9 @@ package com.example.macronews.config;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -105,6 +107,26 @@ class PublicNewsAccessIntegrationTest {
     void givenNewsList_whenRequest_thenReturnOk() throws Exception {
         mockMvc.perform(get("/news"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void givenAnonymousUser_whenRequestNewsListWithoutLocale_thenDefaultToKorean() throws Exception {
+        mockMvc.perform(get("/news"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("news/list"))
+                .andExpect(model().attribute("currentLang", "ko"))
+                .andExpect(content().string(containsString("lang=\"ko\"")))
+                .andExpect(content().string(containsString("시장을 흔드는 핵심 뉴스를 빠르게 읽고, AI 해석으로 방향을 파악하세요.")));
+    }
+
+    @Test
+    void givenAnonymousUser_whenRequestNewsListWithEnglishLocale_thenRenderEnglish() throws Exception {
+        mockMvc.perform(get("/news").param("lang", "en"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("news/list"))
+                .andExpect(model().attribute("currentLang", "en"))
+                .andExpect(content().string(containsString("lang=\"en\"")))
+                .andExpect(content().string(containsString("Read the macro headlines moving the market, with AI-guided interpretation.")));
     }
 
     @Test
