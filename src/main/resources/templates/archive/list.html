@@ -6,7 +6,7 @@
             <div class="topic-kicker mb-2" th:text="#{archive.kicker}">Archive</div>
             <h1 class="topic-heading fw-bold mb-2" th:text="#{archive.heading}">Archive</h1>
             <p class="topic-summary mb-0" th:text="#{archive.subheading}">
-                Browse recent analyzed macro news in reverse chronological order.
+                Browse recently analyzed macro news in reverse chronological order.
             </p>
         </div>
     </section>
@@ -15,10 +15,13 @@
         <div class="card-body p-4 p-lg-5">
             <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
                 <div>
-                    <div class="topic-kicker mb-1" th:text="#{archive.sectionKicker}">Recent items</div>
-                    <h2 class="h5 fw-bold mb-0" th:text="#{archive.sectionTitle}">Recent analyzed news</h2>
+                    <div class="topic-kicker mb-1" th:text="#{archive.sectionKicker}">Archive</div>
+                    <h2 class="h5 fw-bold mb-0" th:text="#{archive.sectionTitle}">Recently analyzed news</h2>
+                    <div class="small text-secondary mt-2" th:text="#{archive.sectionNote}">
+                        Start with the newest items and move backward through the archive.
+                    </div>
                 </div>
-                <span class="badge rounded-pill text-bg-light" th:text="#{archive.count(${archiveCount})}">0 items</span>
+                <span class="badge rounded-pill text-bg-light" th:text="#{archive.count(${archiveCount})}">Total 0</span>
             </div>
 
             <div class="list-group list-group-flush" th:if="${archiveItems != null and !#lists.isEmpty(archiveItems)}">
@@ -62,8 +65,10 @@
                 </ul>
             </nav>
 
-            <div class="text-secondary" th:if="${archiveItems == null or #lists.isEmpty(archiveItems)}" th:text="#{archive.empty}">
-                No archived news is available right now.
+            <div class="border rounded-4 bg-light px-4 py-5 text-center text-secondary"
+                 th:if="${archiveItems == null or #lists.isEmpty(archiveItems)}"
+                 th:text="#{archive.empty}">
+                No archived news is available yet.
             </div>
         </div>
     </section>

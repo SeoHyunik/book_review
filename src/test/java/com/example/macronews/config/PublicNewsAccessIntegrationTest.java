@@ -119,7 +119,7 @@ class PublicNewsAccessIntegrationTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("news/list"))
                 .andExpect(model().attribute("currentLang", "ko"))
                 .andExpect(content().string(containsString("lang=\"ko\"")))
-                .andExpect(content().string(containsString("시장을 흔드는 핵심 뉴스를 빠르게 읽고, AI 해석으로 방향을 파악하세요.")));
+                .andExpect(content().string(containsString("\uc2dc\uc7a5\uc744\u0020\ud754\ub4dc\ub294\u0020\ud575\uc2ec\u0020\ub274\uc2a4\ub97c\u0020\ube60\ub974\uac8c\u0020\uc77d\uace0\u002c\u0020\u0041\u0049\u0020\ud574\uc11d\uc73c\ub85c\u0020\ubc29\ud5a5\uc744\u0020\ud30c\uc545\ud558\uc138\uc694\u002e")));
     }
 
     @Test
@@ -362,7 +362,6 @@ class PublicNewsAccessIntegrationTest {
                 .andExpect(model().attribute("pageTitleKey", "page.archive.title"))
                 .andExpect(model().attribute("pageDescriptionKey", "page.archive.description"));
     }
-
     @Test
     void givenAnonymousUser_whenRequestArchiveWithPage_thenReturnRequestedPage() throws Exception {
         given(newsQueryService.getArchiveNews(2, 20))
@@ -387,7 +386,8 @@ class PublicNewsAccessIntegrationTest {
                 .andExpect(model().attribute("archiveItems", List.of()))
                 .andExpect(model().attribute("archiveCount", 0L))
                 .andExpect(model().attribute("archiveCurrentPage", 1))
-                .andExpect(model().attribute("archiveTotalPages", 0));
+                .andExpect(model().attribute("archiveTotalPages", 0))
+                .andExpect(content().string(containsString("\uc544\uc9c1\u0020\uc544\uce74\uc774\ube0c\uc5d0\u0020\uc800\uc7a5\ub41c\u0020\ub274\uc2a4\uac00\u0020\uc5c6\uc2b5\ub2c8\ub2e4\u002e")));
     }
 
     private NewsListItemDto dollarNewsItem() {
