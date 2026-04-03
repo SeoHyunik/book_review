@@ -1,4 +1,4 @@
-﻿You are generating the daily handoff for this repository.
+You are generating the daily handoff for this repository.
 
 Read first:
 1. S:\dev\project\auziraum\PROJECT_BRIEF.md
@@ -12,6 +12,7 @@ Ops rules:
 - MUST read the handoff format file first
 - MUST write only to: S:\dev\project\auziraum\docs\ops\2026-04-03\DAILY_HANDOFF.md
 - MUST NOT overwrite the format file
+- If the file already exists, update it carefully instead of creating a duplicate file
 
 Read if available:
 - format: S:\dev\project\auziraum\docs\ops\DAILY_HANDOFF_FORMAT.md

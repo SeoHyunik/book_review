@@ -1,4 +1,4 @@
-﻿You are running the planner role for this repository.
+You are running the planner role for this repository.
 
 Read first:
 1. S:\dev\project\auziraum\PROJECT_BRIEF.md
@@ -13,6 +13,7 @@ Ops rules:
 - NEVER create TODAY_STRATEGY.md in root or directly under docs/ops/
 - MUST read the strategy format before writing
 - MUST write only to: S:\dev\project\auziraum\docs\ops\2026-04-03\TODAY_STRATEGY.md
+- If the file already exists, update it carefully instead of creating a second file
 
 Read if available:
 - format: S:\dev\project\auziraum\docs\ops\TODAY_STRATEGY_FORMAT.md

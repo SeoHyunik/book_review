@@ -1,4 +1,4 @@
-﻿You are running the curator role for this repository.
+You are running the curator role for this repository.
 
 Read first:
 1. S:\dev\project\auziraum\PROJECT_BRIEF.md
@@ -23,3 +23,4 @@ Tasks:
 2. Append a concise entry to HARNESS_FAILURES.md
 3. Do not modify code
 4. Do not modify format files
+5. Do not modify any other file
