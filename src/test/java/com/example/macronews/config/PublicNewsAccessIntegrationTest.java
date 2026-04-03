@@ -33,6 +33,7 @@ import com.example.macronews.service.news.MarketSummarySnapshotService;
 import com.example.macronews.service.news.RecentMarketSummaryService;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -132,25 +133,15 @@ class PublicNewsAccessIntegrationTest {
     }
 
     @Test
-    void givenAnonymousUser_whenRequestNewsListWithDetailedSource_thenRenderCombinedSourceLabel() throws Exception {
-        given(newsQueryService.getRecentNews(null, NewsListSort.PUBLISHED_DESC))
-                .willReturn(List.of(newsListItem("NAVER", "NAVER-경향")));
+    void givenAnonymousUser_whenRequestNewsListWithTodayOnlyItems_thenRenderTodayItems() throws Exception {
+        given(newsQueryService.getRecentNewsForToday(null, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(todayNewsItem()));
 
         mockMvc.perform(get("/news"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("news/list"))
-                .andExpect(content().string(containsString("NAVER-경향")));
-    }
-
-    @Test
-    void givenAnonymousUser_whenRequestNewsListWithMissingSourceDetail_thenFallbackToCoarseSource() throws Exception {
-        given(newsQueryService.getRecentNews(null, NewsListSort.PUBLISHED_DESC))
-                .willReturn(List.of(newsListItem("NAVER", "NAVER")));
-
-        mockMvc.perform(get("/news"))
-                .andExpect(status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("news/list"))
-                .andExpect(content().string(containsString("NAVER")));
+                .andExpect(model().attribute("newsItems", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(content().string(containsString("Today-only headline")));
     }
 
     @Test
@@ -559,6 +550,29 @@ class PublicNewsAccessIntegrationTest {
                 "KOSPI UP",
                 "Market breadth improves.",
                 9
+        );
+    }
+
+    private NewsListItemDto todayNewsItem() {
+        ZoneId businessZone = ZoneId.of("Asia/Seoul");
+        LocalDate businessToday = LocalDate.of(2026, 3, 17);
+        Instant publishedAt = businessToday.atTime(10, 0).atZone(businessZone).toInstant();
+        Instant ingestedAt = businessToday.atTime(11, 0).atZone(businessZone).toInstant();
+        return new NewsListItemDto(
+                "today-1",
+                "Today-only headline",
+                "Today-only headline",
+                "Reuters",
+                publishedAt,
+                ingestedAt,
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.NEUTRAL,
+                SignalSentiment.NEUTRAL,
+                "Rates unchanged",
+                "Policy remains steady.",
+                8
         );
     }
 }

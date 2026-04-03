@@ -52,7 +52,7 @@ public class NewsController {
             Model model) {
         NewsStatus selectedStatus = resolveStatus(status);
         NewsListSort selectedSort = resolveSort(sort);
-        List<NewsListItemDto> allNewsItems = safeGetRecentNews(selectedStatus, selectedSort);
+        List<NewsListItemDto> allNewsItems = safeGetRecentNewsForToday(selectedStatus, selectedSort);
         int totalItems = allNewsItems.size();
         int totalPages = Math.max(1, (int) Math.ceil((double) totalItems / NEWS_PAGE_SIZE));
         int currentPage = resolvePage(page, totalPages);
@@ -93,8 +93,12 @@ public class NewsController {
         return "news/list";
     }
 
-    private List<NewsListItemDto> safeGetRecentNews(NewsStatus selectedStatus, NewsListSort selectedSort) {
+    private List<NewsListItemDto> safeGetRecentNewsForToday(NewsStatus selectedStatus, NewsListSort selectedSort) {
         try {
+            List<NewsListItemDto> todayNewsItems = newsQueryService.getRecentNewsForToday(selectedStatus, selectedSort);
+            if (todayNewsItems != null) {
+                return todayNewsItems;
+            }
             return newsQueryService.getRecentNews(selectedStatus, selectedSort);
         } catch (RuntimeException ex) {
             log.warn("Rendering /news with empty news list due to query failure status={} sort={}",

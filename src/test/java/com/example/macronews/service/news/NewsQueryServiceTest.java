@@ -979,6 +979,103 @@ class NewsQueryServiceTest {
     }
 
     @Test
+    @DisplayName("Today-only news list should keep same-day ingested items and exclude previous-day items")
+    void getRecentNewsForToday_filtersToSameBusinessDay() {
+        NewsEvent todayIngested = newsEvent(
+                "today-ingested",
+                "Today headline",
+                "Today summary",
+                "Reuters",
+                "https://example.com/today-ingested",
+                "2026-03-09T13:00:00Z",
+                "2026-03-10T01:00:00Z",
+                NewsStatus.INGESTED,
+                null);
+        NewsEvent yesterdayIngested = newsEvent(
+                "yesterday-ingested",
+                "Yesterday headline",
+                "Yesterday summary",
+                "Reuters",
+                "https://example.com/yesterday-ingested",
+                "2026-03-09T12:00:00Z",
+                "2026-03-09T14:00:00Z",
+                NewsStatus.INGESTED,
+                null);
+
+        given(newsEventRepository.findAll())
+                .willReturn(List.of(todayIngested, yesterdayIngested));
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNewsForToday(null, NewsListSort.PUBLISHED_DESC);
+
+        assertThat(items).extracting(NewsListItemDto::id).containsExactly("today-ingested");
+    }
+
+    @Test
+    @DisplayName("Today-only news list should fall back to publishedAt when ingestedAt is missing")
+    void getRecentNewsForToday_fallsBackToPublishedAtWhenIngestedAtIsMissing() {
+        NewsEvent publishedToday = new NewsEvent(
+                "published-today",
+                null,
+                "Published today but not ingested yet",
+                "Summary",
+                "Reuters",
+                "https://example.com/published-today",
+                Instant.parse("2026-03-10T00:30:00Z"),
+                null,
+                NewsStatus.INGESTED,
+                null,
+                null,
+                null
+        );
+        NewsEvent publishedYesterday = new NewsEvent(
+                "published-yesterday",
+                null,
+                "Published yesterday",
+                "Summary",
+                "Reuters",
+                "https://example.com/published-yesterday",
+                Instant.parse("2026-03-09T14:30:00Z"),
+                null,
+                NewsStatus.INGESTED,
+                null,
+                null,
+                null
+        );
+
+        given(newsEventRepository.findAll())
+                .willReturn(List.of(publishedToday, publishedYesterday));
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNewsForToday(null, NewsListSort.PUBLISHED_DESC);
+
+        assertThat(items).extracting(NewsListItemDto::id).containsExactly("published-today");
+    }
+
+    @Test
+    @DisplayName("Today-only news list should keep same-day items beyond the previous top-20 window")
+    void getRecentNewsForToday_keepsMoreThanTwentySameDayItems() {
+        List<NewsEvent> sameDayEvents = java.util.stream.IntStream.rangeClosed(0, 20)
+                .mapToObj(index -> newsEvent(
+                        "today-" + index,
+                        "Today headline " + index,
+                        "Today summary " + index,
+                        "Reuters",
+                        "https://example.com/today-" + index,
+                        String.format("2026-03-10T09:%02d:00Z", index),
+                        String.format("2026-03-10T09:%02d:30Z", index),
+                        NewsStatus.INGESTED,
+                        null))
+                .toList();
+
+        given(newsEventRepository.findAll())
+                .willReturn(sameDayEvents);
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNewsForToday(null, NewsListSort.PUBLISHED_DESC);
+
+        assertThat(items).hasSize(21);
+        assertThat(items).extracting(NewsListItemDto::id).contains("today-20");
+    }
+
+    @Test
     @DisplayName("Recent news list should use primary freshness window before fallback window")
     void getRecentNews_prefersPrimaryFreshnessWindowOverFallback() {
         ReflectionTestUtils.setField(newsQueryService, "globalMaxAgeHours", 24L);

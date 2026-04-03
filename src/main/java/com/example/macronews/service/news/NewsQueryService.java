@@ -10,6 +10,7 @@ import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.repository.NewsEventRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -31,6 +32,7 @@ import org.springframework.stereotype.Service;
 public class NewsQueryService {
 
     private static final Clock DEFAULT_CLOCK = Clock.system(ZoneId.of("Asia/Seoul"));
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
 
     private final NewsEventRepository newsEventRepository;
     private final NewsEligibilityEvaluator eligibilityEvaluator;
@@ -66,6 +68,19 @@ public class NewsQueryService {
     public List<NewsListItemDto> getRecentNews(NewsStatus status, NewsListSort sort) {
         return getRecentNewsItems(status, sort).stream()
                 .limit(20)
+                .toList();
+    }
+
+    public List<NewsListItemDto> getRecentNewsForToday(NewsStatus status, NewsListSort sort) {
+        LocalDate today = LocalDate.now(clock.withZone(BUSINESS_ZONE));
+        return loadTodayCandidates(status).stream()
+                .filter(event -> eligibilityEvaluator.isDisplayEligible(
+                        event, clock,
+                        naverMaxAgeHours, globalMaxAgeHours,
+                        naverFallbackMaxAgeHours, globalFallbackMaxAgeHours))
+                .filter(event -> isSameBusinessDay(event, today))
+                .sorted(scoringPolicy.buildComparator(sort))
+                .map(newsDtoMapper::toListItem)
                 .toList();
     }
 
@@ -160,6 +175,12 @@ public class NewsQueryService {
                 : newsEventRepository.findByStatus(status);
     }
 
+    private List<NewsEvent> loadTodayCandidates(NewsStatus status) {
+        return status == null
+                ? java.util.stream.StreamSupport.stream(newsEventRepository.findAll().spliterator(), false).toList()
+                : newsEventRepository.findByStatus(status);
+    }
+
     private List<NewsListItemDto> getRecentNewsItems(NewsStatus status, NewsListSort sort) {
         List<NewsEvent> candidates = loadCandidates(status);
         return candidates.stream()
@@ -170,6 +191,17 @@ public class NewsQueryService {
                 .sorted(scoringPolicy.buildComparator(sort))
                 .map(newsDtoMapper::toListItem)
                 .toList();
+    }
+
+    private boolean isSameBusinessDay(NewsEvent event, LocalDate today) {
+        if (event == null || today == null) {
+            return false;
+        }
+        Instant basis = event.ingestedAt() != null ? event.ingestedAt() : event.publishedAt();
+        if (basis == null) {
+            return false;
+        }
+        return basis.atZone(BUSINESS_ZONE).toLocalDate().equals(today);
     }
 
     private Page<NewsListItemDto> pageArchiveItems(List<NewsListItemDto> items, int requestedPage, int pageSize) {

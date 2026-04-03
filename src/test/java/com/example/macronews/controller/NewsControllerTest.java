@@ -75,9 +75,9 @@ class NewsControllerTest {
                 new AnalysisResult(
                         "gpt-4o-mini",
                         Instant.parse("2026-03-17T02:40:00Z"),
-                        "연준 동결",
+                        "?곗? ?숆껐",
                         "Fed pause",
-                        "시장 반응은 제한적이다.",
+                        "?쒖옣 諛섏쓳? ?쒗븳?곸씠??",
                         "Market reaction remains contained.",
                         List.of(),
                         List.of()
@@ -112,9 +112,9 @@ class NewsControllerTest {
                 new AnalysisResult(
                         "gpt-4o-mini",
                         Instant.parse("2026-03-17T02:40:00Z"),
-                        "연준 동결",
+                        "?곗? ?숆껐",
                         "Fed pause",
-                        "시장 반응은 제한적이다.",
+                        "?쒖옣 諛섏쓳? ?쒗븳?곸씠??",
                         "Market reaction remains contained.",
                         List.of(),
                         List.of()
@@ -226,7 +226,7 @@ class NewsControllerTest {
                 Instant.parse("2026-03-13T00:00:00Z").toString(),
                 2
         );
-        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of());
         given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(new MarketSignalOverviewDto(List.of()));
@@ -265,7 +265,7 @@ class NewsControllerTest {
                 null
         );
 
-        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of());
         given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(new MarketSignalOverviewDto(List.of()));
@@ -307,7 +307,7 @@ class NewsControllerTest {
                 null
         );
 
-        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of());
         given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(new MarketSignalOverviewDto(List.of()));
@@ -348,7 +348,7 @@ class NewsControllerTest {
                 "snapshot-1"
         );
 
-        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of());
         given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(new MarketSignalOverviewDto(List.of()));
@@ -384,7 +384,7 @@ class NewsControllerTest {
                 10
         );
 
-        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of(featuredNews));
         given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(new MarketSignalOverviewDto(List.of()));
@@ -422,7 +422,7 @@ class NewsControllerTest {
                 10
         );
 
-        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of(featuredNews));
         given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(new MarketSignalOverviewDto(List.of()));
@@ -452,7 +452,7 @@ class NewsControllerTest {
         given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
         given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
         willThrow(new RuntimeException("recent news unavailable"))
-                .given(newsQueryService).getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC);
+                .given(newsQueryService).getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC);
 
         ConcurrentModel model = new ConcurrentModel();
         String viewName = newsController.list(null, null, null, model);
@@ -483,7 +483,7 @@ class NewsControllerTest {
                 "Interpretation",
                 10
         );
-        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of(newsItem));
         given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
         given(marketSummarySnapshotService.getLatestValidSummary()).willReturn(Optional.empty());
@@ -505,7 +505,7 @@ class NewsControllerTest {
     @Test
     @DisplayName("list should fail open when market forecast lookup throws")
     void list_failsOpenWhenMarketForecastLookupThrows() {
-        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(List.of());
         given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
                 .willReturn(new MarketSignalOverviewDto(List.of()));
