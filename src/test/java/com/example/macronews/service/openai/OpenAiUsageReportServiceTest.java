@@ -60,15 +60,16 @@ class OpenAiUsageReportServiceTest {
     }
 
     @Test
-    @DisplayName("dashboard should exclude previous-day records from the detailed table")
-    void getDashboard_calculatesUsdAndKrwWithLiveFx() {
+    @DisplayName("dashboard should keep daily, monthly, and total costs aligned for mixed models")
+    void getDashboard_keepsDailyMonthlyAndTotalCostsAligned() {
         Instant now = FIXED_NOW;
         List<OpenAiUsageRecord> todayRecords = List.of(
-                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 500, now)
+                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 500, now),
+                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500, now.minus(1, ChronoUnit.HOURS))
         );
         List<OpenAiUsageRecord> summaryWindowRecords = List.of(
                 record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 500, now),
-                record("gpt-4o-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500, now.minus(2, ChronoUnit.DAYS))
+                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500, now.minus(1, ChronoUnit.HOURS))
         );
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
                 .willReturn(todayRecords, summaryWindowRecords);
@@ -76,13 +77,42 @@ class OpenAiUsageReportServiceTest {
 
         var dashboard = openAiUsageReportService.getDashboard();
 
-        assertThat(dashboard.recentRecords()).hasSize(1);
-        assertThat(dashboard.recentUsdTotal()).isEqualByComparingTo("0.0005");
-        assertThat(dashboard.recentKrwTotal()).isEqualByComparingTo("1");
+        assertThat(dashboard.recentRecords()).hasSize(2);
+        assertThat(dashboard.recentUsdTotal()).isEqualByComparingTo("0.0035");
+        assertThat(dashboard.recentKrwTotal()).isEqualByComparingTo("5");
+        assertThat(dashboard.dailyAggregates()).hasSize(1);
+        assertThat(dashboard.dailyAggregates().get(0).estimatedUsdCost()).isEqualByComparingTo("0.0035");
+        assertThat(dashboard.monthlyAggregates()).hasSize(1);
+        assertThat(dashboard.monthlyAggregates().get(0).estimatedKrwCost()).isEqualByComparingTo("5");
         assertThat(dashboard.exchangeRateStatusMessageKey()).isEqualTo("admin.openai.exchange.live");
         assertThat(dashboard.hasUnpricedRecords()).isFalse();
-        assertThat(dashboard.dailyAggregates()).isNotEmpty();
-        assertThat(dashboard.monthlyAggregates()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("dashboard should estimate missing prompt and completion tokens from total tokens")
+    void getDashboard_usesTotalTokensWhenPromptAndCompletionAreMissing() {
+        Instant now = FIXED_NOW;
+        List<OpenAiUsageRecord> records = List.of(
+                new OpenAiUsageRecord(
+                        "missing-usage",
+                        now,
+                        "gpt-5.4",
+                        OpenAiUsageFeatureType.MARKET_FORECAST,
+                        0,
+                        0,
+                        1_000_000
+                )
+        );
+        given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
+                .willReturn(records);
+        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, now)));
+
+        var dashboard = openAiUsageReportService.getDashboard();
+
+        assertThat(dashboard.recentRecords()).hasSize(1);
+        assertThat(dashboard.recentRecords().get(0).estimatedUsdCost()).isEqualByComparingTo("2.5000");
+        assertThat(dashboard.recentUsdTotal()).isEqualByComparingTo("2.5000");
+        assertThat(dashboard.hasUnpricedRecords()).isFalse();
     }
 
     @Test

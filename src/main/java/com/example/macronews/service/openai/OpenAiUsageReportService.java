@@ -65,7 +65,8 @@ public class OpenAiUsageReportService {
         BigDecimal exchangeRate = exchangeRateResolution.exchangeRate();
 
         int requestedPage = resolveRecentRecordPage(page);
-        Page<OpenAiUsageRecord> recentRecordPage = fetchTodayRecordPage(requestedPage);
+        List<OpenAiUsageRecord> todayRecords = loadTodayRecords();
+        Page<OpenAiUsageRecord> recentRecordPage = pageTodayRecords(todayRecords, requestedPage);
         List<OpenAiUsageRecord> recentRecords = recentRecordPage.getContent();
         List<OpenAiUsageRecordViewDto> recentViews = recentRecords.stream()
                 .map(record -> toRecordView(record, exchangeRate))
@@ -86,11 +87,8 @@ public class OpenAiUsageReportService {
                 ? 1
                 : recentRecordPage.getNumber() + 1;
 
-        BigDecimal rawRecentUsdTotal = recentRecords.stream()
-                .map(record -> calculateUsdCost(record, resolvePricing(record)))
-                .flatMap(Optional::stream)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        boolean hasUnpricedRecords = recentViews.stream().anyMatch(record -> !record.estimatedCostAvailable())
+        BigDecimal rawRecentUsdTotal = sumEstimatedUsdCosts(todayRecords);
+        boolean hasUnpricedRecords = todayRecords.stream().anyMatch(record -> resolvePricing(record).isEmpty())
                 || aggregateWindowRecords.stream().anyMatch(record -> resolvePricing(record).isEmpty());
 
         return new OpenAiUsageDashboardDto(
@@ -115,12 +113,15 @@ public class OpenAiUsageReportService {
         return Math.max(page, 1);
     }
 
-    private Page<OpenAiUsageRecord> fetchTodayRecordPage(int page) {
+    private List<OpenAiUsageRecord> loadTodayRecords() {
         Instant todayStart = todayStartInstant();
-        List<OpenAiUsageRecord> todayRecords = openAiUsageRecordRepository
+        return openAiUsageRecordRepository
                 .findByTimestampGreaterThanEqualOrderByTimestampDesc(todayStart).stream()
                 .filter(record -> isOnOrAfterTodayStart(record, todayStart))
                 .toList();
+    }
+
+    private Page<OpenAiUsageRecord> pageTodayRecords(List<OpenAiUsageRecord> todayRecords, int page) {
         int totalItems = todayRecords.size();
         int totalPages = Math.max((int) Math.ceil((double) totalItems / RECENT_RECORD_PAGE_SIZE), 1);
         int safePage = Math.min(Math.max(page, 1), totalPages);
@@ -188,10 +189,7 @@ public class OpenAiUsageReportService {
         long promptTokens = records.stream().mapToLong(OpenAiUsageRecord::promptTokens).sum();
         long completionTokens = records.stream().mapToLong(OpenAiUsageRecord::completionTokens).sum();
         long totalTokens = records.stream().mapToLong(OpenAiUsageRecord::totalTokens).sum();
-        BigDecimal estimatedUsdCost = records.stream()
-                .map(record -> calculateUsdCost(record, resolvePricing(record)))
-                .flatMap(Optional::stream)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal estimatedUsdCost = sumEstimatedUsdCosts(records);
         BigDecimal estimatedKrwCost = estimatedUsdCost.multiply(exchangeRate);
         return new OpenAiUsageAggregateDto(
                 label,
@@ -281,13 +279,21 @@ public class OpenAiUsageReportService {
         if (record == null || pricing.isEmpty()) {
             return Optional.empty();
         }
-        BigDecimal promptCost = BigDecimal.valueOf(record.promptTokens())
+        TokenUsage tokenUsage = resolveTokenUsage(record);
+        BigDecimal promptCost = BigDecimal.valueOf(tokenUsage.promptTokens())
                 .multiply(pricing.get().inputPer1mUsd())
                 .divide(ONE_MILLION_TOKENS, 8, RoundingMode.HALF_UP);
-        BigDecimal completionCost = BigDecimal.valueOf(record.completionTokens())
+        BigDecimal completionCost = BigDecimal.valueOf(tokenUsage.completionTokens())
                 .multiply(pricing.get().outputPer1mUsd())
                 .divide(ONE_MILLION_TOKENS, 8, RoundingMode.HALF_UP);
         return Optional.of(promptCost.add(completionCost));
+    }
+
+    private BigDecimal sumEstimatedUsdCosts(List<OpenAiUsageRecord> records) {
+        return records.stream()
+                .map(record -> calculateUsdCost(record, resolvePricing(record)))
+                .flatMap(Optional::stream)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private ExchangeRateResolution resolveExchangeRate() {
@@ -365,9 +371,21 @@ public class OpenAiUsageReportService {
         return value.setScale(0, RoundingMode.HALF_UP);
     }
 
+    private TokenUsage resolveTokenUsage(OpenAiUsageRecord record) {
+        int promptTokens = Math.max(record.promptTokens(), 0);
+        int completionTokens = Math.max(record.completionTokens(), 0);
+        if (promptTokens == 0 && completionTokens == 0 && record.totalTokens() > 0) {
+            promptTokens = record.totalTokens();
+        }
+        return new TokenUsage(promptTokens, completionTokens);
+    }
+
     private record Pricing(BigDecimal inputPer1mUsd, BigDecimal outputPer1mUsd, String modelAlias) {
     }
 
     private record ExchangeRateResolution(BigDecimal exchangeRate, String messageKey, boolean fallback) {
+    }
+
+    private record TokenUsage(int promptTokens, int completionTokens) {
     }
 }
