@@ -130,6 +130,28 @@ class PublicNewsAccessIntegrationTest {
     }
 
     @Test
+    void givenAnonymousUser_whenRequestNewsListWithDetailedSource_thenRenderCombinedSourceLabel() throws Exception {
+        given(newsQueryService.getRecentNews(null, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(newsListItem("NAVER", "NAVER-경향")));
+
+        mockMvc.perform(get("/news"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("news/list"))
+                .andExpect(content().string(containsString("NAVER-경향")));
+    }
+
+    @Test
+    void givenAnonymousUser_whenRequestNewsListWithMissingSourceDetail_thenFallbackToCoarseSource() throws Exception {
+        given(newsQueryService.getRecentNews(null, NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(newsListItem("NAVER", "NAVER")));
+
+        mockMvc.perform(get("/news"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("news/list"))
+                .andExpect(content().string(containsString("NAVER")));
+    }
+
+    @Test
     void givenMissingNewsDetail_whenRequest_thenRedirectToList() throws Exception {
         mockMvc.perform(get("/news/non-existent-id"))
                 .andExpect(status().is3xxRedirection())
@@ -488,6 +510,26 @@ class PublicNewsAccessIntegrationTest {
                 "KOSPI rises",
                 "KOSPI rises",
                 "Yonhap",
+                Instant.parse("2026-03-17T02:10:00Z"),
+                Instant.parse("2026-03-17T02:15:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.POSITIVE,
+                "KOSPI UP",
+                "Market breadth improves.",
+                9
+        );
+    }
+
+    private NewsListItemDto newsListItem(String source, String displaySource) {
+        return new NewsListItemDto(
+                "news-1",
+                "KOSPI rises",
+                "KOSPI rises",
+                source,
+                displaySource,
                 Instant.parse("2026-03-17T02:10:00Z"),
                 Instant.parse("2026-03-17T02:15:00Z"),
                 NewsStatus.ANALYZED,

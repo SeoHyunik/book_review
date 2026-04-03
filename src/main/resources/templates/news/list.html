@@ -1087,7 +1087,7 @@
                                  th:text="${news.displayTitle != null and !#strings.isEmpty(news.displayTitle) ? news.displayTitle : (news.title ?: #messages.msg('news.untitled'))}">Untitled</div>
                             <div class="small fw-medium news-priority" th:if="${news.priorityScore > 0}" th:text="#{news.priority(${news.priorityScore})}">Priority 0</div>
                         </td>
-                        <td class="news-col-meta text-nowrap text-truncate py-3 fw-medium news-secondary" style="max-width: 10rem;" th:text="${news.source ?: '-'}"></td>
+                        <td class="news-col-meta text-nowrap text-truncate py-3 fw-medium news-secondary" style="max-width: 10rem;" th:text="${news.displaySource ?: news.source ?: '-'}"></td>
                         <td class="news-col-meta text-nowrap py-3 news-secondary" th:text="${@uiDateTimeFormatter.formatKst(news.publishedAt)}"></td>
                         <td class="news-col-status py-3 news-status-cell" th:switch="${news.status != null ? news.status.name() : 'UNKNOWN'}">
                             <span th:case="'ANALYZED'" class="badge ui-pill rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle" th:text="#{status.analyzed}">Analyzed</span>
