@@ -39,12 +39,10 @@ $TodayStrategy   = Join-Path $TodayDir "TODAY_STRATEGY.md"
 $DailyHandoff    = Join-Path $TodayDir "DAILY_HANDOFF.md"
 
 # ==========================================
-# 2. Codex CLI command pieces
+# 2. Codex CLI args
 # ==========================================
-# Official CLI reference:
-# - Non-interactive mode: codex exec
-# - Working directory flag: -C / --cd
-# - Dangerous no-approval mode: --dangerously-bypass-approvals-and-sandbox
+# Non-interactive execution:
+# codex exec --dangerously-bypass-approvals-and-sandbox -C "<workdir>"
 $CodexBaseArgs = 'exec --dangerously-bypass-approvals-and-sandbox -C "{WORKDIR}"'
 
 # ==========================================
@@ -52,20 +50,26 @@ $CodexBaseArgs = 'exec --dangerously-bypass-approvals-and-sandbox -C "{WORKDIR}"
 # ==========================================
 function New-DirectoryIfMissing {
     param([string]$Path)
+
     if (-not (Test-Path $Path)) {
         New-Item -ItemType Directory -Path $Path | Out-Null
     }
 }
 
-function New-FileIfMissing {
+function New-TextFileIfMissing {
     param(
         [string]$Path,
         [string]$DefaultContent = ""
     )
+
     if (-not (Test-Path $Path)) {
         $parent = Split-Path $Path -Parent
         New-DirectoryIfMissing -Path $parent
-        Set-Content -Path $Path -Value $DefaultContent -Encoding UTF8
+
+        # Important:
+        # only create if missing
+        # do NOT rewrite existing files
+        [System.IO.File]::WriteAllText($Path, $DefaultContent, [System.Text.UTF8Encoding]::new($false))
     }
 }
 
@@ -74,9 +78,12 @@ function Write-PromptFile {
         [string]$FilePath,
         [string]$Content
     )
+
     $parent = Split-Path $FilePath -Parent
     New-DirectoryIfMissing -Path $parent
-    Set-Content -Path $FilePath -Value $Content -Encoding UTF8
+
+    # Prompt files are newly generated operational artifacts.
+    [System.IO.File]::WriteAllText($FilePath, $Content, [System.Text.UTF8Encoding]::new($false))
 }
 
 function Get-LatestPreviousHandoffFile {
@@ -85,7 +92,9 @@ function Get-LatestPreviousHandoffFile {
         [string]$CurrentDate
     )
 
-    if (-not (Test-Path $OpsRoot)) { return $null }
+    if (-not (Test-Path $OpsRoot)) {
+        return $null
+    }
 
     $dirs = Get-ChildItem -Path $OpsRoot -Directory |
             Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}$' -and $_.Name -lt $CurrentDate } |
@@ -93,7 +102,9 @@ function Get-LatestPreviousHandoffFile {
 
     foreach ($dir in $dirs) {
         $candidate = Join-Path $dir.FullName "DAILY_HANDOFF.md"
-        if (Test-Path $candidate) { return $candidate }
+        if (Test-Path $candidate) {
+            return $candidate
+        }
     }
 
     return $null
@@ -105,8 +116,8 @@ function Invoke-CodexFromPrompt {
         [string]$WorkDir
     )
 
-    $args = $CodexBaseArgs.Replace("{WORKDIR}", $WorkDir)
-    $cmd  = "Get-Content `"$PromptFile`" -Raw | codex $args"
+    $codexArgs = $CodexBaseArgs.Replace("{WORKDIR}", $WorkDir)
+    $cmd  = "Get-Content `"$PromptFile`" -Raw | codex $codexArgs"
 
     Write-Host ""
     Write-Host "==========================================" -ForegroundColor Cyan
@@ -142,15 +153,16 @@ foreach ($file in $requiredFiles) {
 }
 
 # ==========================================
-# 5. Prepare ops structure
+# 5. Prepare safe ops structure
 # ==========================================
 New-DirectoryIfMissing -Path $OpsDir
 New-DirectoryIfMissing -Path $TodayDir
 New-DirectoryIfMissing -Path $PromptDir
 
-New-FileIfMissing -Path $FailuresFile -DefaultContent "# HARNESS_FAILURES`n"
+# Create only if missing. Never rewrite existing daily docs.
+New-TextFileIfMissing -Path $FailuresFile -DefaultContent "# HARNESS_FAILURES`n"
 
-New-FileIfMissing -Path $QaInbox -DefaultContent @"
+New-TextFileIfMissing -Path $QaInbox -DefaultContent @"
 # QA_INBOX
 
 ## Date
@@ -161,7 +173,7 @@ $DateString
 -
 "@
 
-New-FileIfMissing -Path $QaStructured -DefaultContent @"
+New-TextFileIfMissing -Path $QaStructured -DefaultContent @"
 # QA_STRUCTURED
 
 ## Date
@@ -175,7 +187,7 @@ $DateString
 $PreviousHandoff = Get-LatestPreviousHandoffFile -OpsRoot $OpsDir -CurrentDate $DateString
 
 # ==========================================
-# 6. Prompt content
+# 6. Prompt contents
 # ==========================================
 $PlannerPrompt = @"
 You are running the planner role for this repository.
@@ -193,6 +205,7 @@ Ops rules:
 - NEVER create TODAY_STRATEGY.md in root or directly under docs/ops/
 - MUST read the strategy format before writing
 - MUST write only to: $TodayStrategy
+- If the file already exists, update it carefully instead of creating a second file
 
 Read if available:
 - format: $TodayFmt
@@ -235,6 +248,7 @@ Tasks:
 2. Append a concise entry to HARNESS_FAILURES.md
 3. Do not modify code
 4. Do not modify format files
+5. Do not modify any other file
 "@
 
 $HandoffPrompt = @"
@@ -252,6 +266,7 @@ Ops rules:
 - MUST read the handoff format file first
 - MUST write only to: $DailyHandoff
 - MUST NOT overwrite the format file
+- If the file already exists, update it carefully instead of creating a duplicate file
 
 Read if available:
 - format: $HandoffFmt
@@ -270,7 +285,7 @@ Tasks:
 "@
 
 # ==========================================
-# 7. Write prompt files
+# 7. Write prompt files (safe to overwrite)
 # ==========================================
 $PlannerPromptFile = Join-Path $PromptDir "$DateString-planner.prompt.txt"
 $CuratorPromptFile = Join-Path $PromptDir "$DateString-curator.prompt.txt"
