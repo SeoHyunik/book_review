@@ -1,0 +1,25 @@
+﻿You are running the curator role for this repository.
+
+Read first:
+1. S:\dev\project\auziraum\PROJECT_BRIEF.md
+2. S:\dev\project\auziraum\AGENTS.md
+3. S:\dev\project\auziraum\DEV_LOOP.md
+4. S:\dev\project\auziraum\HARNESS_RULES.md
+
+Today: 2026-04-03
+
+Read if available:
+- TODAY_STRATEGY: S:\dev\project\auziraum\docs\ops\2026-04-03\TODAY_STRATEGY.md
+- DAILY_HANDOFF: S:\dev\project\auziraum\docs\ops\2026-04-03\DAILY_HANDOFF.md
+- QA_INBOX: S:\dev\project\auziraum\docs\ops\2026-04-03\QA_INBOX.md
+- QA_STRUCTURED: S:\dev\project\auziraum\docs\ops\2026-04-03\QA_STRUCTURED.md
+- reports: S:\dev\project\auziraum\docs\reports
+
+You must update only:
+- S:\dev\project\auziraum\docs\ops\HARNESS_FAILURES.md
+
+Tasks:
+1. Detect meaningful repeated mistakes or weak harness points
+2. Append a concise entry to HARNESS_FAILURES.md
+3. Do not modify code
+4. Do not modify format files
