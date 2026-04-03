@@ -39,10 +39,13 @@ $TodayStrategy   = Join-Path $TodayDir "TODAY_STRATEGY.md"
 $DailyHandoff    = Join-Path $TodayDir "DAILY_HANDOFF.md"
 
 # ==========================================
-# 2. Codex CLI command
+# 2. Codex CLI command pieces
 # ==========================================
-# Adjust this only if your local Codex CLI uses a different invocation style.
-$CodexCommandTemplate = 'Get-Content "{PROMPT_FILE}" | codex --dangerously-bypass-approvals-and-sandbox'
+# Official CLI reference:
+# - Non-interactive mode: codex exec
+# - Working directory flag: -C / --cd
+# - Dangerous no-approval mode: --dangerously-bypass-approvals-and-sandbox
+$CodexBaseArgs = 'exec --dangerously-bypass-approvals-and-sandbox -C "{WORKDIR}"'
 
 # ==========================================
 # 3. Helpers
@@ -98,10 +101,12 @@ function Get-LatestPreviousHandoffFile {
 
 function Invoke-CodexFromPrompt {
     param(
-        [string]$PromptFile
+        [string]$PromptFile,
+        [string]$WorkDir
     )
 
-    $cmd = $CodexCommandTemplate.Replace("{PROMPT_FILE}", $PromptFile)
+    $args = $CodexBaseArgs.Replace("{WORKDIR}", $WorkDir)
+    $cmd  = "Get-Content `"$PromptFile`" -Raw | codex $args"
 
     Write-Host ""
     Write-Host "==========================================" -ForegroundColor Cyan
@@ -280,17 +285,17 @@ Write-PromptFile -FilePath $HandoffPromptFile -Content $HandoffPrompt
 # ==========================================
 switch ($Mode) {
     "planner" {
-        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile
+        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
     }
     "curator" {
-        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile
+        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
     }
     "handoff" {
-        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile
+        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
     }
     "all" {
-        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile
-        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile
-        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile
+        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
+        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
+        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
     }
 }
