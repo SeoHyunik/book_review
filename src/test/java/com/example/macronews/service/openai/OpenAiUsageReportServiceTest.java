@@ -31,7 +31,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 class OpenAiUsageReportServiceTest {
 
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
-    private static final Instant FIXED_NOW = Instant.parse("2026-03-10T12:00:00Z");
+    private static final Instant FIXED_NOW = Instant.parse("2026-04-03T12:00:00Z");
 
     @Mock
     private OpenAiUsageRecordRepository openAiUsageRecordRepository;
@@ -54,30 +54,76 @@ class OpenAiUsageReportServiceTest {
                 pricingSnapshotLoader
         );
         ReflectionTestUtils.setField(openAiUsageReportService, "clock", Clock.fixed(FIXED_NOW, BUSINESS_ZONE));
+        ReflectionTestUtils.setField(openAiUsageReportService, "reportingStartDate", LocalDate.of(2026, 4, 1));
         ReflectionTestUtils.setField(openAiUsageReportService, "fallbackKrwRate", BigDecimal.valueOf(1350d));
         ReflectionTestUtils.setField(openAiUsageReportService, "dailyDays", 7);
         ReflectionTestUtils.setField(openAiUsageReportService, "monthlyMonths", 6);
     }
 
     @Test
-    @DisplayName("dashboard should keep daily, monthly, and total costs aligned for mixed models")
-    void getDashboard_keepsDailyMonthlyAndTotalCostsAligned() {
-        Instant now = FIXED_NOW;
-        List<OpenAiUsageRecord> todayRecords = List.of(
-                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 500, now),
-                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500, now.minus(1, ChronoUnit.HOURS))
-        );
-        List<OpenAiUsageRecord> summaryWindowRecords = List.of(
-                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 500, now),
-                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500, now.minus(1, ChronoUnit.HOURS))
+    @DisplayName("dashboard should exclude records before the reporting cutoff")
+    void getDashboard_excludesRecordsBeforeReportingCutoff() {
+        List<OpenAiUsageRecord> records = List.of(
+                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 500,
+                        LocalDate.of(2026, 3, 31).atTime(23, 0).atZone(BUSINESS_ZONE).toInstant()),
+                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500,
+                        LocalDate.of(2026, 4, 1).atTime(10, 0).atZone(BUSINESS_ZONE).toInstant())
         );
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
-                .willReturn(todayRecords, summaryWindowRecords);
-        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, now)));
+                .willReturn(records);
+        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, FIXED_NOW)));
+
+        var dashboard = openAiUsageReportService.getDashboard();
+
+        assertThat(dashboard.recentRecords()).hasSize(1);
+        assertThat(dashboard.recentRecordTotalCount()).isEqualTo(1);
+        assertThat(dashboard.recentUsdTotal()).isEqualByComparingTo("0.0030");
+        assertThat(dashboard.recentKrwTotal()).isEqualByComparingTo("4");
+        assertThat(dashboard.dailyAggregates()).hasSize(1);
+        assertThat(dashboard.dailyAggregates().get(0).estimatedUsdCost()).isEqualByComparingTo("0.0030");
+        assertThat(dashboard.monthlyAggregates()).hasSize(1);
+        assertThat(dashboard.monthlyAggregates().get(0).estimatedKrwCost()).isEqualByComparingTo("4");
+        assertThat(dashboard.exchangeRateStatusMessageKey()).isEqualTo("admin.openai.exchange.live");
+        assertThat(dashboard.hasUnpricedRecords()).isFalse();
+    }
+
+    @Test
+    @DisplayName("dashboard should keep records on and after the reporting cutoff")
+    void getDashboard_keepsRecordsOnAndAfterReportingCutoff() {
+        List<OpenAiUsageRecord> records = List.of(
+                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 500,
+                        LocalDate.of(2026, 4, 1).atTime(9, 0).atZone(BUSINESS_ZONE).toInstant()),
+                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500, FIXED_NOW)
+        );
+        given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
+                .willReturn(records);
+        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, FIXED_NOW)));
 
         var dashboard = openAiUsageReportService.getDashboard();
 
         assertThat(dashboard.recentRecords()).hasSize(2);
+        assertThat(dashboard.recentRecordTotalCount()).isEqualTo(2);
+        assertThat(dashboard.dailyAggregates()).isNotEmpty();
+        assertThat(dashboard.monthlyAggregates()).isNotEmpty();
+    }
+
+    @Test
+    @DisplayName("dashboard should keep daily, monthly, and total costs aligned for reporting records")
+    void getDashboard_keepsDailyMonthlyAndTotalCostsAligned() {
+        List<OpenAiUsageRecord> records = List.of(
+                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 500,
+                        LocalDate.of(2026, 4, 2).atTime(11, 0).atZone(BUSINESS_ZONE).toInstant()),
+                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 1000, 500,
+                        LocalDate.of(2026, 4, 2).atTime(10, 0).atZone(BUSINESS_ZONE).toInstant())
+        );
+        given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
+                .willReturn(records);
+        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, FIXED_NOW)));
+
+        var dashboard = openAiUsageReportService.getDashboard();
+
+        assertThat(dashboard.recentRecords()).hasSize(2);
+        assertThat(dashboard.recentRecordTotalCount()).isEqualTo(2);
         assertThat(dashboard.recentUsdTotal()).isEqualByComparingTo("0.0035");
         assertThat(dashboard.recentKrwTotal()).isEqualByComparingTo("5");
         assertThat(dashboard.dailyAggregates()).hasSize(1);
@@ -86,6 +132,27 @@ class OpenAiUsageReportServiceTest {
         assertThat(dashboard.monthlyAggregates().get(0).estimatedKrwCost()).isEqualByComparingTo("5");
         assertThat(dashboard.exchangeRateStatusMessageKey()).isEqualTo("admin.openai.exchange.live");
         assertThat(dashboard.hasUnpricedRecords()).isFalse();
+    }
+
+    @Test
+    @DisplayName("dashboard should remain safe when only pre-cutoff records exist")
+    void getDashboard_remainsSafeWhenOnlyPreReportingCutoffRecordsExist() {
+        List<OpenAiUsageRecord> records = List.of(
+                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 100, 20,
+                        LocalDate.of(2026, 3, 31).atTime(23, 0).atZone(BUSINESS_ZONE).toInstant())
+        );
+        given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
+                .willReturn(records);
+        given(marketDataFacade.getUsdKrw()).willReturn(Optional.empty());
+
+        var dashboard = openAiUsageReportService.getDashboard();
+
+        assertThat(dashboard.recentRecordTotalCount()).isZero();
+        assertThat(dashboard.recentRecords()).isEmpty();
+        assertThat(dashboard.dailyAggregates()).isEmpty();
+        assertThat(dashboard.monthlyAggregates()).isEmpty();
+        assertThat(dashboard.recentUsdTotal()).isEqualByComparingTo("0.0000");
+        assertThat(dashboard.recentKrwTotal()).isEqualByComparingTo("0");
     }
 
     @Test
@@ -119,7 +186,7 @@ class OpenAiUsageReportServiceTest {
     @DisplayName("dashboard should fall back to configured KRW rate when live FX is unavailable")
     void getDashboard_usesFallbackFxRate() {
         List<OpenAiUsageRecord> records = List.of(
-                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 0, Instant.now())
+                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 1000, 0, FIXED_NOW)
         );
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
                 .willReturn(records);
@@ -135,11 +202,11 @@ class OpenAiUsageReportServiceTest {
     @DisplayName("dashboard should price dated model slugs using normalized configured aliases")
     void getDashboard_pricesDatedModelAliases() {
         List<OpenAiUsageRecord> records = List.of(
-                record("gpt-4o-mini-2026-03-01", OpenAiUsageFeatureType.MARKET_FORECAST, 1000, 500, Instant.now())
+                record("gpt-4o-mini-2026-03-01", OpenAiUsageFeatureType.MARKET_FORECAST, 1000, 500, FIXED_NOW)
         );
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
                 .willReturn(records);
-        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, Instant.now())));
+        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, FIXED_NOW)));
 
         var dashboard = openAiUsageReportService.getDashboard();
 
@@ -152,13 +219,13 @@ class OpenAiUsageReportServiceTest {
     @DisplayName("estimateUsdCost should use repository JSON model pricing for gpt-5.4 family")
     void estimateUsdCost_usesJsonModelPricing() {
         BigDecimal gpt54Cost = openAiUsageReportService.estimateUsdCost(
-                record("gpt-5.4", OpenAiUsageFeatureType.MARKET_FORECAST, 1_000_000, 1_000_000, Instant.now())
+                record("gpt-5.4", OpenAiUsageFeatureType.MARKET_FORECAST, 1_000_000, 1_000_000, FIXED_NOW)
         );
         BigDecimal gpt54MiniCost = openAiUsageReportService.estimateUsdCost(
-                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_FORECAST, 1_000_000, 1_000_000, Instant.now())
+                record("gpt-5.4-mini", OpenAiUsageFeatureType.MARKET_FORECAST, 1_000_000, 1_000_000, FIXED_NOW)
         );
         BigDecimal gpt54NanoCost = openAiUsageReportService.estimateUsdCost(
-                record("gpt-5.4-nano", OpenAiUsageFeatureType.MARKET_FORECAST, 1_000_000, 1_000_000, Instant.now())
+                record("gpt-5.4-nano", OpenAiUsageFeatureType.MARKET_FORECAST, 1_000_000, 1_000_000, FIXED_NOW)
         );
 
         assertThat(gpt54Cost).isEqualByComparingTo("17.5000");
@@ -170,11 +237,11 @@ class OpenAiUsageReportServiceTest {
     @DisplayName("dashboard should exclude unrecognized model slugs from estimated cost totals")
     void getDashboard_excludesUnrecognizedModelsFromCostTotals() {
         List<OpenAiUsageRecord> records = List.of(
-                record("unknown-experimental-model", OpenAiUsageFeatureType.MARKET_FORECAST, 1000, 500, Instant.now())
+                record("unknown-experimental-model", OpenAiUsageFeatureType.MARKET_FORECAST, 1000, 500, FIXED_NOW)
         );
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
                 .willReturn(records);
-        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, Instant.now())));
+        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, FIXED_NOW)));
 
         var dashboard = openAiUsageReportService.getDashboard();
 
@@ -188,11 +255,11 @@ class OpenAiUsageReportServiceTest {
     @DisplayName("dashboard should use feature fallback pricing when model is blank")
     void getDashboard_usesFeatureFallbackWhenModelBlank() {
         List<OpenAiUsageRecord> records = List.of(
-                record("", OpenAiUsageFeatureType.MARKET_FORECAST, 1000, 500, Instant.now())
+                record("", OpenAiUsageFeatureType.MARKET_FORECAST, 1000, 500, FIXED_NOW)
         );
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
                 .willReturn(records);
-        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, Instant.now())));
+        given(marketDataFacade.getUsdKrw()).willReturn(Optional.of(new FxSnapshotDto("USD", "KRW", 1400d, FIXED_NOW)));
 
         var dashboard = openAiUsageReportService.getDashboard();
 
@@ -202,10 +269,10 @@ class OpenAiUsageReportServiceTest {
     }
 
     @Test
-    @DisplayName("dashboard should request today's recent records using the Seoul day boundary")
-    void getDashboard_requestsTodayCutoffForRecentRecords() {
+    @DisplayName("dashboard should request reporting cutoff records using the Seoul boundary")
+    void getDashboard_requestsReportingCutoffForRecentRecords() {
         List<OpenAiUsageRecord> records = List.of(
-                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 100, 20, Instant.now())
+                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 100, 20, FIXED_NOW)
         );
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
                 .willReturn(records);
@@ -214,26 +281,26 @@ class OpenAiUsageReportServiceTest {
         openAiUsageReportService.getDashboard(2);
 
         ArgumentCaptor<Instant> timestampCaptor = ArgumentCaptor.forClass(Instant.class);
-        org.mockito.Mockito.verify(openAiUsageRecordRepository, org.mockito.Mockito.times(2))
+        org.mockito.Mockito.verify(openAiUsageRecordRepository, org.mockito.Mockito.times(1))
                 .findByTimestampGreaterThanEqualOrderByTimestampDesc(
                 timestampCaptor.capture());
         assertThat(timestampCaptor.getAllValues().get(0)).isEqualTo(
-                LocalDate.of(2026, 3, 10).atStartOfDay(BUSINESS_ZONE).toInstant());
+                LocalDate.of(2026, 4, 1).atStartOfDay(BUSINESS_ZONE).toInstant());
     }
 
     @Test
     @DisplayName("dashboard should expose recent record pagination metadata")
     void getDashboard_exposesRecentRecordPaginationMetadata() {
-        List<OpenAiUsageRecord> todayRecords = java.util.stream.IntStream.rangeClosed(0, 20)
+        List<OpenAiUsageRecord> reportingRecords = java.util.stream.IntStream.rangeClosed(0, 20)
                 .mapToObj(index -> record(
                         "gpt-4o-mini",
                         OpenAiUsageFeatureType.MACRO_INTERPRETATION,
                         100,
                         20,
-                        LocalDate.of(2026, 3, 10).atTime(11, 0).minusMinutes(index).atZone(BUSINESS_ZONE).toInstant()))
+                        LocalDate.of(2026, 4, 2).atTime(11, 0).minusMinutes(index).atZone(BUSINESS_ZONE).toInstant()))
                 .toList();
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
-                .willReturn(todayRecords);
+                .willReturn(reportingRecords);
         given(marketDataFacade.getUsdKrw()).willReturn(Optional.empty());
 
         var dashboard = openAiUsageReportService.getDashboard(2);
@@ -247,21 +314,21 @@ class OpenAiUsageReportServiceTest {
     }
 
     @Test
-    @DisplayName("dashboard should keep summaries while the detailed table stays on today's records")
-    void getDashboard_keepsSummariesWhileRecentTableShowsTodayRecords() {
-        List<OpenAiUsageRecord> todayRecords = List.of(
+    @DisplayName("dashboard should keep summaries while the detailed table stays on reporting records")
+    void getDashboard_keepsSummariesWhileRecentTableShowsReportingRecords() {
+        List<OpenAiUsageRecord> reportingRecords = List.of(
                 record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 100, 20,
-                        LocalDate.of(2026, 3, 10).atTime(11, 0).atZone(BUSINESS_ZONE).toInstant()),
+                        LocalDate.of(2026, 4, 2).atTime(11, 0).atZone(BUSINESS_ZONE).toInstant()),
                 record("gpt-4o-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 100, 20,
-                        LocalDate.of(2026, 3, 10).atTime(10, 0).atZone(BUSINESS_ZONE).toInstant())
+                        LocalDate.of(2026, 4, 2).atTime(10, 0).atZone(BUSINESS_ZONE).toInstant())
         );
         List<OpenAiUsageRecord> summaryWindowRecords = List.of(
-                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 100, 20, Instant.now()),
+                record("gpt-4o-mini", OpenAiUsageFeatureType.MACRO_INTERPRETATION, 100, 20, FIXED_NOW),
                 record("gpt-4o-mini", OpenAiUsageFeatureType.MARKET_SUMMARY, 100, 20,
-                        Instant.now().minus(2, ChronoUnit.DAYS))
+                        FIXED_NOW.minus(2, ChronoUnit.DAYS))
         );
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
-                .willReturn(todayRecords, summaryWindowRecords);
+                .willReturn(reportingRecords, summaryWindowRecords);
         given(marketDataFacade.getUsdKrw()).willReturn(Optional.empty());
 
         var dashboard = openAiUsageReportService.getDashboard();
@@ -275,16 +342,16 @@ class OpenAiUsageReportServiceTest {
     @Test
     @DisplayName("dashboard should clamp oversized page requests to the last available page")
     void getDashboard_clampsOversizedPageRequests() {
-        List<OpenAiUsageRecord> todayRecords = java.util.stream.IntStream.rangeClosed(0, 20)
+        List<OpenAiUsageRecord> reportingRecords = java.util.stream.IntStream.rangeClosed(0, 20)
                 .mapToObj(index -> record(
                         "gpt-4o-mini",
                         OpenAiUsageFeatureType.MACRO_INTERPRETATION,
                         100,
                         20,
-                        LocalDate.of(2026, 3, 10).atTime(12, 0).minusMinutes(index).atZone(BUSINESS_ZONE).toInstant()))
+                        LocalDate.of(2026, 4, 2).atTime(12, 0).minusMinutes(index).atZone(BUSINESS_ZONE).toInstant()))
                 .toList();
         given(openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(org.mockito.ArgumentMatchers.any()))
-                .willReturn(todayRecords);
+                .willReturn(reportingRecords);
         given(marketDataFacade.getUsdKrw()).willReturn(Optional.empty());
 
         var dashboard = openAiUsageReportService.getDashboard(5);

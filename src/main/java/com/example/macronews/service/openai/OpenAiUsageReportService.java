@@ -47,6 +47,9 @@ public class OpenAiUsageReportService {
     private final OpenAiPricingSnapshotLoader pricingSnapshotLoader;
     private Clock clock = Clock.system(BUSINESS_ZONE);
 
+    @Value("${openai.cost.reporting-start-date:2026-04-01}")
+    private LocalDate reportingStartDate;
+
     @Value("${openai.cost.krw-fallback-rate:1350.0}")
     private BigDecimal fallbackKrwRate;
 
@@ -65,31 +68,22 @@ public class OpenAiUsageReportService {
         BigDecimal exchangeRate = exchangeRateResolution.exchangeRate();
 
         int requestedPage = resolveRecentRecordPage(page);
-        List<OpenAiUsageRecord> todayRecords = loadTodayRecords();
-        Page<OpenAiUsageRecord> recentRecordPage = pageTodayRecords(todayRecords, requestedPage);
+        List<OpenAiUsageRecord> reportingRecords = loadReportingRecords();
+        Page<OpenAiUsageRecord> recentRecordPage = pageReportingRecords(reportingRecords, requestedPage);
         List<OpenAiUsageRecord> recentRecords = recentRecordPage.getContent();
         List<OpenAiUsageRecordViewDto> recentViews = recentRecords.stream()
                 .map(record -> toRecordView(record, exchangeRate))
                 .toList();
 
-        Instant monthlyCutoff = YearMonth.now(BUSINESS_ZONE)
-                .minusMonths(Math.max(monthlyMonths, 1) - 1L)
-                .atDay(1)
-                .atStartOfDay(BUSINESS_ZONE)
-                .toInstant();
-        List<OpenAiUsageRecord> aggregateWindowRecords =
-                openAiUsageRecordRepository.findByTimestampGreaterThanEqualOrderByTimestampDesc(monthlyCutoff);
-
-        List<OpenAiUsageAggregateDto> dailyAggregates = buildDailyAggregates(aggregateWindowRecords, exchangeRate);
-        List<OpenAiUsageAggregateDto> monthlyAggregates = buildMonthlyAggregates(aggregateWindowRecords, exchangeRate);
+        List<OpenAiUsageAggregateDto> dailyAggregates = buildDailyAggregates(reportingRecords, exchangeRate);
+        List<OpenAiUsageAggregateDto> monthlyAggregates = buildMonthlyAggregates(reportingRecords, exchangeRate);
         int recentRecordTotalPages = Math.max(recentRecordPage.getTotalPages(), 1);
         int recentRecordCurrentPage = recentRecordPage.getTotalPages() == 0
                 ? 1
                 : recentRecordPage.getNumber() + 1;
 
-        BigDecimal rawRecentUsdTotal = sumEstimatedUsdCosts(todayRecords);
-        boolean hasUnpricedRecords = todayRecords.stream().anyMatch(record -> resolvePricing(record).isEmpty())
-                || aggregateWindowRecords.stream().anyMatch(record -> resolvePricing(record).isEmpty());
+        BigDecimal rawRecentUsdTotal = sumEstimatedUsdCosts(reportingRecords);
+        boolean hasUnpricedRecords = reportingRecords.stream().anyMatch(record -> resolvePricing(record).isEmpty());
 
         return new OpenAiUsageDashboardDto(
                 recentViews,
@@ -113,21 +107,21 @@ public class OpenAiUsageReportService {
         return Math.max(page, 1);
     }
 
-    private List<OpenAiUsageRecord> loadTodayRecords() {
-        Instant todayStart = todayStartInstant();
+    private List<OpenAiUsageRecord> loadReportingRecords() {
+        Instant reportingStart = reportingStartInstant();
         return openAiUsageRecordRepository
-                .findByTimestampGreaterThanEqualOrderByTimestampDesc(todayStart).stream()
-                .filter(record -> isOnOrAfterTodayStart(record, todayStart))
+                .findByTimestampGreaterThanEqualOrderByTimestampDesc(reportingStart).stream()
+                .filter(record -> isOnOrAfterReportingStart(record, reportingStart))
                 .toList();
     }
 
-    private Page<OpenAiUsageRecord> pageTodayRecords(List<OpenAiUsageRecord> todayRecords, int page) {
-        int totalItems = todayRecords.size();
+    private Page<OpenAiUsageRecord> pageReportingRecords(List<OpenAiUsageRecord> reportingRecords, int page) {
+        int totalItems = reportingRecords.size();
         int totalPages = Math.max((int) Math.ceil((double) totalItems / RECENT_RECORD_PAGE_SIZE), 1);
         int safePage = Math.min(Math.max(page, 1), totalPages);
         int fromIndex = Math.min((safePage - 1) * RECENT_RECORD_PAGE_SIZE, totalItems);
         int toIndex = Math.min(fromIndex + RECENT_RECORD_PAGE_SIZE, totalItems);
-        List<OpenAiUsageRecord> pageContent = todayRecords.subList(fromIndex, toIndex);
+        List<OpenAiUsageRecord> pageContent = reportingRecords.subList(fromIndex, toIndex);
         return new org.springframework.data.domain.PageImpl<>(
                 pageContent,
                 recentRecordPageable(safePage),
@@ -138,17 +132,15 @@ public class OpenAiUsageReportService {
         return PageRequest.of(page - 1, RECENT_RECORD_PAGE_SIZE, Sort.by(Sort.Direction.DESC, "timestamp"));
     }
 
-    private Instant todayStartInstant() {
-        return LocalDate.now(clock.withZone(BUSINESS_ZONE))
-                .atStartOfDay(BUSINESS_ZONE)
-                .toInstant();
+    private Instant reportingStartInstant() {
+        return reportingStartDate.atStartOfDay(BUSINESS_ZONE).toInstant();
     }
 
-    private boolean isOnOrAfterTodayStart(OpenAiUsageRecord record, Instant todayStart) {
+    private boolean isOnOrAfterReportingStart(OpenAiUsageRecord record, Instant reportingStart) {
         return record != null
                 && record.timestamp() != null
-                && todayStart != null
-                && !record.timestamp().isBefore(todayStart);
+                && reportingStart != null
+                && !record.timestamp().isBefore(reportingStart);
     }
 
     BigDecimal estimateUsdCost(OpenAiUsageRecord record) {
