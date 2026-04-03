@@ -41,7 +41,7 @@
 <body class="bg-body-tertiary">
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm sticky-top">
     <div class="container">
-        <a class="navbar-brand fw-semibold" th:href="@{/news}" th:text="#{app.name}">Macro News</a>
+        <a class="navbar-brand fw-semibold" th:href="@{/news}" th:text="#{layout.brand}">Auziraum</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav"
                 aria-expanded="false" th:attr="aria-label=#{layout.toggleNav}">
             <span class="navbar-toggler-icon"></span>
@@ -54,7 +54,7 @@
                     <a class="nav-link" th:href="@{/admin/news/manual}" th:text="#{nav.admin.manual}">Admin Manual</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
-                    <a class="btn btn-light text-primary fw-semibold ms-lg-1" th:href="@{/admin/news/auto}" th:text="#{nav.admin.auto}">Admin Auto</a>
+                    <a class="btn btn-outline-light btn-sm fw-semibold ms-lg-1" th:href="@{/admin/news/auto}" th:text="#{nav.admin.auto}">Admin Auto</a>
                 </li>
                 <li class="nav-item" sec:authorize="hasRole('ADMIN')">
                     <a class="nav-link" th:href="@{/admin/openai-usage}" th:text="#{nav.admin.usage}">Admin Usage</a>
@@ -95,7 +95,7 @@
     <div class="row justify-content-center">
         <div class="col-12 col-lg-10 col-xl-9">
             <header class="mb-4 d-flex align-items-center gap-2">
-                <span class="badge ui-pill bg-info-subtle text-info fw-semibold text-uppercase" th:text="#{app.name}">Macro News</span>
+                <span class="badge ui-pill bg-info-subtle text-info fw-semibold text-uppercase" th:text="#{layout.brand}">Auziraum</span>
                 <p class="mb-0 text-secondary" th:text="#{app.description}">Macro News Interpretation Service</p>
             </header>
 
@@ -119,7 +119,7 @@
 
 <footer class="fixed-bottom bg-body-tertiary text-center text-secondary small py-2">
     <div class="container">
-        <p class="mb-1" th:text="#{layout.footer}">Macro News Interpreter crafted with Spring Boot &amp; Thymeleaf by Fastlaner</p>
+        <p class="mb-1" th:text="#{layout.footer}">Auziraum · Macro News Interpreter</p>
     </div>
 </footer>
 
