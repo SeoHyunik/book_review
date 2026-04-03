@@ -41,42 +41,38 @@ $DailyHandoff    = Join-Path $TodayDir "DAILY_HANDOFF.md"
 # ==========================================
 # 2. Codex CLI command
 # ==========================================
-# Official docs say this flag bypasses approvals and sandboxing.
-# Use only in a trusted/hardened environment.
-#
-# If your local Codex CLI uses a slightly different invocation style,
-# adjust only this line.
+# Adjust this only if your local Codex CLI uses a different invocation style.
 $CodexCommandTemplate = 'codex --dangerously-bypass-approvals-and-sandbox --cwd "{WORKDIR}" --prompt-file "{PROMPT_FILE}"'
 
 # ==========================================
 # 3. Helpers
 # ==========================================
-function Ensure-Directory {
+function New-DirectoryIfMissing {
     param([string]$Path)
     if (-not (Test-Path $Path)) {
         New-Item -ItemType Directory -Path $Path | Out-Null
     }
 }
 
-function Ensure-File {
+function New-FileIfMissing {
     param(
         [string]$Path,
         [string]$DefaultContent = ""
     )
     if (-not (Test-Path $Path)) {
         $parent = Split-Path $Path -Parent
-        Ensure-Directory -Path $parent
+        New-DirectoryIfMissing -Path $parent
         Set-Content -Path $Path -Value $DefaultContent -Encoding UTF8
     }
 }
 
-function New-PromptFile {
+function Write-PromptFile {
     param(
         [string]$FilePath,
         [string]$Content
     )
     $parent = Split-Path $FilePath -Parent
-    Ensure-Directory -Path $parent
+    New-DirectoryIfMissing -Path $parent
     Set-Content -Path $FilePath -Value $Content -Encoding UTF8
 }
 
@@ -116,7 +112,7 @@ function Invoke-CodexFromPrompt {
     Write-Host ""
 
     if ($DryRun) {
-        Write-Host "[DryRun] 실행은 하지 않고 여기서 멈춥니다." -ForegroundColor Yellow
+        Write-Host "[DryRun] Execution skipped." -ForegroundColor Yellow
         return
     }
 
@@ -137,20 +133,20 @@ $requiredFiles = @(
 
 foreach ($file in $requiredFiles) {
     if (-not (Test-Path $file)) {
-        throw "필수 파일이 없습니다: $file"
+        throw "Required file not found: $file"
     }
 }
 
 # ==========================================
 # 5. Prepare ops structure
 # ==========================================
-Ensure-Directory -Path $OpsDir
-Ensure-Directory -Path $TodayDir
-Ensure-Directory -Path $PromptDir
+New-DirectoryIfMissing -Path $OpsDir
+New-DirectoryIfMissing -Path $TodayDir
+New-DirectoryIfMissing -Path $PromptDir
 
-Ensure-File -Path $FailuresFile -DefaultContent "# HARNESS_FAILURES`n"
+New-FileIfMissing -Path $FailuresFile -DefaultContent "# HARNESS_FAILURES`n"
 
-Ensure-File -Path $QaInbox -DefaultContent @"
+New-FileIfMissing -Path $QaInbox -DefaultContent @"
 # QA_INBOX
 
 ## Date
@@ -161,7 +157,7 @@ $DateString
 -
 "@
 
-Ensure-File -Path $QaStructured -DefaultContent @"
+New-FileIfMissing -Path $QaStructured -DefaultContent @"
 # QA_STRUCTURED
 
 ## Date
@@ -204,7 +200,7 @@ Read if available:
 Tasks:
 1. Read TODAY_STRATEGY_FORMAT.md
 2. Create or update exactly: $TodayStrategy
-3. Keep plan small, safe, and Codex-executable
+3. Keep the plan small, safe, and Codex-executable
 4. Do not implement code
 5. Do not modify any other file
 "@
@@ -276,9 +272,9 @@ $PlannerPromptFile = Join-Path $PromptDir "$DateString-planner.prompt.txt"
 $CuratorPromptFile = Join-Path $PromptDir "$DateString-curator.prompt.txt"
 $HandoffPromptFile = Join-Path $PromptDir "$DateString-handoff.prompt.txt"
 
-New-PromptFile -FilePath $PlannerPromptFile -Content $PlannerPrompt
-New-PromptFile -FilePath $CuratorPromptFile -Content $CuratorPrompt
-New-PromptFile -FilePath $HandoffPromptFile -Content $HandoffPrompt
+Write-PromptFile -FilePath $PlannerPromptFile -Content $PlannerPrompt
+Write-PromptFile -FilePath $CuratorPromptFile -Content $CuratorPrompt
+Write-PromptFile -FilePath $HandoffPromptFile -Content $HandoffPrompt
 
 # ==========================================
 # 8. Execute by mode
