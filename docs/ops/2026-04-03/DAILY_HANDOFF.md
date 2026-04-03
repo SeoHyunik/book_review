@@ -10,114 +10,155 @@
 
 ### What Was Done
 
-- provider query noise tuning 1차를 완료했다.
-- Naver / Naver-like 기본 query set에서 불필요한 지엽 토큰을 제거했다.
-- NewsAPI / GNews recent query 및 fallback query에서 broad token을 줄이고 기본 query를 정리했다.
-- `application.yaml`의 기본 query 구성을 코드와 맞췄다.
-- provider 테스트가 실제 기본 query set과 더 가깝게 동작하도록 정리했다.
-- query resolution과 fallback 동작을 bounded change 범위로 고정했다.
+- Step 1의 query noise tuning 범위를 완료했다.
+- provider 기본 query set에서 불필요한 broad token을 줄이고, fallback / recent query 해석을 더 결정적으로 정리했다.
+- query resolution과 fallback 동작을 selector, ranking, UI, AI summary 로직과 분리된 bounded change로 유지했다.
+- 오늘의 ops 문서 기준으로는 다음 세션이 이어받을 수 있도록 완료 / 보류 / 위험 항목을 정리했다.
 
 ### Today in One Line
 
-- 오늘은 하네스 기반 첫 실행 step으로 provider query 노이즈를 줄이고, 다음 단계가 안전하게 이어질 수 있도록 query 경로를 정리했다.
+- 오늘은 provider query 경로의 불필요한 noise를 줄여 다음 step의 기준선을 고정했다.
 
 ---
 
-## 3. Completed Steps
+## 3. Completed Work
 
 - Step 1: Query Noise Tuning
   - 완료
-  - Naver / NewsAPI / GNews provider query set의 불필요한 broad token을 제거했다.
-  - recent query와 fallback query가 deterministic하게 동작하도록 정리했다.
-  - query 관련 변경을 selector, ranking, UI, AI summary 로직과 분리했다.
+  - Naver / Naver-like 기본 query set에서 불필요한 broad token을 제거했다.
+  - NewsAPI / GNews recent query와 fallback query가 더 좁고 결정적으로 동작하도록 정리했다.
+  - query 변경 범위를 provider query 해석에만 한정하고, selector / ranking / UI / AI summary 로직은 건드리지 않았다.
 
 ---
 
-## 4. Partially Completed / Deferred Work
+## 4. Partially Completed Work
+
+- 없음
+  - 오늘의 실행 범위는 Step 1에 한정되었고, 중간 상태로 남겨 둔 구현 작업은 없다.
+
+---
+
+## 5. Deferred Work
 
 - AI Summary Korean Tone Cleanup
-  - 아직 시작하지 않았다.
-  - 요약 문구의 한국어 톤과 읽기 쉬움은 다음 step에서 다룬다.
+  - 이유: query tuning과 분리된 별도 step이 필요하다.
+  - 재검토 시점: 다음 summary tone step.
 
 - SEO Foundation Minimal Pass
-  - 아직 시작하지 않았다.
-  - archive / topic / public route metadata 정리는 다음 단계로 미뤘다.
+  - 이유: archive / topic / public route metadata 정리는 별도 축으로 다뤄야 한다.
+  - 재검토 시점: query 안정화 이후.
 
 - Partial Update Pilot
-  - 아직 시작하지 않았다.
-  - Thymeleaf partial update 실험은 query tuning과 분리했다.
+  - 이유: Thymeleaf partial update 실험은 query tuning과 무관한 별도 작업이다.
+  - 재검토 시점: UI / rendering step이 열릴 때.
 
 - Retention Policy Decision
-  - 아직 시작하지 않았다.
-  - today-only / archive / delete 정책 결정은 별도 판단이 필요하다.
+  - 이유: today-only / archive / delete 정책은 제품 방향 결정을 포함한다.
+  - 재검토 시점: 보존 정책 논의가 가능할 때.
 
 - Admin Usage Follow-up
-  - 아직 시작하지 않았다.
-  - usage parity와 관리 기능 점검은 이번 step 범위를 넘는다.
+  - 이유: usage parity와 admin 기능 정리는 이번 step의 범위를 넘는다.
+  - 재검토 시점: 관리 기능 step이 필요할 때.
 
 ---
 
-## 5. New Findings / Observations
+## 6. Carry-over Candidates (CRITICAL)
 
-- `china` / `ukraine` 같은 broad geopolitics 토큰을 기본 query에서 빼면 불필요한 noise는 줄지만, 관련 뉴스 recall이 같이 낮아질 수 있다.
-- `sanctions`는 일부 noise를 줄이는 데는 유효하지만, 모든 시장 영향 이벤트를 대체할 수 있는 만능 토큰은 아니다.
-- query resolution은 now bounded area가 되었기 때문에, 이후 조정은 더 작은 표면에서 검증할 수 있다.
-- `docs/ops/2026-04-03/TODAY_STRATEGY.md`에는 이전 상태의 formatting noise가 남아 있어 `git diff --check` 신호를 흐릴 수 있다.
-- 오늘 QA 입력 문서(`QA_INBOX.md`, `QA_STRUCTURED.md`)에는 별도 항목이 없었다.
+- Query noise tuning 후속 검증
+  - origin: Step 1
+  - previous status: partial
+  - why it should continue: broad token 제거가 실제 recall 저하를 만들지 확인해야 한다.
+  - risk if ignored: 일부 기사군이 누락될 수 있다.
+  - suggested priority: high
 
----
+- AI Summary Korean Tone Cleanup
+  - origin: TODAY_STRATEGY
+  - previous status: deferred
+  - why it should continue: 사용자 체감 품질에 직접 영향을 준다.
+  - risk if ignored: 결과물은 맞아도 한국어 톤이 거칠게 남을 수 있다.
+  - suggested priority: medium
 
-## 6. Risks Identified
+- SEO Foundation Minimal Pass
+  - origin: TODAY_STRATEGY
+  - previous status: deferred
+  - why it should continue: public route 검색성과 탐색성이 아직 약하다.
+  - risk if ignored: archive / topic page의 유입과 재방문이 약해질 수 있다.
+  - suggested priority: medium
 
-- 기본 query를 너무 좁히면 geopolitics 관련 기사 recall이 떨어질 수 있다.
-- provider마다 fallback 세트가 조금씩 달라지면, 나중에 결과 차이가 다시 커질 수 있다.
-- ops 문서의 formatting/whitespace noise가 실제 변경 신호를 가릴 수 있다.
-- query tuning 결과가 production 데이터에서 동일한 체감으로 이어진다는 보장은 없다.
-
----
-
-## 7. Documentation Changes
-
-- 오늘 수정한 문서: `docs/ops/2026-04-03/DAILY_HANDOFF.md`
-- 오늘 수정하지 않은 문서: `README.md`, `PROJECT_BRIEF.md`, `DEV_LOOP.md`, `HARNESS_RULES.md`, `docs/reports/*`
-- 기존 문서/코드 정합성 이슈는 오늘 재작성하지 않았다.
-
----
-
-## 8. Harness Improvements (Very Important)
-
-- 첫 harness-driven execution step의 결과를 날짜별 handoff로 남겼다.
-- provider query tuning을 summary / SEO / retention 작업과 분리해서 step isolation을 지켰다.
-- bounded change 원칙을 실제 query 경로에 적용했다.
-- `HARNESS_RULES.md` 자체는 오늘 수정하지 않았다.
+- Retention Policy Decision
+  - origin: TODAY_STRATEGY
+  - previous status: deferred
+  - why it should continue: today-only 운영은 데이터 보존과 UX에 직접 연결된다.
+  - risk if ignored: 운영 기대와 실제 보관 정책이 어긋날 수 있다.
+  - suggested priority: medium
 
 ---
 
-## 9. Known Mismatches (Code vs Docs)
+## 7. Dropped / Rejected Work
 
-- README가 현재 provider/query 상태를 완전히 반영하지 못하고 있을 가능성이 있다.
-- 일부 ops 문서에 formatting noise가 남아 있어 문서 품질과 validation 신호가 완전히 정리되지 않았다.
-- 오늘은 코드와 문서의 세부 정합성까지 전부 맞추지 않았다.
-
----
-
-## 10. Next Recommended Steps
-
-- Step A: AI Summary Korean Tone Cleanup
-- Step B: SEO Foundation Minimal Pass
-- Step C: Ops Document Hygiene Cleanup
+- 없음
+  - 오늘 범위에서 불필요하다고 판정되어 폐기한 항목은 없다.
 
 ---
 
-## 11. Priority for Tomorrow
+## 8. New Findings / Observations
 
-1. AI Summary Korean Tone Cleanup
-2. SEO Foundation Minimal Pass
-3. Ops Document Hygiene Cleanup
+- provider query 해석은 범위를 좁힐수록 deterministic 해지지만, 지나치게 좁히면 recall 손실이 생길 수 있다.
+- query tuning은 selector / ranking / UI / AI summary와 섞지 않는 편이 regression risk가 낮다.
+- `docs/reports/` 디렉터리는 확인 시점에 존재하지 않았다.
+- 이전 ops 문서에는 formatting / encoding noise가 남아 있었고, 이번 턴에서는 그 파일들을 수정하지 않았다.
 
 ---
 
-## 12. Required Reading for Next Session
+## 9. Risks Identified
+
+- broad token 제거로 인해 일부 geopolitics 관련 기사 recall이 줄어들 수 있다.
+- provider별 fallback 차이가 커지면 같은 키워드라도 결과 일관성이 흔들릴 수 있다.
+- 다음 step에서 summary tone, SEO, retention을 한 번에 건드리면 change surface가 커진다.
+- 문서와 코드의 상태가 어긋난 채로 남으면 다음 세션의 판단 비용이 커진다.
+
+---
+
+## 10. Documentation State
+
+- 업데이트된 문서: `docs/ops/2026-04-03/DAILY_HANDOFF.md`
+- 변경하지 않은 문서: `README.md`, `PROJECT_BRIEF.md`, `DEV_LOOP.md`, `HARNESS_RULES.md`, `docs/reports/*`
+- 미해결 상태로 남긴 문서 이슈: 이전 ops 문서의 formatting / encoding noise
+
+---
+
+## 11. Harness Improvements (Very Important)
+
+- no harness improvement today
+- 다만 Step 1에서 provider query 범위를 bounded change로 제한해야 한다는 점은 다시 확인되었다.
+
+---
+
+## 12. Known Mismatches (Code vs Docs)
+
+- README가 현재 provider/query 상태를 충분히 반영하지 못할 가능성이 있다.
+- ops 문서 일부에 formatting / encoding noise가 남아 있을 수 있다.
+- `docs/reports/`는 작업 입력에 포함되었지만 현재 디렉터리가 존재하지 않는다.
+
+---
+
+## 13. Next Recommended Steps
+
+- Step A: query tuning 후속 검증으로 recall 저하 여부를 확인한다.
+- Step B: AI Summary Korean Tone Cleanup을 별도 step으로 진행한다.
+- Step C: SEO Foundation Minimal Pass를 작은 범위로 시작한다.
+
+---
+
+## 14. Priority for Next Session
+
+1. Query tuning 후속 검증
+2. AI Summary Korean Tone Cleanup
+3. SEO Foundation Minimal Pass
+
+---
+
+## 15. Required Reading for Next Session
 
 - `PROJECT_BRIEF.md`
 - `AGENTS.md`
@@ -125,29 +166,28 @@
 - `DEV_LOOP.md`
 - `docs/ops/2026-04-03/TODAY_STRATEGY.md`
 - `docs/ops/2026-04-03/DAILY_HANDOFF.md`
-- query tuning과 직접 관련된 provider 구현 파일
 
 ---
 
-## 13. Open Questions / Clarifications Needed
+## 16. Open Questions / Clarifications Needed
 
-- 기본 query에서 추가 토큰 정리를 더 할지, 아니면 recall 영향 확인 후 진행할지 결정이 필요하다.
-- `sanctions`를 모든 provider의 기본 query에 유지할지 여부는 아직 열려 있다.
-- 다음 step을 AI summary tone으로 바로 넘어갈지, SEO groundwork를 먼저 다룰지 우선순위 확인이 있으면 좋다.
-
----
-
-## 14. Notes for Agents
-
-- 다음 step은 꼭 하나의 bounded bucket만 다루어야 한다.
-- README를 truth source처럼 보지 말고, 코드와 현재 ops 문서를 먼저 확인해야 한다.
-- query tuning과 summary tone / SEO 개선을 한 step에 섞지 말아야 한다.
+- query set을 더 좁힐지, recall 유지 쪽으로 한 단계 완화할지 결정이 필요하다.
+- `sanctions` 같은 geopolitics 토큰을 기본 query에 유지할지 재검토가 필요하다.
+- 다음 step은 summary tone부터 갈지, SEO groundwork부터 갈지 우선순위 확인이 필요하다.
 
 ---
 
-## 15. Definition of a Clean Handoff
+## 17. Notes for Agents
 
-- 오늘 완료된 step과 보류된 step이 분리되어 있다.
-- 변경 범위가 query tuning으로 명확하게 제한되어 있다.
-- 다음 step이 바로 보인다.
-- 남은 risk와 문서 정합성 문제가 숨지지 않았다.
+- 다음 세션도 반드시 하나의 bounded step만 다뤄야 한다.
+- provider query tuning 결과를 summary / SEO / retention과 섞지 말아야 한다.
+- README를 truth source로 가정하지 말고, 현재 ops 문서와 코드 상태를 먼저 확인해야 한다.
+
+---
+
+## 18. Definition of a Clean Handoff
+
+- 오늘 완료한 step과 보류된 step이 분리되어 있다.
+- 다음에 확인할 carry-over가 명확하다.
+- 주요 위험이 문서에 드러나 있다.
+- 다음 세션의 첫 행동이 바로 보인다.
