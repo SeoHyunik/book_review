@@ -24,6 +24,6 @@ Read if available:
 Tasks:
 1. Read TODAY_STRATEGY_FORMAT.md
 2. Create or update exactly: S:\dev\project\auziraum\docs\ops\2026-04-03\TODAY_STRATEGY.md
-3. Keep plan small, safe, and Codex-executable
+3. Keep the plan small, safe, and Codex-executable
 4. Do not implement code
 5. Do not modify any other file

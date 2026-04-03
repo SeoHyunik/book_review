@@ -42,7 +42,7 @@ $DailyHandoff    = Join-Path $TodayDir "DAILY_HANDOFF.md"
 # 2. Codex CLI command
 # ==========================================
 # Adjust this only if your local Codex CLI uses a different invocation style.
-$CodexCommandTemplate = 'codex --dangerously-bypass-approvals-and-sandbox --cwd "{WORKDIR}" --prompt-file "{PROMPT_FILE}"'
+$CodexCommandTemplate = 'Get-Content "{PROMPT_FILE}" | codex --dangerously-bypass-approvals-and-sandbox'
 
 # ==========================================
 # 3. Helpers
@@ -98,11 +98,10 @@ function Get-LatestPreviousHandoffFile {
 
 function Invoke-CodexFromPrompt {
     param(
-        [string]$PromptFile,
-        [string]$WorkDir
+        [string]$PromptFile
     )
 
-    $cmd = $CodexCommandTemplate.Replace("{PROMPT_FILE}", $PromptFile).Replace("{WORKDIR}", $WorkDir)
+    $cmd = $CodexCommandTemplate.Replace("{PROMPT_FILE}", $PromptFile)
 
     Write-Host ""
     Write-Host "==========================================" -ForegroundColor Cyan
@@ -281,17 +280,17 @@ Write-PromptFile -FilePath $HandoffPromptFile -Content $HandoffPrompt
 # ==========================================
 switch ($Mode) {
     "planner" {
-        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
+        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile
     }
     "curator" {
-        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
+        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile
     }
     "handoff" {
-        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
+        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile
     }
     "all" {
-        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
-        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
-        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
+        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile
+        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile
+        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile
     }
 }
