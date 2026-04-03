@@ -23,6 +23,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.RegexRequestMatcher;
 import org.springframework.util.StringUtils;
 
 @Slf4j
@@ -68,6 +69,9 @@ public class SecurityConfig {
                             .requestMatchers(HttpMethod.GET, "/topic/oil")
                             .permitAll()
                             .requestMatchers(HttpMethod.GET, "/archive")
+                            .permitAll()
+                            .requestMatchers(new RegexRequestMatcher("^/market-summary/[0-9a-fA-F]{24}$",
+                                    HttpMethod.GET.name()))
                             .permitAll()
                             .requestMatchers("/admin/**")
                             .hasRole("ADMIN")

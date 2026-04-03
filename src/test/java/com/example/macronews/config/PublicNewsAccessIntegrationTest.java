@@ -8,15 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.macronews.dto.MarketSummaryDetailDto;
+import com.example.macronews.dto.MarketSummarySupportingNewsDto;
 import com.example.macronews.dto.MarketSignalOverviewDto;
-import com.example.macronews.repository.UserRepository;
-import com.example.macronews.service.forecast.MarketForecastQueryService;
-import com.example.macronews.service.market.MarketDataFacade;
-import com.example.macronews.service.news.AiMarketSummaryService;
-import com.example.macronews.service.news.NewsListSort;
-import com.example.macronews.service.news.NewsQueryService;
-import com.example.macronews.service.news.MarketSummarySnapshotService;
-import com.example.macronews.service.news.RecentMarketSummaryService;
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.dto.forecast.MarketForecastSnapshotDto;
 import com.example.macronews.dto.market.DxySnapshotDto;
@@ -26,6 +20,14 @@ import com.example.macronews.domain.ImpactDirection;
 import com.example.macronews.domain.MarketMood;
 import com.example.macronews.domain.NewsStatus;
 import com.example.macronews.domain.SignalSentiment;
+import com.example.macronews.repository.UserRepository;
+import com.example.macronews.service.forecast.MarketForecastQueryService;
+import com.example.macronews.service.market.MarketDataFacade;
+import com.example.macronews.service.news.AiMarketSummaryService;
+import com.example.macronews.service.news.NewsListSort;
+import com.example.macronews.service.news.NewsQueryService;
+import com.example.macronews.service.news.MarketSummarySnapshotService;
+import com.example.macronews.service.news.RecentMarketSummaryService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -125,6 +127,27 @@ class PublicNewsAccessIntegrationTest {
     @Test
     void givenAnonymousUser_whenRequestAdminRoute_thenRedirectToLogin() throws Exception {
         mockMvc.perform(get("/admin/news/manual"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void givenAnonymousUser_whenRequestMarketSummaryDetail_thenReturnOk() throws Exception {
+        String snapshotId = "507f1f77bcf86cd799439011";
+        given(marketSummarySnapshotService.getSnapshotDetail(snapshotId))
+                .willReturn(Optional.of(marketSummaryDetail(snapshotId)));
+
+        mockMvc.perform(get("/market-summary/" + snapshotId))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("market-summary/detail"))
+                .andExpect(model().attribute("marketSummarySourceMode", "stored"))
+                .andExpect(model().attribute("isCurrentSummary", false))
+                .andExpect(model().attribute("isStoredSnapshot", true));
+    }
+
+    @Test
+    void givenAnonymousUser_whenRequestMarketSummaryCurrent_thenRedirectToLogin() throws Exception {
+        mockMvc.perform(get("/market-summary/current"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
     }
@@ -376,6 +399,32 @@ class PublicNewsAccessIntegrationTest {
                 "Oil UP",
                 "Crude and energy pricing firm as supply tightens.",
                 10
+        );
+    }
+
+    private MarketSummaryDetailDto marketSummaryDetail(String id) {
+        return new MarketSummaryDetailDto(
+                id,
+                Instant.parse("2026-03-17T03:00:00Z"),
+                3,
+                3,
+                "headline ko",
+                "headline en",
+                "summary ko",
+                "summary en",
+                "view ko",
+                "view en",
+                SignalSentiment.POSITIVE,
+                0.8d,
+                List.of("USD", "Oil"),
+                List.of(new MarketSummarySupportingNewsDto(
+                        "news-1",
+                        "KOSPI rises",
+                        "Yonhap",
+                        Instant.parse("2026-03-17T02:10:00Z"),
+                        ImpactDirection.UP,
+                        SignalSentiment.POSITIVE
+                ))
         );
     }
 }
