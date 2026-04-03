@@ -19,6 +19,9 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -61,16 +64,14 @@ public class NewsQueryService {
     }
 
     public List<NewsListItemDto> getRecentNews(NewsStatus status, NewsListSort sort) {
-        List<NewsEvent> candidates = loadCandidates(status);
-        return candidates.stream()
-                .filter(event -> eligibilityEvaluator.isDisplayEligible(
-                        event, clock,
-                        naverMaxAgeHours, globalMaxAgeHours,
-                        naverFallbackMaxAgeHours, globalFallbackMaxAgeHours))
-                .sorted(scoringPolicy.buildComparator(sort))
+        return getRecentNewsItems(status, sort).stream()
                 .limit(20)
-                .map(newsDtoMapper::toListItem)
                 .toList();
+    }
+
+    public Page<NewsListItemDto> getArchiveNews(int page, int pageSize) {
+        List<NewsListItemDto> archiveItems = getRecentNewsItems(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC);
+        return pageArchiveItems(archiveItems, page, pageSize);
     }
 
     public MarketSignalOverviewDto getMarketSignalOverview(NewsStatus status, NewsListSort sort) {
@@ -157,5 +158,36 @@ public class NewsQueryService {
         return status == null
                 ? newsEventRepository.findTop20ByOrderByIngestedAtDesc()
                 : newsEventRepository.findByStatus(status);
+    }
+
+    private List<NewsListItemDto> getRecentNewsItems(NewsStatus status, NewsListSort sort) {
+        List<NewsEvent> candidates = loadCandidates(status);
+        return candidates.stream()
+                .filter(event -> eligibilityEvaluator.isDisplayEligible(
+                        event, clock,
+                        naverMaxAgeHours, globalMaxAgeHours,
+                        naverFallbackMaxAgeHours, globalFallbackMaxAgeHours))
+                .sorted(scoringPolicy.buildComparator(sort))
+                .map(newsDtoMapper::toListItem)
+                .toList();
+    }
+
+    private Page<NewsListItemDto> pageArchiveItems(List<NewsListItemDto> items, int requestedPage, int pageSize) {
+        int safePageSize = Math.max(pageSize, 1);
+        int totalItems = items.size();
+        int totalPages = totalItems == 0 ? 0 : (int) Math.ceil((double) totalItems / safePageSize);
+        int safePage = Math.max(requestedPage, 1);
+        if (totalPages > 0 && safePage > totalPages) {
+            safePage = totalPages;
+        }
+
+        int fromIndex = totalItems == 0 ? 0 : Math.min((safePage - 1) * safePageSize, totalItems);
+        int toIndex = Math.min(fromIndex + safePageSize, totalItems);
+
+        return new PageImpl<>(
+                items.subList(fromIndex, toIndex),
+                PageRequest.of(Math.max(safePage - 1, 0), safePageSize),
+                totalItems
+        );
     }
 }

@@ -41,6 +41,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -356,28 +358,45 @@ class PublicNewsAccessIntegrationTest {
     }
 
     @Test
-    void givenArchiveRequest_whenCalled_thenReturnPage() throws Exception {
-        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
-                .willReturn(List.of(archiveNewsItem()));
+    void givenAnonymousUser_whenRequestArchive_thenReturnPage() throws Exception {
+        given(newsQueryService.getArchiveNews(1, 20))
+                .willReturn(new PageImpl<>(List.of(archiveNewsItem()), PageRequest.of(0, 20), 1));
 
         mockMvc.perform(get("/archive"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("archive/list"))
                 .andExpect(model().attribute("archiveItems", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(model().attribute("archiveCurrentPage", 1))
+                .andExpect(model().attribute("archiveTotalPages", 1))
                 .andExpect(model().attribute("pageTitleKey", "page.archive.title"))
                 .andExpect(model().attribute("pageDescriptionKey", "page.archive.description"));
     }
 
     @Test
-    void givenNoNews_whenArchive_thenRenderEmpty() throws Exception {
-        given(newsQueryService.getRecentNews(NewsStatus.ANALYZED, NewsListSort.PUBLISHED_DESC))
-                .willReturn(List.of());
+    void givenAnonymousUser_whenRequestArchiveWithPage_thenReturnRequestedPage() throws Exception {
+        given(newsQueryService.getArchiveNews(2, 20))
+                .willReturn(new PageImpl<>(List.of(archiveNewsItem()), PageRequest.of(1, 20), 21));
+
+        mockMvc.perform(get("/archive?page=2"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("archive/list"))
+                .andExpect(model().attribute("archiveItems", org.hamcrest.Matchers.hasSize(1)))
+                .andExpect(model().attribute("archiveCurrentPage", 2))
+                .andExpect(model().attribute("archiveTotalPages", 2));
+    }
+
+    @Test
+    void givenAnonymousUser_whenRequestArchiveWithNoNews_thenRenderEmpty() throws Exception {
+        given(newsQueryService.getArchiveNews(1, 20))
+                .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         mockMvc.perform(get("/archive"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("archive/list"))
                 .andExpect(model().attribute("archiveItems", List.of()))
-                .andExpect(model().attribute("archiveCount", 0));
+                .andExpect(model().attribute("archiveCount", 0L))
+                .andExpect(model().attribute("archiveCurrentPage", 1))
+                .andExpect(model().attribute("archiveTotalPages", 0));
     }
 
     private NewsListItemDto dollarNewsItem() {

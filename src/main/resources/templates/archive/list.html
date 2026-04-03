@@ -40,6 +40,28 @@
                 </a>
             </div>
 
+            <nav class="mt-4" th:if="${archiveTotalPages > 1}" th:attr="aria-label=#{pagination.nav}">
+                <ul class="pagination justify-content-center flex-wrap gap-2 mb-0">
+                    <li class="page-item" th:classappend="${!archiveHasPreviousPage ? ' disabled' : ''}">
+                        <a class="page-link rounded-pill border-0 shadow-sm px-3"
+                           th:href="${archiveHasPreviousPage} ? @{/archive(page=${archiveCurrentPage - 1})} : '#'"
+                           th:text="#{pagination.previous}">Previous</a>
+                    </li>
+                    <li class="page-item"
+                        th:each="pageNumber : ${#numbers.sequence(1, archiveTotalPages)}"
+                        th:classappend="${pageNumber == archiveCurrentPage ? ' active' : ''}">
+                        <a class="page-link rounded-pill border-0 shadow-sm px-3"
+                           th:href="@{/archive(page=${pageNumber})}"
+                           th:text="${pageNumber}">1</a>
+                    </li>
+                    <li class="page-item" th:classappend="${!archiveHasNextPage ? ' disabled' : ''}">
+                        <a class="page-link rounded-pill border-0 shadow-sm px-3"
+                           th:href="${archiveHasNextPage} ? @{/archive(page=${archiveCurrentPage + 1})} : '#'"
+                           th:text="#{pagination.next}">Next</a>
+                    </li>
+                </ul>
+            </nav>
+
             <div class="text-secondary" th:if="${archiveItems == null or #lists.isEmpty(archiveItems)}" th:text="#{archive.empty}">
                 No archived news is available right now.
             </div>

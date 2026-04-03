@@ -507,6 +507,144 @@ class NewsQueryServiceTest {
     }
 
     @Test
+    @DisplayName("Archive page should return the first slice of analyzed news")
+    void getArchiveNews_returnsFirstPageOfAnalyzedNews() {
+        NewsEvent middle = newsEvent(
+                "middle",
+                "Fed signals policy steady after inflation update",
+                "Market participants reacted to the latest inflation reading.",
+                "Reuters",
+                "https://www.reuters.com/markets/middle",
+                "2026-03-10T11:00:00Z",
+                "2026-03-10T11:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+        NewsEvent oldest = newsEvent(
+                "oldest",
+                "Treasury yields ease after soft auction demand",
+                "Bond traders watched the latest auction closely.",
+                "Reuters",
+                "https://www.reuters.com/markets/oldest",
+                "2026-03-10T10:00:00Z",
+                "2026-03-10T10:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+        NewsEvent newest = newsEvent(
+                "newest",
+                "Fed keeps rates unchanged as inflation stays sticky",
+                "Officials signaled patience while inflation remained elevated.",
+                "Reuters",
+                "https://www.reuters.com/markets/newest",
+                "2026-03-10T12:00:00Z",
+                "2026-03-10T12:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(middle, oldest, newest));
+
+        var archivePage = newsQueryService.getArchiveNews(1, 2);
+
+        assertThat(archivePage.getContent()).extracting(NewsListItemDto::id)
+                .containsExactly("newest", "middle");
+        assertThat(archivePage.getNumber()).isZero();
+        assertThat(archivePage.getTotalElements()).isEqualTo(3);
+        assertThat(archivePage.getTotalPages()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Archive page should normalize non-positive page requests to the first page")
+    void getArchiveNews_normalizesNonPositivePageRequestsToFirstPage() {
+        NewsEvent middle = newsEvent(
+                "middle",
+                "Fed signals policy steady after inflation update",
+                "Market participants reacted to the latest inflation reading.",
+                "Reuters",
+                "https://www.reuters.com/markets/middle",
+                "2026-03-10T11:00:00Z",
+                "2026-03-10T11:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+        NewsEvent oldest = newsEvent(
+                "oldest",
+                "Treasury yields ease after soft auction demand",
+                "Bond traders watched the latest auction closely.",
+                "Reuters",
+                "https://www.reuters.com/markets/oldest",
+                "2026-03-10T10:00:00Z",
+                "2026-03-10T10:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+        NewsEvent newest = newsEvent(
+                "newest",
+                "Fed keeps rates unchanged as inflation stays sticky",
+                "Officials signaled patience while inflation remained elevated.",
+                "Reuters",
+                "https://www.reuters.com/markets/newest",
+                "2026-03-10T12:00:00Z",
+                "2026-03-10T12:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(middle, oldest, newest));
+
+        var archivePage = newsQueryService.getArchiveNews(-3, 2);
+
+        assertThat(archivePage.getContent()).extracting(NewsListItemDto::id)
+                .containsExactly("newest", "middle");
+        assertThat(archivePage.getNumber()).isZero();
+        assertThat(archivePage.getTotalElements()).isEqualTo(3);
+        assertThat(archivePage.getTotalPages()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Archive page should clamp oversized page requests to the last page")
+    void getArchiveNews_clampsOversizedPageRequestsToLastPage() {
+        NewsEvent middle = newsEvent(
+                "middle",
+                "Fed signals policy steady after inflation update",
+                "Market participants reacted to the latest inflation reading.",
+                "Reuters",
+                "https://www.reuters.com/markets/middle",
+                "2026-03-10T11:00:00Z",
+                "2026-03-10T11:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+        NewsEvent oldest = newsEvent(
+                "oldest",
+                "Treasury yields ease after soft auction demand",
+                "Bond traders watched the latest auction closely.",
+                "Reuters",
+                "https://www.reuters.com/markets/oldest",
+                "2026-03-10T10:00:00Z",
+                "2026-03-10T10:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+        NewsEvent newest = newsEvent(
+                "newest",
+                "Fed keeps rates unchanged as inflation stays sticky",
+                "Officials signaled patience while inflation remained elevated.",
+                "Reuters",
+                "https://www.reuters.com/markets/newest",
+                "2026-03-10T12:00:00Z",
+                "2026-03-10T12:05:00Z",
+                NewsStatus.ANALYZED,
+                analyzedResult());
+
+        given(newsEventRepository.findByStatus(NewsStatus.ANALYZED))
+                .willReturn(List.of(middle, oldest, newest));
+
+        var archivePage = newsQueryService.getArchiveNews(9, 2);
+
+        assertThat(archivePage.getContent()).extracting(NewsListItemDto::id)
+                .containsExactly("oldest");
+        assertThat(archivePage.getNumber()).isEqualTo(1);
+        assertThat(archivePage.getTotalElements()).isEqualTo(3);
+        assertThat(archivePage.getTotalPages()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("Market signal overview should keep direction and semantic sentiment distinct")
     void getMarketSignalOverview_aggregatesDominantDirectionsAndSentiments() {
         NewsEvent analyzedOne = newsEvent(
