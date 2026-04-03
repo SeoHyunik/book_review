@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.macronews.dto.FeaturedMarketSummaryDto;
 import com.example.macronews.dto.MarketSummaryDetailDto;
 import com.example.macronews.dto.MarketSummarySupportingNewsDto;
 import com.example.macronews.dto.MarketSignalOverviewDto;
@@ -132,6 +133,22 @@ class PublicNewsAccessIntegrationTest {
     }
 
     @Test
+    void givenAnonymousUser_whenRequestMarketSummaryCurrent_thenReturnOk() throws Exception {
+        String newsId = "news-1";
+        given(aiMarketSummaryService.getCurrentSummary())
+                .willReturn(Optional.of(currentAiMarketSummary(newsId)));
+        given(newsQueryService.getNewsItemsByIds(List.of(newsId)))
+                .willReturn(List.of(marketSummaryNewsItem(newsId)));
+
+        mockMvc.perform(get("/market-summary/current"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("market-summary/detail"))
+                .andExpect(model().attribute("marketSummarySourceMode", "ai"))
+                .andExpect(model().attribute("isCurrentSummary", true))
+                .andExpect(model().attribute("isStoredSnapshot", false));
+    }
+
+    @Test
     void givenAnonymousUser_whenRequestMarketSummaryDetail_thenReturnOk() throws Exception {
         String snapshotId = "507f1f77bcf86cd799439011";
         given(marketSummarySnapshotService.getSnapshotDetail(snapshotId))
@@ -143,13 +160,6 @@ class PublicNewsAccessIntegrationTest {
                 .andExpect(model().attribute("marketSummarySourceMode", "stored"))
                 .andExpect(model().attribute("isCurrentSummary", false))
                 .andExpect(model().attribute("isStoredSnapshot", true));
-    }
-
-    @Test
-    void givenAnonymousUser_whenRequestMarketSummaryCurrent_thenRedirectToLogin() throws Exception {
-        mockMvc.perform(get("/market-summary/current"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login"));
     }
 
     @Test
@@ -425,6 +435,47 @@ class PublicNewsAccessIntegrationTest {
                         ImpactDirection.UP,
                         SignalSentiment.POSITIVE
                 ))
+        );
+    }
+
+    private FeaturedMarketSummaryDto currentAiMarketSummary(String newsId) {
+        return new FeaturedMarketSummaryDto(
+                "AI headline ko",
+                "AI headline en",
+                "AI summary ko",
+                "AI summary en",
+                Instant.parse("2026-03-17T03:00:00Z"),
+                1,
+                3,
+                Instant.parse("2026-03-17T00:00:00Z"),
+                Instant.parse("2026-03-17T03:00:00Z"),
+                SignalSentiment.POSITIVE,
+                List.of("USD"),
+                List.of(newsId),
+                "market view ko",
+                "market view en",
+                0.8d,
+                true,
+                null
+        );
+    }
+
+    private NewsListItemDto marketSummaryNewsItem(String id) {
+        return new NewsListItemDto(
+                id,
+                "KOSPI rises",
+                "KOSPI rises",
+                "Yonhap",
+                Instant.parse("2026-03-17T02:10:00Z"),
+                Instant.parse("2026-03-17T02:15:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.POSITIVE,
+                "KOSPI UP",
+                "Market breadth improves.",
+                9
         );
     }
 }

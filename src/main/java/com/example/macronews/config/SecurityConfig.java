@@ -70,6 +70,8 @@ public class SecurityConfig {
                             .permitAll()
                             .requestMatchers(HttpMethod.GET, "/archive")
                             .permitAll()
+                            .requestMatchers(HttpMethod.GET, "/market-summary/current")
+                            .permitAll()
                             .requestMatchers(new RegexRequestMatcher("^/market-summary/[0-9a-fA-F]{24}$",
                                     HttpMethod.GET.name()))
                             .permitAll()
