@@ -40,7 +40,7 @@ public class GNewsSourceProvider implements NewsSourceProvider {
     @Value("${app.news.gnews.api-key:}")
     private String apiKey;
 
-    @Value("${app.news.gnews.query:market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR china OR sanctions OR ukraine}")
+    @Value("${app.news.gnews.query:market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR sanctions}")
     private String query;
 
     @Value("${app.news.gnews.lang:en}")

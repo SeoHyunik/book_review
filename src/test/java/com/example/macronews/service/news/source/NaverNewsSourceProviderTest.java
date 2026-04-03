@@ -501,7 +501,7 @@ class NaverNewsSourceProviderTest {
 
         provider.fetchTopHeadlines(5);
 
-        assertThat(decodedRequestUrls()).hasSize(17)
+        assertThat(decodedRequestUrls()).hasSize(15)
                 .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uD53C"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uB2E5"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uC6D0\uB2EC\uB7EC \uD658\uC728"))
@@ -515,9 +515,7 @@ class NaverNewsSourceProviderTest {
                 .anySatisfy(url -> assertThat(url).contains("query=\uBB3C\uAC00 \uBC1C\uD45C"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uACE0\uC6A9 \uBC1C\uD45C"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uAD00\uC138"))
-                .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uC911\uAC08\uB4F1"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uC81C\uC7AC"))
-                .anySatisfy(url -> assertThat(url).contains("query=\uC6B0\uD06C\uB77C\uC774\uB098"))
                 .allSatisfy(url -> assertThat(url)
                         .doesNotContain("query=\uC7A5\uC911")
                         .doesNotContain("query=\uB9C8\uAC10"));
@@ -535,14 +533,15 @@ class NaverNewsSourceProviderTest {
 
         provider.fetchTopHeadlines(5);
 
-        assertThat(decodedRequestUrls()).hasSize(17)
+        assertThat(decodedRequestUrls()).hasSize(15)
                 .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uD53C"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uC5F0\uC900"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uACE0\uC6A9 \uBC1C\uD45C"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uAD00\uC138"))
-                .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uC911\uAC08\uB4F1"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uC81C\uC7AC"))
-                .anySatisfy(url -> assertThat(url).contains("query=\uC6B0\uD06C\uB77C\uC774\uB098"));
+                .allSatisfy(url -> assertThat(url)
+                        .doesNotContain("query=\uBBF8\uC911\uAC08\uB4F1")
+                        .doesNotContain("query=\uC6B0\uD06C\uB77C\uC774\uB098"));
     }
 
     @Test

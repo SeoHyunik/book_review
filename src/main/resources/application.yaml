@@ -115,9 +115,9 @@ news:
     category: business
     default-limit: 5
     # Primary foreign/global NewsAPI query with a small geopolitical/policy expansion.
-    recent-query: market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR selloff OR rally OR china OR sanctions OR ukraine
+    recent-query: market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR selloff OR rally OR sanctions
     # Secondary recent-query variant used only when the primary recent search underfills.
-    recent-query-fallback: breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi OR china OR sanctions OR ukraine
+    recent-query-fallback: breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi OR sanctions
     # Macro relevance filter applied to title + description.
     filter-keywords: korea,kospi,kosdaq,volatility,oil,usd,interest rate,inflation,gold,semiconductor,tariff,fed
     recency-hours: 72
@@ -184,7 +184,7 @@ app:
       enabled: true
       base-url: https://gnews.io/api/v4/search
       api-key: ${APP_NEWS_GNEWS_API_KEY:}
-      query: market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR china OR sanctions OR ukraine
+      query: market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR sanctions
       lang: en
       country: us
       max-age-hours: 24

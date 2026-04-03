@@ -230,9 +230,9 @@ class NewsApiServiceImplTest {
         ReflectionTestUtils.setField(newsApiService, "globalMaxAgeHours", 24L);
         ReflectionTestUtils.setField(newsApiService, "globalFallbackMaxAgeHours", 36L);
         ReflectionTestUtils.setField(newsApiService, "recentQuery",
-                "market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR selloff OR rally OR china OR sanctions OR ukraine");
+                "market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR selloff OR rally OR sanctions");
         ReflectionTestUtils.setField(newsApiService, "recentQueryFallback",
-                "breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi OR china OR sanctions OR ukraine");
+                "breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi OR sanctions");
         ReflectionTestUtils.setField(newsApiService, "filterKeywords", "fed, kospi, inflation, market");
         ReflectionTestUtils.setField(newsApiService, "searchUrl", "https://newsapi.org/v2/everything");
         ReflectionTestUtils.setField(newsApiService, "baseUrl", "https://newsapi.org/v2/top-headlines");
