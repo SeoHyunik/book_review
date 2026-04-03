@@ -754,8 +754,8 @@
         }
 
         .news-table-card tbody td {
-            padding-top: 1rem;
-            padding-bottom: 1rem;
+            padding-top: 1.08rem;
+            padding-bottom: 1.08rem;
             vertical-align: middle;
         }
 
@@ -776,6 +776,12 @@
         .news-secondary {
             color: color-mix(in srgb, var(--surface-muted) 88%, #334155);
             font-size: 0.88rem;
+        }
+
+        .news-col-source {
+            width: 15%;
+            min-width: 9.5rem;
+            text-align: left;
         }
 
         .news-status-cell,
@@ -1070,7 +1076,7 @@
                     <thead>
                     <tr>
                         <th class="news-col-title" style="width: 42%;" th:text="#{news.table.title}">Title</th>
-                        <th class="news-col-meta text-nowrap" style="width: 12%;" th:text="#{news.table.source}">Source</th>
+                        <th class="news-col-meta news-col-source" style="width: 15%;" th:text="#{news.table.source}">Source</th>
                         <th class="news-col-meta text-nowrap" style="width: 14%;" th:text="#{news.table.publishedAt}">Published At</th>
                         <th class="news-col-status text-nowrap" style="width: 10%;" th:text="#{news.table.status}">Status</th>
                         <th class="news-col-forecast forecast-column" style="width: 12%;" th:text="#{news.table.forecast}">Forecast</th>
@@ -1087,7 +1093,8 @@
                                  th:text="${news.displayTitle != null and !#strings.isEmpty(news.displayTitle) ? news.displayTitle : (news.title ?: #messages.msg('news.untitled'))}">Untitled</div>
                             <div class="small fw-medium news-priority" th:if="${news.priorityScore > 0}" th:text="#{news.priority(${news.priorityScore})}">Priority 0</div>
                         </td>
-                        <td class="news-col-meta text-nowrap text-truncate py-3 fw-medium news-secondary" style="max-width: 10rem;" th:text="${news.displaySource ?: news.source ?: '-'}"></td>
+                        <td class="news-col-meta news-col-source py-3 fw-medium news-secondary"
+                            th:text="${news.displaySource ?: news.source ?: '-'}"></td>
                         <td class="news-col-meta text-nowrap py-3 news-secondary" th:text="${@uiDateTimeFormatter.formatKst(news.publishedAt)}"></td>
                         <td class="news-col-status py-3 news-status-cell" th:switch="${news.status != null ? news.status.name() : 'UNKNOWN'}">
                             <span th:case="'ANALYZED'" class="badge ui-pill rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle" th:text="#{status.analyzed}">Analyzed</span>
