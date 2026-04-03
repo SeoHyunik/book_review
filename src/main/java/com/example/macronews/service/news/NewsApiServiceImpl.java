@@ -60,10 +60,10 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
     @Value("${news.api.default-limit:10}")
     private int defaultLimit;
 
-    @Value("${news.api.recent-query:market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR selloff OR rally}")
+    @Value("${news.api.recent-query:market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR selloff OR rally OR china OR sanctions OR ukraine}")
     private String recentQuery;
 
-    @Value("${news.api.recent-query-fallback:breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi}")
+    @Value("${news.api.recent-query-fallback:breaking market OR intraday stocks OR fed OR inflation OR tariff OR oil OR semiconductor OR usd OR kospi OR china OR sanctions OR ukraine}")
     private String recentQueryFallback;
 
     @Value("${news.api.filter-keywords:korea,kospi,kosdaq,volatility,oil,usd,interest rate,inflation,gold,semiconductor,tariff,fed}")
