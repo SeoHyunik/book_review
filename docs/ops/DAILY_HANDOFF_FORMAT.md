@@ -1,4 +1,4 @@
-# DAILY_HANDOFF
+# DAILY_HANDOFF_FORMAT
 
 ## 1. Date
 
@@ -10,166 +10,216 @@ YYYY-MM-DD
 
 ### What Was Done
 
-- high-level summary of completed work
-- focus on meaningful changes, not minor edits
+Provide a concise but meaningful summary.
 
-Example:
-- fixed null handling in provider layer for NewsAPI fallback
-- added minimal guard logic in service layer
-- updated README to reflect actual supported providers
+Focus on:
+- actual progress
+- meaningful changes
+- impact
+
+Avoid listing trivial edits.
 
 ---
 
-## 3. Completed Steps
+## 3. Completed Work
 
-List of steps that were fully completed.
+List fully completed steps.
 
 - Step X: description
 - Step Y: description
 
-Each step should map to a clear intent defined in TODAY_STRATEGY.md.
+Each must map to a defined step in TODAY_STRATEGY.
 
 ---
 
-## 4. Partially Completed / Deferred Work
+## 4. Partially Completed Work
 
-Work that was started but not fully finished.
+Work that started but is incomplete.
+
+For each:
 
 - Step X:
-    - current status
-    - what is missing
-    - why it was not completed
+  - current progress
+  - what remains
+  - why incomplete
 
 ---
 
-## 5. New Findings / Observations
+## 5. Deferred Work
 
-Important discoveries during development.
+Work intentionally postponed.
 
+For each:
+
+- item
+  - reason for deferral
+  - when it should be reconsidered
+
+---
+
+## 6. Carry-over Candidates (CRITICAL)
+
+🔥 This section is the most important for continuity.
+
+List work that should be reconsidered in the next session.
+
+For each item:
+
+- item name
+- origin (step / QA / bug / finding)
+- previous status (partial / deferred / blocked)
+- why it should continue
+- risk if ignored
+- suggested priority (high / medium / low)
+
+⚠️ These items MUST be evaluated by the next planner.
+
+---
+
+## 7. Dropped / Rejected Work
+
+List work that is no longer needed.
+
+For each:
+
+- item
+- reason for dropping
+- confirmation that it should not return
+
+---
+
+## 8. New Findings / Observations
+
+Important discoveries during work.
+
+Examples:
 - hidden side effects
 - unexpected behavior
 - architectural inconsistencies
 - doc vs code mismatch
 - provider/API quirks
 
-These should be concrete and actionable.
+Must be concrete and actionable.
 
 ---
 
-## 6. Risks Identified
+## 9. Risks Identified
 
-List risks that may affect future work.
+List risks affecting future work.
 
-- regression risk
-- incomplete edge case handling
-- potential production impact
-- unclear ownership of logic
+- regression risks
+- incomplete logic
 - performance concerns
+- unclear ownership
 
-Each risk should be short and specific.
+Each should be short and specific.
 
 ---
 
-## 7. Documentation Changes
+## 10. Documentation State
 
-List documents that were updated today.
+List documentation updates.
 
-- README.md
+- updated docs
+- outdated docs
+- mismatches intentionally left unresolved
+
+If no updates:
+- explicitly state so
+
+---
+
+## 11. Harness Improvements (Very Important)
+
+List improvements to the development process.
+
+Examples:
+- new rule added
+- agent behavior refined
+- repeated failure pattern identified
+- workflow clarified
+
+If none:
+- explicitly say "no harness improvement today"
+
+---
+
+## 12. Known Mismatches (Code vs Docs)
+
+List inconsistencies still remaining.
+
+Example:
+- README claims feature X, but partially implemented
+- PROJECT_BRIEF outdated relative to current system
+
+---
+
+## 13. Next Recommended Steps
+
+Actionable next steps.
+
+Each must be:
+- small
+- safe
+- well-scoped
+
+---
+
+## 14. Priority for Next Session
+
+Order clearly:
+
+1. highest priority
+2. important
+3. optional
+
+Must reflect:
+- carry-over importance
+- user impact
+- risk
+
+---
+
+## 15. Required Reading for Next Session
+
+Must-read before continuing:
+
 - PROJECT_BRIEF.md
 - AGENTS.md
 - HARNESS_RULES.md
-- reports/*
-
-If documents were NOT updated despite mismatch, explicitly state that.
-
----
-
-## 8. Harness Improvements (Very Important)
-
-List any harness-related improvements made today.
-
-- new rule added to HARNESS_RULES.md
-- clarification added to AGENTS.md
-- workflow refinement
-- subagent instruction improvement
-- repeated mistake identified
-
-If none:
-- explicitly state "no harness improvement today"
+- DEV_LOOP.md
+- latest TODAY_STRATEGY.md
+- THIS DAILY_HANDOFF.md
 
 ---
 
-## 9. Known Mismatches (Code vs Docs)
-
-List known inconsistencies that still remain.
-
-Example:
-- README states GNews fallback, but not implemented
-- PROJECT_BRIEF implies full provider abstraction, but partially implemented
-
-This helps avoid future confusion.
-
----
-
-## 10. Next Recommended Steps
-
-Clear, actionable suggestions for the next session.
-
-- Step A: description
-- Step B: description
-
-Must be small, safe, and aligned with current state.
-
----
-
-## 11. Priority for Tomorrow
-
-Order of execution:
-
-1. most critical
-2. important but not blocking
-3. optional / improvement
-
----
-
-## 12. Required Reading for Next Session
-
-List documents that MUST be read before continuing.
-
-- PROJECT_BRIEF.md
-- AGENTS.md
-- specific report files
-- relevant source files
-
----
-
-## 13. Open Questions / Clarifications Needed
+## 16. Open Questions / Clarifications Needed
 
 List unresolved questions.
 
-- unclear product behavior
-- ambiguous requirement
-- missing spec
-- decision needed from human
+Examples:
+- unclear requirement
+- ambiguous behavior
+- decision needed
 
 ---
 
-## 14. Notes for Agents
+## 17. Notes for Agents
 
 Optional but useful:
 
-- constraints to remember
-- pitfalls to avoid
-- context not obvious from code
+- pitfalls
+- constraints
+- hidden assumptions
 
 ---
 
-## 15. Definition of a Clean Handoff
+## 18. Definition of a Clean Handoff
 
-A good handoff means:
+A clean handoff means:
 
 - next session can start without re-analysis
-- no ambiguity about current progress
-- next step is obvious and safe
+- carry-over items are clearly defined
+- next step is obvious
 - risks are visible
-- documents are aligned or mismatches are declared
+- no ambiguity exists

@@ -24,13 +24,33 @@ Summarize the current project state relevant to today's work.
 Include:
 - what is already working
 - what is currently unstable or incomplete
-- any important carry-over context from the previous handoff
+- any important carry-over context from the previous session
 
 Keep this section short and concrete.
 
 ---
 
-## 4. Inputs for Today's Planning
+## 4. Carry-over from Previous Session
+
+List unfinished or deferred work from the most recent DAILY_HANDOFF.
+
+For each item include:
+- item name
+- previous status (partial / deferred / blocked)
+- why it was not completed
+- whether it is still relevant
+- decision today:
+    - continue now
+    - defer again
+    - drop
+
+⚠️ IMPORTANT:
+Do NOT ignore carry-over work.
+All carry-over items must be explicitly evaluated.
+
+---
+
+## 5. Inputs for Today's Planning
 
 List the materials used to create today's strategy.
 
@@ -44,7 +64,7 @@ Typical inputs:
 
 ---
 
-## 5. User-Observed Issues
+## 6. User-Observed Issues
 
 List issues directly observed by the human during QA or real usage.
 
@@ -53,33 +73,28 @@ For each issue include:
 - where it appears
 - why it matters
 
-Example:
-- homepage summary feels repetitive and weak in light mode
-- topic page navigation is not obvious
-- public detail route behavior is unclear on failure
-
 ---
 
-## 6. Code / System Findings
+## 7. Code / System Findings
 
 List findings from analysis, reports, or repository inspection.
 
 Include:
-- real execution path findings
+- execution path findings
 - architecture risks
 - doc vs code mismatches
 - operational concerns
 - flaky or missing tests
 
-This section should be evidence-based, not speculative.
+Must be evidence-based.
 
 ---
 
-## 7. Candidate Work Buckets
+## 8. Candidate Work Buckets
 
-Group today's work into logical buckets.
+Group work into logical buckets.
 
-Recommended bucket types:
+Recommended types:
 - reliability
 - bug fix
 - feature
@@ -88,148 +103,165 @@ Recommended bucket types:
 - test coverage
 - harness improvement
 
-Each bucket should include:
+Each bucket includes:
 - bucket name
 - why it exists
-- rough scope
+- scope
 
 ---
 
-## 8. Priority Order
+## 9. Priority Order
 
-Order the candidate buckets.
+Order all candidate buckets.
 
 Use:
 1. highest priority
 2. medium priority
-3. optional / nice-to-have
+3. optional
 
-Priority should reflect:
+Priority must consider:
 - production risk
 - user impact
 - unblock value
-- change safety
+- safety of change
 
 ---
 
-## 9. Selected Work for Today
+## 10. Selection Logic
 
-List only the buckets that should actually be worked on today.
+Explain HOW today's work was selected.
 
-For each selected bucket include:
+Must explicitly answer:
+- why carry-over items are or are not selected
+- how new QA influenced priorities
+- what trade-offs were made
+
+This section prevents arbitrary planning.
+
+---
+
+## 11. Selected Work for Today
+
+List ONLY the work to be executed today.
+
+For each:
 - bucket name
-- today's goal
-- why selected now
+- goal
+- why selected
 - why not deferred
 
 ---
 
-## 10. Step Breakdown
+## 12. Step Breakdown
 
-Break selected work into small, Codex-executable steps.
-
-For each step include:
+Break selected work into small executable steps.
 
 ### Step N. Title
 
 **Goal**
-- exact goal of this step
+- exact objective
 
 **Target Area**
 - controller / service / provider / repository / docs / tests / template / config
 
 **Likely Files**
-- list only likely involved files
-- do not over-broaden
+- realistic subset only
 
 **Forbidden Scope**
-- what must NOT be changed in this step
+- explicitly what must NOT change
 
 **Validation**
-- how the result should be checked
-- tests, manual behavior, report consistency, diff review, etc.
+- how correctness is verified
 
 **Expected Output**
-- implementation change / analysis report / doc update / test update
+- code / doc / test / report
 
 ---
 
-## 11. Recommended Agent Flow
-
-Define the recommended subagent sequence for today's work.
+## 13. Recommended Agent Flow
 
 Default:
-1. `navi`
-2. `reviewer`
-3. `worker`
-4. `reviewer`
-5. `dockeeper`
-6. `gitter`
+1. navi
+2. reviewer
+3. worker
+4. reviewer
+5. dockeeper
+6. gitter
 
-If a different order is needed, explain why.
+Explain if different.
 
 ---
 
-## 12. Codex Execution Notes
+## 14. Codex Execution Notes
 
-List execution guidance that Codex must follow today.
+Codex must:
+
+- read:
+    - `PROJECT_BRIEF.md`
+    - `AGENTS.md`
+    - `HARNESS_RULES.md`
+    - `DEV_LOOP.md`
+    - THIS strategy file
+
+- use:
+    - `docs/ops/YYYY-MM-DD/` folder only
+
+- must NOT:
+    - create docs outside ops/date folder
+    - modify unrelated files
+    - mix multiple steps
+
+- must:
+    - execute step-by-step
+    - validate before commit
+
+---
+
+## 15. Risks and Constraints
+
+List today's key risks.
 
 Examples:
-- read `PROJECT_BRIEF.md`, `AGENTS.md`, `HARNESS_RULES.md`, `DEV_LOOP.md` first
-- reuse the current date folder under `docs/ops/YYYY-MM-DD/`
-- do not create daily docs in root or directly under `docs/ops/`
-- read this strategy file before implementing steps
-- keep changes minimal and traceable
+- scope expansion risk
+- doc inconsistency
+- incomplete tests
+- coupling risks
 
 ---
 
-## 13. Risks and Constraints
+## 16. Deferrals
 
-List today's important risks.
+List intentionally postponed work.
 
-Examples:
-- scope may expand if provider logic is coupled
-- docs may be stale
-- current test suite may not fully validate UI behavior
-- feature work must not mix with refactor work
-
-Be concise and explicit.
+For each:
+- item
+- reason
+- when to revisit
 
 ---
 
-## 14. Deferrals
+## 17. Definition of Done for Today
 
-List things intentionally NOT included today.
+Success means:
 
-For each deferral include:
-- what is deferred
-- why it is deferred
-- when it should be reconsidered
-
----
-
-## 15. Definition of Done for Today
-
-Describe what counts as a successful day.
-
-Examples:
 - selected steps completed safely
-- no unrelated file changes
-- docs aligned if repository reality changed
-- risks documented honestly
-- next session can continue from updated handoff
+- no unrelated changes
+- carry-over handled correctly
+- risks documented
+- next session can continue seamlessly
 
 ---
 
-## 16. Handoff Requirement
+## 18. Handoff Requirement
 
-At the end of today's work, the next file must be generated:
+At end of work, MUST generate:
 
-- `docs/ops/YYYY-MM-DD/DAILY_HANDOFF.md`
+`docs/ops/YYYY-MM-DD/DAILY_HANDOFF.md`
 
-That handoff must reflect:
-- completed steps
-- partial steps
-- new risks
+It must include:
+- completed work
+- partial work
+- carry-over candidates
+- risks
 - harness improvements
 - next recommended steps
