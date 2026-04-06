@@ -445,6 +445,7 @@ function Write-FinalRunSummary {
     )
 
     $elapsed = (Get-Date) - $RunStartedAt
+    $elapsedText = $elapsed.ToString("hh\:mm\:ss")
     $executed = if ($ExecutedStages.Count -gt 0) { $ExecutedStages -join ' -> ' } else { '(none)' }
     $summaryColor = if ($Status -eq 'SUCCESS') { 'Green' } else { 'Red' }
 
