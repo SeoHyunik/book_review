@@ -592,19 +592,20 @@ function Assert-StepProducedExpectedChange {
 function Invoke-StepMode {
     param([int]$SelectedStepNumber)
 
-    $stepPromptFile = Get-StepPromptFilePath -SelectedStepNumber $SelectedStepNumber
-    $stepPromptContent = New-StepPromptContent -SelectedStepNumber $SelectedStepNumber
     $allowedChangedPaths = @(Get-AllowedChangedFiles -WorkDir $RootDir -CurrentScriptPath $ScriptPath)
-    $beforeChangedFiles = @(Get-ChangedFileList -WorkDir $RootDir)
-    $allowsAnalysisArtifact = Test-StepAllowsAnalysisArtifact -TodayStrategyPath $TodayStrategy -SelectedStepNumber $SelectedStepNumber
-
-    Write-PromptFile -FilePath $stepPromptFile -Content $stepPromptContent
 
     Assert-StepExecutionReady `
         -TodayStrategyPath $TodayStrategy `
         -WorkDir $RootDir `
         -SkipGitCheck:$SkipGitStatusCheck `
         -AdditionalAllowedPaths $allowedChangedPaths
+
+    $stepPromptFile = Get-StepPromptFilePath -SelectedStepNumber $SelectedStepNumber
+    $stepPromptContent = New-StepPromptContent -SelectedStepNumber $SelectedStepNumber
+    $beforeChangedFiles = @(Get-ChangedFileList -WorkDir $RootDir)
+    $allowsAnalysisArtifact = Test-StepAllowsAnalysisArtifact -TodayStrategyPath $TodayStrategy -SelectedStepNumber $SelectedStepNumber
+
+    Write-PromptFile -FilePath $stepPromptFile -Content $stepPromptContent
 
     Invoke-CodexFromPrompt -PromptFile $stepPromptFile -WorkDir $RootDir -StageName ("step-{0}" -f $SelectedStepNumber)
 
@@ -644,6 +645,7 @@ function Wait-ForQaCheckpoint {
 }
 
 function Invoke-WorkdayMode {
+    Write-PromptFile -FilePath $PlannerPromptFile -Content $PlannerPrompt
     Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir -StageName "planner"
 
     if (-not (Test-Path $TodayStrategy)) {
@@ -665,7 +667,10 @@ function Invoke-WorkdayMode {
         Assert-PreHandoffReadiness
     }
 
+    Write-PromptFile -FilePath $CuratorPromptFile -Content $CuratorPrompt
     Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir -StageName "curator"
+
+    Write-PromptFile -FilePath $HandoffPromptFile -Content $HandoffPrompt
     Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir -StageName "handoff"
 
     if (-not $DryRun) {
@@ -914,17 +919,12 @@ Tasks:
 "@
 
 # ==========================================
-# 7. Write prompt files
+# 7. Prompt file paths
 # ==========================================
 $PlannerPromptFile = Join-Path $PromptDir "$DateString-planner.prompt.txt"
 $StepPromptFile    = Get-StepPromptFilePath -SelectedStepNumber $StepNumber
 $CuratorPromptFile = Join-Path $PromptDir "$DateString-curator.prompt.txt"
 $HandoffPromptFile = Join-Path $PromptDir "$DateString-handoff.prompt.txt"
-
-Write-PromptFile -FilePath $PlannerPromptFile -Content $PlannerPrompt
-Write-PromptFile -FilePath $StepPromptFile -Content $StepPrompt
-Write-PromptFile -FilePath $CuratorPromptFile -Content $CuratorPrompt
-Write-PromptFile -FilePath $HandoffPromptFile -Content $HandoffPrompt
 
 # ==========================================
 # 8. Execute by mode
@@ -935,12 +935,14 @@ $errorMessage = $null
 try {
     switch ($Mode) {
         "planner" {
+            Write-PromptFile -FilePath $PlannerPromptFile -Content $PlannerPrompt
             Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir -StageName "planner"
         }
         "step" {
             Invoke-StepMode -SelectedStepNumber $StepNumber
         }
         "curator" {
+            Write-PromptFile -FilePath $CuratorPromptFile -Content $CuratorPrompt
             Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir -StageName "curator"
         }
         "handoff" {
