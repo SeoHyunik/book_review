@@ -689,6 +689,9 @@
 
         .news-toolbar-chip {
             border-radius: 999px;
+            --bs-btn-border-width: 1px;
+            --bs-btn-padding-x: 0.9rem;
+            --bs-btn-padding-y: 0.38rem;
         }
 
         .news-table-card {
@@ -719,6 +722,11 @@
 
         .news-col-title {
             text-align: left;
+        }
+
+        .news-table-card thead th.news-col-title,
+        .news-table-card tbody td.news-col-title {
+            padding-left: 1.2rem;
         }
 
         .news-col-meta,
@@ -787,6 +795,14 @@
             white-space: normal;
             overflow-wrap: anywhere;
             word-break: break-word;
+        }
+
+        .news-source-label {
+            display: inline-block;
+            max-width: 100%;
+            line-height: 1.25;
+            word-break: keep-all;
+            text-wrap: balance;
         }
 
         .news-status-cell,
@@ -910,8 +926,8 @@
     <section class="mb-4" th:if="${featuredStoredSummary != null or featuredAiSummary != null or featuredSummary != null or featuredNews != null}"
              th:with="activeFeaturedSummary=${featuredStoredSummary != null ? featuredStoredSummary : (featuredAiSummary != null ? featuredAiSummary : featuredSummary)},
                       featuredSignal=${activeFeaturedSummary != null ? (activeFeaturedSummary.dominantSentiment != null and activeFeaturedSummary.dominantSentiment.name() == 'POSITIVE' ? 'bullish' : (activeFeaturedSummary.dominantSentiment != null and activeFeaturedSummary.dominantSentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed')) : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'POSITIVE' ? 'bullish' : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed'))},
-                      featuredDetailHref=${featuredStoredSummary != null and featuredStoredSummary.snapshotId != null and !#strings.isEmpty(featuredStoredSummary.snapshotId) ? '/market-summary/' + featuredStoredSummary.snapshotId : (activeFeaturedSummary != null ? '/market-summary/current' : '/news/' + featuredNews.id)},
-                      featuredSourceLabel=${#strings.replace(featuredNews.displaySource ?: featuredNews.source ?: '-', 'NAVER-', '')}">
+                       featuredDetailHref=${featuredStoredSummary != null and featuredStoredSummary.snapshotId != null and !#strings.isEmpty(featuredStoredSummary.snapshotId) ? '/market-summary/' + featuredStoredSummary.snapshotId : (activeFeaturedSummary != null ? '/market-summary/current' : '/news/' + featuredNews.id)},
+                       featuredSourceLabel=${featuredNews.displaySource ?: featuredNews.source ?: '-'}">
         <div class="card border-0 overflow-hidden news-surface featured-card"
              th:classappend="${featuredSignal == 'bullish' ? ' featured-card--bullish' : (featuredSignal == 'bearish' ? ' featured-card--bearish' : ' featured-card--mixed')}">
             <div class="card-body p-4">
@@ -929,7 +945,8 @@
                                 </span>
                             </div>
                             <div class="featured-support">
-                                <span class="fw-medium"
+                                <span class="fw-medium news-source-label"
+                                      th:title="${activeFeaturedSummary != null ? #messages.msg('news.featured.marketSummary.sources', activeFeaturedSummary.sourceCount) : featuredSourceLabel}"
                                       th:text="${activeFeaturedSummary != null ? #messages.msg('news.featured.marketSummary.sources', activeFeaturedSummary.sourceCount) : featuredSourceLabel}">Source</span>
                                 <span class="featured-support-dot">&middot;</span>
                                 <span th:text="${activeFeaturedSummary != null ? #messages.msg('news.featured.marketSummary.window', activeFeaturedSummary.windowHours) : @uiDateTimeFormatter.formatKst(featuredNews.publishedAt)}">Published At</span>
@@ -1100,8 +1117,8 @@
                             <div class="small fw-medium news-priority" th:if="${news.priorityScore > 0}" th:text="#{news.priority(${news.priorityScore})}">Priority 0</div>
                         </td>
                         <td class="news-col-meta news-col-source py-3 fw-medium">
-                            <span class="badge ui-pill rounded-pill bg-body-tertiary text-body border fw-medium px-3 py-2"
-                                  th:with="sourceLabel=${#strings.replace(news.displaySource ?: news.source ?: '-', 'NAVER-', '')}"
+                            <span class="badge ui-pill rounded-pill bg-body-tertiary text-body border fw-medium px-3 py-2 news-source-label"
+                                  th:with="sourceLabel=${news.displaySource ?: news.source ?: '-'}"
                                   th:title="${sourceLabel}"
                                   th:text="${sourceLabel}">Source</span>
                         </td>

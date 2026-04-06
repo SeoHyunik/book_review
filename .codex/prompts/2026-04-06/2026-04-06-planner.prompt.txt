@@ -15,19 +15,22 @@ Ops rules:
 - MUST write only to: S:\dev\project\auziraum\docs\ops\2026-04-06\TODAY_STRATEGY.md
 - If the file already exists, update it carefully instead of creating a second file
 
+Primary planning input:
+- QA structured: S:\dev\project\auziraum\docs\ops\2026-04-06\QA_STRUCTURED.md
+
+Cross-check input:
+- QA inbox: S:\dev\project\auziraum\docs\ops\2026-04-06\QA_INBOX.md
+
 Read if available:
 - format: S:\dev\project\auziraum\docs\ops\TODAY_STRATEGY_FORMAT.md
-- QA structured (PRIMARY INPUT): S:\dev\project\auziraum\docs\ops\2026-04-06\QA_STRUCTURED.md
-- QA inbox (CROSS-CHECK ONLY): S:\dev\project\auziraum\docs\ops\2026-04-06\QA_INBOX.md
 - previous handoff: S:\dev\project\auziraum\docs\ops\2026-04-03\DAILY_HANDOFF.md
 - reports: S:\dev\project\auziraum\docs\reports
 
 Tasks:
 1. Read TODAY_STRATEGY_FORMAT.md
-2. Treat QA_STRUCTURED.md as the primary planning input.
-3. Use QA_INBOX.md only to cross-check whether any important issue was missed in QA_STRUCTURED.md.
-4. If QA_STRUCTURED.md and QA_INBOX.md disagree materially, report that mismatch inside the strategy.
-5. Create or update exactly: S:\dev\project\auziraum\docs\ops\2026-04-06\TODAY_STRATEGY.md
-6. Keep the plan small, safe, and Codex-executable
-7. Do not implement code
-8. Do not modify any other file
+2. Create or update exactly: S:\dev\project\auziraum\docs\ops\2026-04-06\TODAY_STRATEGY.md
+3. Use QA_STRUCTURED.md as the primary input, and QA_INBOX.md only as a cross-check source.
+4. If QA_STRUCTURED.md and QA_INBOX.md differ materially, report that mismatch inside the strategy.
+5. Keep the plan small, safe, and Codex-executable.
+6. Do not implement code.
+7. Do not modify any other file.

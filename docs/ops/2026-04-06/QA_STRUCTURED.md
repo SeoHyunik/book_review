@@ -1,246 +1,158 @@
-### Item 1
+# QA_STRUCTURED
+
+## Date
+2026-04-06
+
+## 정리 기준
+- 구현 우선: 화면 품질, 문구 정리, 페이지 동작, 수집/관리자 안정성처럼 바로 손댈 수 있는 항목
+- 제품 판단: 접근 정책, 예측 카드의 규칙, 브랜드 방향, 수익화, 인프라 전환처럼 먼저 방향을 정해야 하는 항목
+- 중복은 합치고, 같은 원인에서 나온 항목은 하나로 묶음
+
+## 구현 우선 후보
+
+### 1. 공통 UI shell/controls polish
 - category: UI/UX
-- surface: 메인페이지 하단 뉴스 테이블
-- symptom: 좌측 제목 쪽 패딩이 부족하고, 출처 표기가 너무 뭉뚱그려져 보임
-- user impact: high
-- requested change: 테이블 좌측 여백을 늘리고, 출처를 `NAVER-언론사` 형태로 분리 표기하며 칸이 좁으면 개행되도록 수정
-- scope hint: template
+- surface: header, footer, main news table, 상세/재해석/삭제 버튼
+- symptom: 전체 화면이 딱딱하고 조악해 보이며, 헤더와 푸터가 자연스럽지 않고 버튼 테두리와 테이블 여백도 거칠어 보임
+- requested change: 헤더/메뉴/푸터/버튼 스타일을 정리하고, 메인 뉴스 테이블 좌측 여백과 패딩을 넓히며, 버튼 외곽선 품질을 개선함
+- impact: high
 - priority: P1
 - selected today: yes
-- status: pending
-- carry over: yes
-- notes: 뉴스 테이블의 padding, 출처 표기, 줄바꿈 요구를 하나의 레이아웃 이슈로 묶음
+- carry-over candidate: yes
 
-### Item 2
+### 2. 첫 진입 언어 및 한국어 카피 자연화
 - category: localization
-- surface: 최초 진입 언어
-- symptom: 첫 진입 시 영문이 먼저 노출되어 한국어 서비스 인상이 약함
-- user impact: medium
-- requested change: 기본 표시 언어를 한국어로 변경
-- scope hint: template
+- surface: 최초 진입, 공용 문구, 아카이브/요약 페이지 카피
+- symptom: 초기 진입 시 영어가 먼저 보이고, 일부 한국어 문장이 기계적으로 느껴짐
+- requested change: 기본 표시 언어를 한국어로 바꾸고, 주요 페이지의 한국어 표현을 자연스럽게 다듬음
+- impact: medium
 - priority: P2
 - selected today: yes
-- status: pending
-- carry over: yes
-- notes: 초기 언어 기본값만 다루는 좁은 수정 항목
+- carry-over candidate: yes
 
-### Item 3
-- category: content tone
-- surface: footer
-- symptom: 푸터 브랜드 문구가 현재 제품 톤과 맞지 않음
-- user impact: low
-- requested change: `Auziraum: K-Market Forcest by AI`로 문구를 교체
-- scope hint: template
-- priority: P3
-- selected today: yes
-- status: pending
-- carry over: yes
-- notes: 브랜드 카피 교체 요청만 분리한 항목
-
-### Item 4
+### 3. 아카이브 페이지 개선
 - category: UI/UX
-- surface: 상세, 재해석, 삭제 등 버튼
-- symptom: 라운드 처리된 테두리가 흐릿해 보여 버튼 품질이 떨어져 보임
-- user impact: medium
-- requested change: 버튼 테두리와 라운드 렌더링을 정리해 더 또렷하고 세련되게 보이도록 개선
-- scope hint: static-assets
+- surface: archive page
+- symptom: 페이징이 없고, 화면이 밋밋하며, 같은 제목이 반복될 때 가독성이 떨어짐
+- requested change: 페이지네이션을 추가하고, archive 레이아웃을 보강하며, 중복 제목 표시 방식을 정리함
+- impact: medium
 - priority: P2
 - selected today: yes
-- status: pending
-- carry over: yes
-- notes: 버튼 스타일 품질 문제를 한 항목으로 묶음
+- carry-over candidate: yes
 
-### Item 5
+### 4. 부분 갱신형 페이지 전환
 - category: UI/UX
-- surface: 아카이브 페이지
-- symptom: 페이지네이션이 없어서 긴 목록 탐색이 불편함
-- user impact: medium
-- requested change: 아카이브 목록에 페이징을 추가
-- scope hint: controller
-- priority: P2
-- selected today: no
-- status: pending
-- carry over: yes
-- notes: 페이지네이션 자체는 좁지만, 현재 아카이브는 다른 UX 문제와 함께 제기되어 별도 확인이 필요함
-
-### Item 6
-- category: localization
-- surface: 아카이브 페이지
-- symptom: 한국어가 부자연스럽고 중복된 제목이 보여 콘텐츠 신뢰도가 떨어짐
-- user impact: medium
-- requested change: 아카이브 문구를 자연스러운 한국어로 정리하고 중복 제목 노출을 줄임
-- scope hint: docs
-- priority: P2
-- selected today: no
-- status: pending
-- carry over: yes
-- notes: 아카이브의 문구 품질과 제목 중복 이슈를 함께 정리함
-
-### Item 7
-- category: infra
-- surface: 클릭 시 전체 페이지 갱신
-- symptom: 일부 영역만 바뀌어도 전체 페이지가 새로고침되어 흐름이 끊김
-- user impact: medium
-- requested change: Thymeleaf 기반의 부분 갱신 방식으로 전환해 React/Vue처럼 클릭 영역만 갱신되게 개선
-- scope hint: controller
-- priority: P2
-- selected today: no
-- status: pending
-- carry over: yes
-- notes: 인터랙션 구조 개선이 필요하지만 범위가 넓어 즉시 선택하지 않음
-
-### Item 8
-- category: UI/UX
-- surface: AI 시장 요약 상세페이지
-- symptom: 화면이 밋밋하고 AI스럽지 않으며, 좋을 때와 나쁠 때의 체감 연출이 약함
-- user impact: high
-- requested change: 더 강한 시각 언어와 감정적 대비를 넣어 좋은 국면은 확실히 좋게, 나쁜 국면은 강하게 위험 신호로 보이도록 재구성
-- scope hint: product-decision
-- priority: P2
-- selected today: no
-- status: deferred
-- carry over: yes
-- notes: 밋밋한 UI, AI 같은 문체, 호재/악재 연출 요구를 하나의 상세페이지 방향성 이슈로 합침
-
-### Item 9
-- category: product-direction
-- surface: AI 시장 요약 카드 흐름 및 접근 정책
-- symptom: 현재는 최신 해석 카드만 보여주고, 좌우 탐색과 가까운 미래 예측, 전일 검증 카드, 비로그인 공개 접근이 모두 빠져 있음
-- user impact: high
-- requested change: 좌우 슬라이드형 카드 흐름을 도입하고, 어제 검증 카드와 내일 예측 카드, 1~2시간 내 단기 예측 카드를 구성하며, 상세 페이지 접근 제한도 다시 검토
-- scope hint: product-decision
+- surface: 전체 페이지 클릭 동작
+- symptom: 한 영역만 바꾸고 싶은 경우에도 전체 페이지가 새로고침되어 흐름이 끊김
+- requested change: Thymeleaf 기반에서도 가능한 범위 안에서 클릭한 부분만 갱신되는 상호작용으로 개선함
+- impact: high
 - priority: P1
-- selected today: no
-- status: deferred
-- carry over: yes
-- notes: 카드 인터랙션, 예측 범위, 로그인 정책을 한 제품 방향 이슈로 묶음
+- selected today: yes
+- carry-over candidate: yes
 
-### Item 10
+### 5. 최신뉴스 수집/자동배치 장애
 - category: reliability
-- surface: 메인페이지 하단 뉴스 보관 정책
-- symptom: 전일 뉴스가 남아 있어 화면과 데이터 수명이 일치하지 않음
-- user impact: medium
-- requested change: 당일 생성 뉴스만 남기고 전일 생성 뉴스는 자동 삭제
-- scope hint: service
-- priority: P2
-- selected today: no
-- status: pending
-- carry over: yes
-- notes: 보관 정책 변경은 단순 표시가 아니라 데이터 삭제를 수반하므로 별도 확인 필요
-
-### Item 11
-- category: ingestion
-- surface: 뉴스 수집 키워드
-- symptom: 정치, 지정학 키워드가 충분히 넓지 않아 시장 민감 뉴스 포착이 약함
-- user impact: medium
-- requested change: 뉴스 수집 키워드를 다변화하고 시장 민감도가 높은 키워드를 우선 반영
-- scope hint: provider
-- priority: P2
-- selected today: no
-- status: deferred
-- carry over: yes
-- notes: 키워드 전략 개선은 필요하지만 실행 범위가 넓어 장기 과제로 분리
-
-### Item 12
-- category: reliability
-- surface: 관리자 자동 수집 페이지 / 자동 수집 배치
-- symptom: 최신뉴스 가져오기 기능이 멈췄고 배치를 시작해도 수집이 되지 않음
-- user impact: high
-- requested change: 자동 수집 중단 원인을 추적하고 최신뉴스 수집 배치를 복구
-- scope hint: service
+- surface: 관리자 자동 수집 페이지, 최신뉴스 fetch, 자동 배치
+- symptom: 최신뉴스 가져오기 기능이 정지된 상태처럼 보이고, 자동 수집 배치를 시작해도 데이터가 들어오지 않음
+- requested change: 수집 경로와 배치 실행 여부를 점검하고, Naver News 키워드 조건을 재검토해 수집 실패를 복구함
+- impact: high
 - priority: P1
-- selected today: no
-- status: pending
-- carry over: yes
-- notes: 키워드 문제 가능성이 언급됐지만 현재는 수집 중단 장애로 우선 분류
+- selected today: yes
+- carry-over candidate: yes
 
-### Item 13
+### 6. 관리자 사용량/비용 로그 정리
 - category: admin
 - surface: 관리자 사용량 페이지
-- symptom: 오래된 기록이 누적되고, 일별/월별 요약 비용이 실제 Billing과 맞지 않음
-- user impact: medium
-- requested change: 과거 상세 기록은 정리하고 금일 기록 중심으로 보이게 하며, 총합과 요약 비용 계산을 다시 맞춤
-- scope hint: service
+- symptom: 오래된 기록이 너무 많아 보이고, 일별/월별 예상 비용이 실제 OpenAI Billing과 어긋남
+- requested change: 오늘 기록만 테이블에 노출하고 과거 기록은 집계 중심으로 정리하며, 비용 계산 로직을 실제 청구 흐름에 맞게 보정함
+- impact: medium
+- priority: P2
+- selected today: yes
+- carry-over candidate: yes
+
+### 7. 시장 지표/실시간 데이터 확장
+- category: data
+- surface: 시장 예측 입력 데이터, 외부 지표 수집
+- symptom: 현재 예측에 쓰는 지표가 부족해 시장 현실 반영력이 약함
+- requested change: USD/KRW, US 10Y Treasury Yield, DXY, WTI/Brent, KOSPI 등 핵심 지표를 추가하고, 가능한 경우 cron 또는 주기 호출로 최신값을 반영함
+- impact: medium
 - priority: P2
 - selected today: no
-- status: pending
-- carry over: yes
-- notes: 기록 보존 범위와 비용 산정 문제를 하나로 묶었고, 2026-04 기준 재정리 요청도 포함함
+- carry-over candidate: yes
 
-### Item 14
-- category: market-data
-- surface: 시장 예측 지표
-- symptom: 예측에 쓰는 지표가 부족하고 실시간 반영 체계가 약함
-- user impact: medium
-- requested change: USD/KRW, 미 10년물, DXY, WTI/Brent, KOSPI 등 핵심 지표를 넓히고 cron 또는 상시 호출로 최신값을 반영
-- scope hint: provider
+## 제품 판단 필요
+
+### 8. AI 시장 요약 상세페이지 연출 강화
+- category: product-design
+- surface: AI 시장 요약 상세페이지
+- symptom: 화면이 너무 밋밋하고, 한국어 어투가 기계적이며, 호재/악재의 분위기 차이가 거의 드러나지 않음
+- requested change: 긍정/부정 시나리오를 더 강하게 보여주는 시각 연출과 문체 방향을 정하고, AI 같은 화면 느낌을 줄임
+- impact: high
+- priority: P1
+- selected today: no
+- carry-over candidate: yes
+
+### 9. 시장 요약 카드 캐러셀
+- category: feature
+- surface: AI 시장 요약 페이지
+- symptom: 현재는 최신 해석 완료 뉴스 기반 카드만 단일 방향으로 보임
+- requested change: 카드를 좌우로 넘길 수 있게 하고, 왼쪽에는 어제의 예측 성공 여부와 어제 시황 분석, 가운데에는 1~2시간 내 근미래 카드, 오른쪽에는 다음 구간 카드가 보이도록 구성함
+- impact: high
+- priority: P1
+- selected today: yes
+- carry-over candidate: yes
+
+### 10. 내일 예측 알고리즘/확률 카드 정의
+- category: product-decision
+- surface: 미래 예측 카드 로직
+- symptom: 내일 시장 예측 카드의 산식과 신뢰도 기준이 아직 정해지지 않음
+- requested change: 선물 가격과 최신 뉴스를 결합한 예측 규칙, 확률 표현 방식, Crisis Opportunity(Customized GPT)에게 맡길 프롬프트 범위를 먼저 정의함
+- impact: high
+- priority: P1
+- selected today: no
+- carry-over candidate: yes
+
+### 11. 상세 페이지 공개 전환
+- category: access-control
+- surface: 상세 페이지 접근 정책
+- symptom: 현재는 로그인해야 상세 페이지에 들어갈 수 있어 진입 장벽이 높음
+- requested change: 우선은 모두 접근 가능하게 바꾸고, 이후 네이버/카카오/구글 자동 로그인 기반 회원 전환 정책을 따로 설계함
+- impact: medium
 - priority: P2
 - selected today: no
-- status: deferred
-- carry over: yes
-- notes: 시장 지표 추가와 자동 반영 인프라를 함께 요구하는 장기 항목
+- carry-over candidate: yes
 
-### Item 15
-- category: SEO
-- surface: 프로젝트명 및 화면 브랜딩
-- symptom: 현재 이름과 표기가 제품 방향성을 충분히 드러내지 못함
-- user impact: low
-- requested change: 프로젝트명과 화면 상 브랜드를 `Auziraum` 중심으로 정리하고, `K-Market Forecast` 노선과 SEO 전략을 함께 정비
-- scope hint: product-decision
+### 12. 브랜드/포지셔닝 및 SEO
+- category: branding/SEO
+- surface: 프로젝트명, 화면 브랜딩, 검색 노출 구조
+- symptom: 현재 명칭과 화면 표현이 제품 방향을 충분히 드러내지 못하고, SEO 전략도 아직 분산되어 있음
+- requested change: 프로젝트명/화면 브랜딩을 `Auziraum` 중심으로 정리하고, `K-Market Forecast` 포지셔닝 및 summary/topic/archive/forecast 페이지 SEO 전략을 확정함
+- impact: medium
 - priority: P3
 - selected today: no
-- status: deferred
-- carry over: yes
-- notes: GitHub 프로젝트명 변경, 사이트 표기 변경, SEO 전략 수립 요청을 한 묶음으로 정리함
+- carry-over candidate: yes
 
-### Item 16
-- category: product-direction
-- surface: 광고/수익화 영역
-- symptom: 향후 광고를 둘 공간이 없어 수익화 확장 여지가 제한됨
-- user impact: low
-- requested change: AdSense나 유사 광고 영역을 UX를 해치지 않는 범위에서 확보
-- scope hint: product-decision
-- priority: P3
-- selected today: no
-- status: deferred
-- carry over: yes
-- notes: 팝업 포함 가능성은 있으나 사용자 이탈 리스크가 있어 장기 검토 항목으로 둠
-
-### Item 17
+### 13. 수익화/호스팅/배포
 - category: infra
-- surface: 배포/운영 인프라
-- symptom: 무료 Render, MongoDB 무료 플랜, 브랜치별 배포 분기 등 운영 구조가 확장성 대비 불안정함
-- user impact: high
-- requested change: 유료 서버 전환과 autoscaling 가능 아키텍처를 검토하고, master/codex 브랜치별 배포 분기를 운영 정책으로 정리
-- scope hint: product-decision
+- surface: 배포 환경, Render/MongoDB 운영, 광고 영역
+- symptom: 현재 무료 Render와 MongoDB Cloud 구성이 장기 운영과 확장성 측면에서 불안하고, 광고용 공간도 아직 확정되지 않음
+- requested change: 유료 서버 이전 계획, ENV 보존, master/codex 브랜치별 배포 분기, Cloud Architecture 전략, AdSense 또는 유사 광고 슬롯 계획을 수립함
+- impact: high
 - priority: P2
 - selected today: no
-- status: deferred
-- carry over: yes
-- notes: 서버 이전, DB 플랜, Git workflow 분기까지 포함된 운영 인프라 과제
+- carry-over candidate: yes
 
-### Item 18
-- category: admin
-- surface: 방문자 수 추적 기능
-- symptom: 봇 차단, 체류 시간 계산, 추이 그래프가 없어 실제 방문자 분석이 어렵다
-- user impact: medium
-- requested change: 사람 방문자 중심으로 카운팅하고 봇을 제외하며, 체류 시간과 추이 그래프를 관리자 기능에 추가
-- scope hint: service
+### 14. 방문자 분석/사회적 반응
+- category: growth
+- surface: 관리자 분석 기능, 상호작용 기능
+- symptom: 인간 방문자 수, 체류 시간, 봇 차단, 좋아요/싫어요/공유 같은 성장 지표가 없음
+- requested change: 봇을 제외한 방문자 추적, 체류 시간 계산, 추이 그래프, 좋아요/싫어요 카운트, 공유 기능의 우선순위를 정함
+- impact: medium
 - priority: P2
 - selected today: no
-- status: deferred
-- carry over: yes
-- notes: SEO 보조 지표 성격이 강해 별도 분석 기능으로 분리함
+- carry-over candidate: yes
 
-### Item 19
-- category: product-direction
-- surface: AI 시장 요약 카드
-- symptom: 카드 반응형 피드백과 공유 흐름이 없어 참여 유도가 약함
-- user impact: low
-- requested change: 좋아요, 싫어요, 공유 기능을 카드별로 추가 검토
-- scope hint: product-decision
-- priority: P3
-- selected today: no
-- status: deferred
-- carry over: yes
-- notes: 참여도 기능이지만 핵심 안정성 이슈보다 우선순위가 낮음
+## 요약
+- 총 14건
+- 구현 우선 후보: 7건
+- 제품 판단 필요: 7건

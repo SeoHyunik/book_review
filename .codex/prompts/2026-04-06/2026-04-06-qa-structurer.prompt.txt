@@ -5,32 +5,28 @@ Read first:
 2. S:\dev\project\auziraum\AGENTS.md
 3. S:\dev\project\auziraum\DEV_LOOP.md
 4. S:\dev\project\auziraum\HARNESS_RULES.md
-5. S:\dev\project\auziraum\docs\ops\2026-04-06\QA_INBOX.md
 
 Today: 2026-04-06
+
+Read:
+- QA inbox: S:\dev\project\auziraum\docs\ops\2026-04-06\QA_INBOX.md
 
 Write only:
 - S:\dev\project\auziraum\docs\ops\2026-04-06\QA_STRUCTURED.md
 
 Tasks:
-1. Read QA_INBOX.md and normalize all actionable user issues into a structured issue list.
-2. Merge duplicates where appropriate.
-3. Separate immediate implementation-ready issues from broad product ideas or long-term plans.
-4. Use this exact structure for each item:
-
-### Item N
-- category: UI/UX | reliability | localization | content tone | admin | ingestion | market-data | SEO | infra | product-direction
-- surface:
-- symptom:
-- user impact: high | medium | low
-- requested change:
-- scope hint: template | controller | service | provider | docs | static-assets | product-decision
-- priority: P1 | P2 | P3
-- selected today: yes | no
-- status: pending | completed | partial | deferred | blocked
-- carry over: yes | no
-- notes:
-
-5. Mark today's likely implementation-ready items as selected today: yes only when they are narrow and safe.
+1. Convert raw QA into a normalized structured issue list.
+2. Merge duplicates and closely related requests.
+3. Separate implementation-ready items from broader product decisions.
+4. Mark each item with:
+   - category
+   - surface
+   - symptom
+   - requested change
+   - impact
+   - priority
+   - selected today (yes/no)
+   - carry-over candidate (yes/no)
+5. MUST produce a non-empty structured result if QA_INBOX contains actionable items.
 6. Do not implement code.
 7. Do not modify any other file.
