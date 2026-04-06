@@ -1,10 +1,14 @@
 param(
-    [ValidateSet("planner", "curator", "handoff", "all")]
+    [ValidateSet("planner", "step", "curator", "handoff", "all")]
     [string]$Mode = "planner",
 
     [string]$RootDir = (Get-Location).Path,
 
     [string]$DateString = (Get-Date -Format "yyyy-MM-dd"),
+
+    [int]$StepNumber = 1,
+
+    [switch]$SkipGitStatusCheck,
 
     [switch]$DryRun
 )
@@ -65,10 +69,6 @@ function New-TextFileIfMissing {
     if (-not (Test-Path $Path)) {
         $parent = Split-Path $Path -Parent
         New-DirectoryIfMissing -Path $parent
-
-        # Important:
-        # only create if missing
-        # do NOT rewrite existing files
         [System.IO.File]::WriteAllText($Path, $DefaultContent, [System.Text.UTF8Encoding]::new($false))
     }
 }
@@ -81,8 +81,6 @@ function Write-PromptFile {
 
     $parent = Split-Path $FilePath -Parent
     New-DirectoryIfMissing -Path $parent
-
-    # Prompt files are newly generated operational artifacts.
     [System.IO.File]::WriteAllText($FilePath, $Content, [System.Text.UTF8Encoding]::new($false))
 }
 
@@ -110,14 +108,79 @@ function Get-LatestPreviousHandoffFile {
     return $null
 }
 
+function Test-GitAvailable {
+    try {
+        $null = Get-Command git -ErrorAction Stop
+        return $true
+    }
+    catch {
+        return $false
+    }
+}
+
+function Get-ChangedFileList {
+    param([string]$WorkDir)
+
+    if (-not (Test-GitAvailable)) {
+        return @()
+    }
+
+    Push-Location $WorkDir
+    try {
+        $output = git status --short 2>$null
+        if (-not $output) {
+            return @()
+        }
+
+        return @($output | ForEach-Object {
+            if ($_.Length -ge 4) {
+                $_.Substring(3).Trim()
+            }
+        } | Where-Object { $_ })
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Assert-StepExecutionReady {
+    param(
+        [string]$TodayStrategyPath,
+        [string]$WorkDir,
+        [switch]$SkipGitCheck
+    )
+
+    if (-not (Test-Path $TodayStrategyPath)) {
+        throw "TODAY_STRATEGY.md not found: $TodayStrategyPath"
+    }
+
+    if ($SkipGitCheck) {
+        return
+    }
+
+    $changedFiles = Get-ChangedFileList -WorkDir $WorkDir
+    if ($changedFiles.Count -eq 0) {
+        return
+    }
+
+    $unexpected = @($changedFiles | Where-Object {
+        ($_ -notmatch '^docs[/\\]ops[/\\]') -and ($_ -notmatch '^\.codex[/\\]prompts[/\\]')
+    })
+
+    if ($unexpected.Count -gt 0) {
+        $joined = ($unexpected -join ', ')
+        throw "Step execution blocked because non-ops changes already exist in the worktree: $joined"
+    }
+}
+
 function Invoke-CodexFromPrompt {
     param(
         [string]$PromptFile,
         [string]$WorkDir
     )
 
-    $codexArgs = $CodexBaseArgs.Replace("{WORKDIR}", $WorkDir)
-    $cmd  = "Get-Content `"$PromptFile`" -Raw | codex $codexArgs"
+    $codexArgs = $CodexBaseArgs.Replace('{WORKDIR}', $WorkDir)
+    $cmd = "Get-Content `"$PromptFile`" -Raw | codex $codexArgs"
 
     Write-Host ""
     Write-Host "==========================================" -ForegroundColor Cyan
@@ -159,7 +222,6 @@ New-DirectoryIfMissing -Path $OpsDir
 New-DirectoryIfMissing -Path $TodayDir
 New-DirectoryIfMissing -Path $PromptDir
 
-# Create only if missing. Never rewrite existing daily docs.
 New-TextFileIfMissing -Path $FailuresFile -DefaultContent "# HARNESS_FAILURES`n"
 
 New-TextFileIfMissing -Path $QaInbox -DefaultContent @"
@@ -220,6 +282,46 @@ Tasks:
 3. Keep the plan small, safe, and Codex-executable
 4. Do not implement code
 5. Do not modify any other file
+"@
+
+$StepPrompt = @"
+You are executing exactly one planned development step for this repository.
+
+Read first:
+1. $ProjectBrief
+2. $AgentsFile
+3. $DevLoop
+4. $HarnessRules
+5. $TodayStrategy
+
+Today: $DateString
+Step Number: $StepNumber
+
+Critical rules:
+- Read TODAY_STRATEGY.md and locate exactly Step $StepNumber
+- Execute ONLY that step
+- If Step $StepNumber does not exist, stop and report that clearly
+- Do NOT execute any other step
+- Do NOT modify TODAY_STRATEGY.md, DAILY_HANDOFF.md, QA_INBOX.md, QA_STRUCTURED.md, or HARNESS_FAILURES.md
+- Do NOT modify unrelated files
+- Keep changes minimal, safe, and scoped to the selected step
+- Follow any Forbidden Scope and Validation instructions written for Step $StepNumber
+
+Execution flow:
+1. Read TODAY_STRATEGY.md carefully
+2. Extract the exact goal / target area / likely files / forbidden scope / validation for Step $StepNumber
+3. Analyze the code paths needed for only that step
+4. Implement only the smallest safe change for that step
+5. Run relevant validation for that step if available
+6. Report:
+   - what changed
+   - why it changed
+   - what was not changed
+   - risks
+   - next possible step
+
+Do not generate handoff or curator outputs in this run.
+Do not widen scope.
 "@
 
 $CuratorPrompt = @"
@@ -285,13 +387,15 @@ Tasks:
 "@
 
 # ==========================================
-# 7. Write prompt files (safe to overwrite)
+# 7. Write prompt files
 # ==========================================
 $PlannerPromptFile = Join-Path $PromptDir "$DateString-planner.prompt.txt"
+$StepPromptFile    = Join-Path $PromptDir "$DateString-step$StepNumber.prompt.txt"
 $CuratorPromptFile = Join-Path $PromptDir "$DateString-curator.prompt.txt"
 $HandoffPromptFile = Join-Path $PromptDir "$DateString-handoff.prompt.txt"
 
 Write-PromptFile -FilePath $PlannerPromptFile -Content $PlannerPrompt
+Write-PromptFile -FilePath $StepPromptFile -Content $StepPrompt
 Write-PromptFile -FilePath $CuratorPromptFile -Content $CuratorPrompt
 Write-PromptFile -FilePath $HandoffPromptFile -Content $HandoffPrompt
 
@@ -302,6 +406,10 @@ switch ($Mode) {
     "planner" {
         Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
     }
+    "step" {
+        Assert-StepExecutionReady -TodayStrategyPath $TodayStrategy -WorkDir $RootDir -SkipGitCheck:$SkipGitStatusCheck
+        Invoke-CodexFromPrompt -PromptFile $StepPromptFile -WorkDir $RootDir
+    }
     "curator" {
         Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
     }
@@ -310,6 +418,8 @@ switch ($Mode) {
     }
     "all" {
         Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
+        Assert-StepExecutionReady -TodayStrategyPath $TodayStrategy -WorkDir $RootDir -SkipGitCheck:$SkipGitStatusCheck
+        Invoke-CodexFromPrompt -PromptFile $StepPromptFile -WorkDir $RootDir
         Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
         Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
     }
