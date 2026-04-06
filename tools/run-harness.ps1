@@ -419,11 +419,27 @@ function Test-TextLooksCorrupted {
         return $false
     }
 
-    return (
-    $Content.Contains([char]0xFFFD) -or
-            $Content -match 'Ã.|Â.|ì.|ë.|ê.|ìž|ìš|ì•|ì„|í•|í—' -or
-            $Content -match '\?\?\?'
+    if ($Content.Contains([string][char]0xFFFD)) {
+        return $true
+    }
+
+    $markers = @(
+        '???',
+        ([string][char]0x00C3),
+        ([string][char]0x00C2),
+        ([string][char]0x00EC),
+        ([string][char]0x00EB),
+        ([string][char]0x00EA),
+        ([string][char]0x00ED)
     )
+
+    foreach ($marker in $markers) {
+        if (-not [string]::IsNullOrWhiteSpace($marker) -and $Content.Contains($marker)) {
+            return $true
+        }
+    }
+
+    return $false
 }
 
 function Assert-ReadableDailyOpsFiles {
