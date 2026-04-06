@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("planner", "step", "curator", "handoff", "all", "workday")]
+    [ValidateSet("qa-structurer", "planner", "step", "curator", "handoff", "all", "workday")]
     [string]$Mode = "planner",
 
     [string]$RootDir = (Get-Location).Path,
@@ -339,21 +339,10 @@ function Test-TextLooksCorrupted {
         return $false
     }
 
-    if ($Content.Contains([char]0xFFFD)) {
-        return $true
-    }
-
-    if ($Content.Contains('ï»¿')) {
-        return $true
-    }
-
-    if ($Content.Contains('ì') -and $Content.Contains('ë') -and $Content.Contains('ê')) {
-        return $true
-    }
-
-    if ($Content.Contains('???')) {
-        return $true
-    }
+    if ($Content.Contains([char]0xFFFD)) { return $true }
+    if ($Content.Contains('ï»¿')) { return $true }
+    if ($Content.Contains('???')) { return $true }
+    if ($Content.Contains('ì') -and $Content.Contains('ë') -and $Content.Contains('ê')) { return $true }
 
     return $false
 }
@@ -369,13 +358,65 @@ function Assert-ReadableDailyOpsFiles {
     }
 }
 
+function Test-HasActionableQaInbox {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return $false
+    }
+
+    $content = Get-Content $Path -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        return $false
+    }
+
+    $matches = [regex]::Matches($content, '(?m)^\s*-\s+\S+')
+    return ($matches.Count -gt 0)
+}
+
+function Test-IsMeaningfullyStructuredQa {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return $false
+    }
+
+    $content = Get-Content $Path -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        return $false
+    }
+
+    $normalized = $content.Trim()
+    if ($normalized -eq "# QA_STRUCTURED`r`n`r`n## Date`r`n$DateString`r`n`r`n## Structured Items`r`n`r`n-" -or
+            $normalized -eq "# QA_STRUCTURED`n`n## Date`n$DateString`n`n## Structured Items`n`n-") {
+        return $false
+    }
+
+    if ($content -match '(?im)^###\s+Item\s+\d+' -or $content -match '(?im)^-\s+category:' -or $content -match '(?im)^##\s+Normalized\s+Issues') {
+        return $true
+    }
+
+    $bulletMatches = [regex]::Matches($content, '(?m)^\s*-\s+\S+')
+    return ($bulletMatches.Count -ge 3)
+}
+
+function Assert-QaStructuredReady {
+    if (Test-HasActionableQaInbox -Path $QaInbox) {
+        if (-not (Test-IsMeaningfullyStructuredQa -Path $QaStructured)) {
+            throw "QA_STRUCTURED.md is empty or not meaningfully normalized while QA_INBOX.md contains actionable items. Run qa-structurer before planner."
+        }
+    }
+}
+
 function Assert-PreHandoffReadiness {
     Assert-ReadableDailyOpsFiles -Paths $ReadableDocsToCheckBeforeHandoff
+    Assert-QaStructuredReady
 }
 
 function Assert-PostHandoffReadiness {
     $required = @($ReadableDocsToCheckBeforeHandoff + $DailyHandoff)
     Assert-ReadableDailyOpsFiles -Paths $required
+    Assert-QaStructuredReady
 }
 
 function Add-ExecutedStage {
@@ -432,12 +473,16 @@ function Write-FinalRunSummary {
     Write-Host ("Elapsed   : {0}" -f $elapsedText) -ForegroundColor $summaryColor
     Write-Host ("Stages    : {0}" -f $executed) -ForegroundColor $summaryColor
 
-    if ($ModeName -eq 'workday' -or $ModeName -eq 'planner' -or $ModeName -eq 'all') {
+    if ($ModeName -in @('workday', 'planner', 'all')) {
         Write-Host ("Strategy  : {0}" -f $TodayStrategy) -ForegroundColor $summaryColor
     }
 
-    if ($ModeName -eq 'workday' -or $ModeName -eq 'handoff' -or $ModeName -eq 'all') {
+    if ($ModeName -in @('workday', 'handoff', 'all')) {
         Write-Host ("Handoff   : {0}" -f $DailyHandoff) -ForegroundColor $summaryColor
+    }
+
+    if ($ModeName -in @('workday', 'qa-structurer', 'all')) {
+        Write-Host ("QA File   : {0}" -f $QaStructured) -ForegroundColor $summaryColor
     }
 
     if (-not [string]::IsNullOrWhiteSpace($ErrorMessage)) {
@@ -456,7 +501,7 @@ function Invoke-CodexFromPrompt {
     )
 
     $codexArgs = $CodexBaseArgs.Replace('{WORKDIR}', $WorkDir)
-    $cmd = "Get-Content `"$PromptFile`" -Raw | codex $codexArgs"
+    $cmd = "Get-Content `\"$PromptFile`\" -Raw | codex $codexArgs"
 
     Write-StageBanner -Title ("Running {0}" -f $StageName) -Color "Cyan"
     Write-Host $cmd
@@ -472,6 +517,93 @@ function Invoke-CodexFromPrompt {
     Invoke-Expression $cmd
     Add-ExecutedStage -StageName $StageName
     Write-StageCompletion -StageName $StageName -StartedAt $stageStartedAt
+}
+
+function New-QaStructurerPromptContent {
+    return @"
+You are running the QA normalization role for this repository.
+
+Read first:
+1. $ProjectBrief
+2. $AgentsFile
+3. $DevLoop
+4. $HarnessRules
+5. $QaInbox
+
+Today: $DateString
+
+Write only:
+- $QaStructured
+
+Tasks:
+1. Normalize raw QA notes into a structured issue list.
+2. Merge duplicates and split unrelated concerns.
+3. Separate immediate implementation-ready issues from broader product decisions.
+4. Use a concise, machine-readable structure.
+5. Preserve the user's Korean wording where appropriate.
+6. Do not implement code.
+7. Do not modify any file other than QA_STRUCTURED.md.
+
+Required output structure:
+# QA_STRUCTURED
+
+## Date
+$DateString
+
+## Normalized Issues
+
+### Item 1
+- category: UI/UX | reliability | localization | content tone | admin | ingestion | market-data | SEO | infra | product-decision
+- surface: specific page or system surface
+- symptom: concise problem statement
+- user impact: high | medium | low
+- requested change: concise action
+- scope hint: template | controller | service | provider | docs | product-decision | infra
+- priority: P1 | P2 | P3
+- selected today: yes | no
+- notes: optional concise note
+"@
+}
+
+function New-PlannerPromptContent {
+    return @"
+You are running the planner role for this repository.
+
+Read first:
+1. $ProjectBrief
+2. $AgentsFile
+3. $DevLoop
+4. $HarnessRules
+
+Today: $DateString
+
+Ops rules:
+- Daily docs must be created in docs/ops/YYYY-MM-DD/
+- NEVER create TODAY_STRATEGY.md in root or directly under docs/ops/
+- MUST read the strategy format before writing
+- MUST write only to: $TodayStrategy
+- If the file already exists, update it carefully instead of creating a second file
+
+Read if available:
+- format: $TodayFmt
+- QA inbox: $QaInbox
+- QA structured: $QaStructured
+- previous handoff: $PreviousHandoff
+- reports: $ReportsDir
+
+Hard requirements:
+- QA_STRUCTURED.md is the primary planning input.
+- QA_INBOX.md is only a cross-check / completeness input.
+- If QA_INBOX.md contains actionable items and QA_STRUCTURED.md is empty or unnormalized, STOP and report that planning cannot proceed safely.
+- Explicitly reflect structured QA priorities in selection logic.
+
+Tasks:
+1. Read TODAY_STRATEGY_FORMAT.md
+2. Create or update exactly: $TodayStrategy
+3. Keep the plan small, safe, and Codex-executable
+4. Do not implement code
+5. Do not modify any other file
+"@
 }
 
 function New-StepPromptContent {
@@ -516,47 +648,6 @@ Execution flow:
 
 Do not generate handoff or curator outputs in this run.
 Do not widen scope.
-"@
-}
-
-function Get-StepPromptFilePath {
-    param([int]$SelectedStepNumber)
-
-    return (Join-Path $PromptDir "$DateString-step$SelectedStepNumber.prompt.txt")
-}
-
-function New-PlannerPromptContent {
-    return @"
-You are running the planner role for this repository.
-
-Read first:
-1. $ProjectBrief
-2. $AgentsFile
-3. $DevLoop
-4. $HarnessRules
-
-Today: $DateString
-
-Ops rules:
-- Daily docs must be created in docs/ops/YYYY-MM-DD/
-- NEVER create TODAY_STRATEGY.md in root or directly under docs/ops/
-- MUST read the strategy format before writing
-- MUST write only to: $TodayStrategy
-- If the file already exists, update it carefully instead of creating a second file
-
-Read if available:
-- format: $TodayFmt
-- QA inbox: $QaInbox
-- QA structured: $QaStructured
-- previous handoff: $PreviousHandoff
-- reports: $ReportsDir
-
-Tasks:
-1. Read TODAY_STRATEGY_FORMAT.md
-2. Create or update exactly: $TodayStrategy
-3. Keep the plan small, safe, and Codex-executable
-4. Do not implement code
-5. Do not modify any other file
 "@
 }
 
@@ -621,12 +712,32 @@ Tasks:
 1. Read DAILY_HANDOFF_FORMAT.md
 2. Create or update exactly: $DailyHandoff
 3. Distinguish completed / partial / deferred / risks / next steps
-4. Do not invent finished work
-5. Do not modify any other file
+4. Explicitly state whether QA_STRUCTURED.md was normalized and usable for planning
+5. Do not invent finished work
+6. Do not modify any other file
 "@
 }
 
+function Get-StepPromptFilePath {
+    param([int]$SelectedStepNumber)
+    return (Join-Path $PromptDir "$DateString-step$SelectedStepNumber.prompt.txt")
+}
+
+function Invoke-QaStructurerMode {
+    $qaPromptFile = Join-Path $PromptDir "$DateString-qa-structurer.prompt.txt"
+    $qaPromptContent = New-QaStructurerPromptContent
+
+    Write-PromptFile -FilePath $qaPromptFile -Content $qaPromptContent
+    Invoke-CodexFromPrompt -PromptFile $qaPromptFile -WorkDir $RootDir -StageName "qa-structurer"
+
+    if (-not $DryRun) {
+        Assert-QaStructuredReady
+    }
+}
+
 function Invoke-PlannerMode {
+    Assert-QaStructuredReady
+
     $plannerPromptFile = Join-Path $PromptDir "$DateString-planner.prompt.txt"
     $plannerPromptContent = New-PlannerPromptContent
 
@@ -664,7 +775,6 @@ function Get-StepPurposeHint {
     }
 
     $content = Get-Content $TodayStrategy -Raw -Encoding UTF8
-
     $pattern = "(?is)###?\s*Step\s*$SelectedStepNumber\b(.*?)(?=^\s{0,3}(?:#{1,6}\s*)?(?:Step|Phase)\s+\d+\b|\z)"
     $match = [regex]::Match($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
 
@@ -674,24 +784,15 @@ function Get-StepPurposeHint {
 
     $stepBody = $match.Groups[1].Value
 
-    if ($stepBody -match '(?i)expected output\s*[\r\n-:\s]*analysis note') {
-        return "analysis"
-    }
-
-    if ($stepBody -match '(?i)expected output\s*[\r\n-:\s]*report') {
-        return "analysis"
-    }
-
-    if ($stepBody -match '(?i)\bgoal\b[\r\n-:\s]*.*\btrace\b') {
-        return "analysis"
-    }
+    if ($stepBody -match '(?i)expected output\s*[\r\n-:\s]*analysis note') { return "analysis" }
+    if ($stepBody -match '(?i)expected output\s*[\r\n-:\s]*report') { return "analysis" }
+    if ($stepBody -match '(?i)\bgoal\b[\r\n-:\s]*.*\btrace\b') { return "analysis" }
 
     return "implementation"
 }
 
 function Get-ChangedFileSnapshot {
     param([string]$WorkDir)
-
     return @(Get-ChangedFileList -WorkDir $WorkDir | Sort-Object -Unique)
 }
 
@@ -704,9 +805,7 @@ function Get-NewlyChangedFiles {
     $beforeNormalized = @($Before | ForEach-Object { Normalize-RepoPath -Path $_ })
     return @(
     $After |
-            Where-Object {
-                (Normalize-RepoPath -Path $_) -notin $beforeNormalized
-            } |
+            Where-Object { (Normalize-RepoPath -Path $_) -notin $beforeNormalized } |
             Sort-Object -Unique
     )
 }
@@ -728,9 +827,7 @@ function Assert-StepProducedExpectedArtifact {
     if ($stepPurpose -eq 'analysis') {
         $analysisArtifacts = @(
         $newlyChanged |
-                Where-Object {
-                    Test-StartsWithNormalizedPath -Path $_ -Prefix 'docs\reports\'
-                }
+                Where-Object { Test-StartsWithNormalizedPath -Path $_ -Prefix 'docs\reports\' }
         )
 
         if ($analysisArtifacts.Count -eq 0) {
@@ -768,7 +865,6 @@ function Invoke-StepMode {
     $stepPromptContent = New-StepPromptContent -SelectedStepNumber $SelectedStepNumber
 
     Write-PromptFile -FilePath $stepPromptFile -Content $stepPromptContent
-
     Invoke-CodexFromPrompt -PromptFile $stepPromptFile -WorkDir $RootDir -StageName ("step-{0}" -f $SelectedStepNumber)
 
     $afterChangedFiles = Get-ChangedFileSnapshot -WorkDir $RootDir
@@ -800,6 +896,7 @@ function Wait-ForQaCheckpoint {
 }
 
 function Invoke-WorkdayMode {
+    Invoke-QaStructurerMode
     Invoke-PlannerMode
 
     if (-not (Test-Path $TodayStrategy)) {
@@ -807,7 +904,6 @@ function Invoke-WorkdayMode {
     }
 
     $plannedSteps = @(Get-PlannedStepNumbers -TodayStrategyPath $TodayStrategy | Where-Object { $_ -ge $StepNumber })
-
     if ($plannedSteps.Count -eq 0) {
         throw "No planned steps were found in TODAY_STRATEGY.md starting from Step $StepNumber"
     }
@@ -865,7 +961,7 @@ New-TextFileIfMissing -Path $QaStructured -DefaultContent @"
 ## Date
 $DateString
 
-## Structured Items
+## Normalized Issues
 
 -
 "@
@@ -880,6 +976,9 @@ $errorMessage = $null
 
 try {
     switch ($Mode) {
+        "qa-structurer" {
+            Invoke-QaStructurerMode
+        }
         "planner" {
             Invoke-PlannerMode
         }
@@ -893,6 +992,7 @@ try {
             Invoke-HandoffMode
         }
         "all" {
+            Invoke-QaStructurerMode
             Invoke-PlannerMode
             Invoke-StepMode -SelectedStepNumber $StepNumber
             Invoke-CuratorMode
