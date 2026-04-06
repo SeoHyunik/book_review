@@ -1,4 +1,3 @@
-
 param(
     [ValidateSet("planner", "qa-structurer", "step", "curator", "handoff", "all", "workday")]
     [string]$Mode = "planner",
@@ -28,36 +27,30 @@ $ExecutedStages = New-Object System.Collections.Generic.List[string]
 # ==========================================
 # 1. Core paths
 # ==========================================
-$DocsDir          = Join-Path $RootDir "docs"
-$OpsDir           = Join-Path $DocsDir "ops"
-$ReportsDir       = Join-Path $DocsDir "reports"
-$TodayDir         = Join-Path $OpsDir $DateString
-$NextDateString   = (Get-Date $DateString).AddDays(1).ToString("yyyy-MM-dd")
-$NextDayDir       = Join-Path $OpsDir $NextDateString
-$PromptRootDir    = Join-Path $RootDir ".codex\prompts"
-$PromptDateDir    = Join-Path $PromptRootDir $DateString
+$DocsDir         = Join-Path $RootDir "docs"
+$OpsDir          = Join-Path $DocsDir "ops"
+$ReportsDir      = Join-Path $DocsDir "reports"
+$TodayDir        = Join-Path $OpsDir $DateString
+$PromptRootDir   = Join-Path $RootDir ".codex\prompts"
+$PromptDir       = Join-Path $PromptRootDir $DateString
+$AgentsDir       = Join-Path $RootDir ".codex\agents"
 
-$AgentsFile       = Join-Path $RootDir "AGENTS.md"
-$ProjectBrief     = Join-Path $RootDir "PROJECT_BRIEF.md"
-$DevLoop          = Join-Path $RootDir "DEV_LOOP.md"
-$HarnessRules     = Join-Path $RootDir "HARNESS_RULES.md"
-$GitterToml       = Join-Path $RootDir ".codex\agents\gitter.toml"
+$AgentsFile      = Join-Path $RootDir "AGENTS.md"
+$ProjectBrief    = Join-Path $RootDir "PROJECT_BRIEF.md"
+$DevLoop         = Join-Path $RootDir "DEV_LOOP.md"
+$HarnessRules    = Join-Path $RootDir "HARNESS_RULES.md"
 
-$TodayFmt         = Join-Path $OpsDir "TODAY_STRATEGY_FORMAT.md"
-$HandoffFmt       = Join-Path $OpsDir "DAILY_HANDOFF_FORMAT.md"
-$FailuresFile     = Join-Path $OpsDir "HARNESS_FAILURES.md"
+$TodayFmt        = Join-Path $OpsDir "TODAY_STRATEGY_FORMAT.md"
+$HandoffFmt      = Join-Path $OpsDir "DAILY_HANDOFF_FORMAT.md"
+$FailuresFile    = Join-Path $OpsDir "HARNESS_FAILURES.md"
 
-$QaInbox          = Join-Path $TodayDir "QA_INBOX.md"
-$QaStructured     = Join-Path $TodayDir "QA_STRUCTURED.md"
-$TodayStrategy    = Join-Path $TodayDir "TODAY_STRATEGY.md"
-$DailyHandoff     = Join-Path $TodayDir "DAILY_HANDOFF.md"
+$QaInbox         = Join-Path $TodayDir "QA_INBOX.md"
+$QaStructured    = Join-Path $TodayDir "QA_STRUCTURED.md"
+$TodayStrategy   = Join-Path $TodayDir "TODAY_STRATEGY.md"
+$DailyHandoff    = Join-Path $TodayDir "DAILY_HANDOFF.md"
 
-$NextQaInbox      = Join-Path $NextDayDir "QA_INBOX.md"
-$NextQaStructured = Join-Path $NextDayDir "QA_STRUCTURED.md"
-$NextTodayStrategy= Join-Path $NextDayDir "TODAY_STRATEGY.md"
-$NextDailyHandoff = Join-Path $NextDayDir "DAILY_HANDOFF.md"
-
-$ScriptPath       = $MyInvocation.MyCommand.Path
+$ScriptPath      = $MyInvocation.MyCommand.Path
+$GitterToml      = Join-Path $AgentsDir "gitter.toml"
 
 $ReadableDocsToCheckBeforeHandoff = @(
     $QaInbox,
@@ -94,24 +87,15 @@ function New-TextFileIfMissing {
     }
 }
 
-function Write-TextFile {
-    param(
-        [string]$Path,
-        [string]$Content
-    )
-
-    $parent = Split-Path $Path -Parent
-    New-DirectoryIfMissing -Path $parent
-    [System.IO.File]::WriteAllText($Path, $Content, [System.Text.UTF8Encoding]::new($false))
-}
-
 function Write-PromptFile {
     param(
         [string]$FilePath,
         [string]$Content
     )
 
-    Write-TextFile -Path $FilePath -Content $Content
+    $parent = Split-Path $FilePath -Parent
+    New-DirectoryIfMissing -Path $parent
+    [System.IO.File]::WriteAllText($FilePath, $Content, [System.Text.UTF8Encoding]::new($false))
 }
 
 function Get-LatestPreviousHandoffFile {
@@ -366,11 +350,11 @@ function Test-TextLooksCorrupted {
         return $true
     }
 
-    if ($Content.Contains('ì') -and $Content.Contains('ë') -and $Content.Contains('ê')) {
+    if ($Content.Contains('???')) {
         return $true
     }
 
-    if ($Content.Contains('???')) {
+    if ($Content.Contains('ì') -and $Content.Contains('ë') -and $Content.Contains('ê')) {
         return $true
     }
 
@@ -388,7 +372,57 @@ function Assert-ReadableDailyOpsFiles {
     }
 }
 
+function Test-QaInboxHasActionableItems {
+    if (-not (Test-Path $QaInbox)) {
+        return $false
+    }
+
+    $content = Get-Content $QaInbox -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        return $false
+    }
+
+    return ($content -match '(?m)^\s*-\s+\S')
+}
+
+function Test-QaStructuredHasStructuredItems {
+    if (-not (Test-Path $QaStructured)) {
+        return $false
+    }
+
+    $content = Get-Content $QaStructured -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        return $false
+    }
+
+    if ($content -match '(?im)^\s*##\s*Normalized Issues\s*$') {
+        return ($content -match '(?im)^\s*###\s+Item\s+\d+')
+    }
+
+    return ($content -match '(?m)^\s*-\s+\S')
+}
+
+function Assert-QaStructuredReadyForPlanning {
+    $qaInboxHasActionableItems = Test-QaInboxHasActionableItems
+    if (-not $qaInboxHasActionableItems) {
+        return
+    }
+
+    $qaStructuredPopulated = Test-QaStructuredHasStructuredItems
+    if ($qaStructuredPopulated) {
+        return
+    }
+
+    if ($DryRun) {
+        Write-Host "[DryRun] QA_STRUCTURED.md is still empty, but planner gate is bypassed for dry-run validation." -ForegroundColor Yellow
+        return
+    }
+
+    throw "QA_STRUCTURED.md must be populated before planner can run when QA_INBOX.md contains actionable items."
+}
+
 function Assert-PreHandoffReadiness {
+    Assert-QaStructuredReadyForPlanning
     Assert-ReadableDailyOpsFiles -Paths $ReadableDocsToCheckBeforeHandoff
 }
 
@@ -450,16 +484,9 @@ function Write-FinalRunSummary {
     Write-Host ("Date      : {0}" -f $DateString) -ForegroundColor $summaryColor
     Write-Host ("Elapsed   : {0}" -f $elapsedText) -ForegroundColor $summaryColor
     Write-Host ("Stages    : {0}" -f $executed) -ForegroundColor $summaryColor
-
-    if ($ModeName -eq 'workday' -or $ModeName -eq 'planner' -or $ModeName -eq 'all') {
-        Write-Host ("Strategy  : {0}" -f $TodayStrategy) -ForegroundColor $summaryColor
-    }
-
-    if ($ModeName -eq 'workday' -or $ModeName -eq 'handoff' -or $ModeName -eq 'all') {
-        Write-Host ("Handoff   : {0}" -f $DailyHandoff) -ForegroundColor $summaryColor
-    }
-
-    Write-Host ("Prompts   : {0}" -f $PromptDateDir) -ForegroundColor $summaryColor
+    Write-Host ("Strategy  : {0}" -f $TodayStrategy) -ForegroundColor $summaryColor
+    Write-Host ("Handoff   : {0}" -f $DailyHandoff) -ForegroundColor $summaryColor
+    Write-Host ("Prompts   : {0}" -f $PromptDir) -ForegroundColor $summaryColor
 
     if (-not [string]::IsNullOrWhiteSpace($ErrorMessage)) {
         Write-Host ("Error     : {0}" -f $ErrorMessage) -ForegroundColor Red
@@ -467,12 +494,6 @@ function Write-FinalRunSummary {
 
     Write-Host "==========================================" -ForegroundColor $summaryColor
     Write-Host ""
-}
-
-function Get-PromptFilePath {
-    param([string]$PromptName)
-
-    return (Join-Path $PromptDateDir ("{0}-{1}.prompt.txt" -f $DateString, $PromptName))
 }
 
 function Invoke-CodexFromPrompt {
@@ -501,102 +522,7 @@ function Invoke-CodexFromPrompt {
     Write-StageCompletion -StageName $StageName -StartedAt $stageStartedAt
 }
 
-function Get-ChangedFileSnapshot {
-    param([string]$WorkDir)
-
-    return @(Get-ChangedFileList -WorkDir $WorkDir | Sort-Object -Unique)
-}
-
-function Get-NewlyChangedFiles {
-    param(
-        [string[]]$Before,
-        [string[]]$After
-    )
-
-    $beforeNormalized = @($Before | ForEach-Object { Normalize-RepoPath -Path $_ })
-    return @(
-    $After |
-            Where-Object {
-                (Normalize-RepoPath -Path $_) -notin $beforeNormalized
-            } |
-            Sort-Object -Unique
-    )
-}
-
-function Test-QAInboxHasActionableItems {
-    param([string]$Path)
-
-    if (-not (Test-Path $Path)) {
-        return $false
-    }
-
-    $content = Get-Content $Path -Raw -Encoding UTF8
-    if ([string]::IsNullOrWhiteSpace($content)) {
-        return $false
-    }
-
-    $matches = [regex]::Matches($content, '(?m)^\s*-\s+\S')
-    foreach ($match in $matches) {
-        $line = $match.Value.Trim()
-        if ($line -ne '-' -and $line -notmatch '^(?i)-\s*(none|n/a)$') {
-            return $true
-        }
-    }
-
-    return $false
-}
-
-function Test-QAStructuredReady {
-    param([string]$Path)
-
-    if (-not (Test-Path $Path)) {
-        return $false
-    }
-
-    $content = Get-Content $Path -Raw -Encoding UTF8
-    if ([string]::IsNullOrWhiteSpace($content)) {
-        return $false
-    }
-
-    if ($content -match '(?im)^##\s+Normalized Issues') {
-        $matches = [regex]::Matches($content, '(?im)^###\s+Item\s+\d+')
-        return ($matches.Count -gt 0)
-    }
-
-    return ($content -match '(?im)^\s*-\s+\S')
-}
-
-function Assert-QAStructuredReadyForPlanning {
-    if ((Test-QAInboxHasActionableItems -Path $QaInbox) -and -not (Test-QAStructuredReady -Path $QaStructured)) {
-        throw "QA_STRUCTURED.md must be populated before planner can run when QA_INBOX.md contains actionable items."
-    }
-}
-
-function New-QAStructuredDefaultContent {
-    return @"
-# QA_STRUCTURED
-
-## Date
-$DateString
-
-## Normalized Issues
-
-### Item 1
-- category:
-- surface:
-- symptom:
-- user impact:
-- requested change:
-- scope hint:
-- priority:
-- selected today:
-- status:
-- carry over:
-- notes:
-"@
-}
-
-function New-QAStructurerPromptContent {
+function New-QaStructurerPromptContent {
     return @"
 You are running the QA normalization role for this repository.
 
@@ -605,33 +531,29 @@ Read first:
 2. $AgentsFile
 3. $DevLoop
 4. $HarnessRules
-5. $QaInbox
 
 Today: $DateString
+
+Read:
+- QA inbox: $QaInbox
 
 Write only:
 - $QaStructured
 
 Tasks:
-1. Read QA_INBOX.md and normalize all actionable user issues into a structured issue list.
-2. Merge duplicates where appropriate.
-3. Separate immediate implementation-ready issues from broad product ideas or long-term plans.
-4. Use this exact structure for each item:
-
-### Item N
-- category: UI/UX | reliability | localization | content tone | admin | ingestion | market-data | SEO | infra | product-direction
-- surface:
-- symptom:
-- user impact: high | medium | low
-- requested change:
-- scope hint: template | controller | service | provider | docs | static-assets | product-decision
-- priority: P1 | P2 | P3
-- selected today: yes | no
-- status: pending | completed | partial | deferred | blocked
-- carry over: yes | no
-- notes:
-
-5. Mark today's likely implementation-ready items as selected today: yes only when they are narrow and safe.
+1. Convert raw QA into a normalized structured issue list.
+2. Merge duplicates and closely related requests.
+3. Separate implementation-ready items from broader product decisions.
+4. Mark each item with:
+   - category
+   - surface
+   - symptom
+   - requested change
+   - impact
+   - priority
+   - selected today (yes/no)
+   - carry-over candidate (yes/no)
+5. MUST produce a non-empty structured result if QA_INBOX contains actionable items.
 6. Do not implement code.
 7. Do not modify any other file.
 "@
@@ -656,22 +578,25 @@ Ops rules:
 - MUST write only to: $TodayStrategy
 - If the file already exists, update it carefully instead of creating a second file
 
+Primary planning input:
+- QA structured: $QaStructured
+
+Cross-check input:
+- QA inbox: $QaInbox
+
 Read if available:
 - format: $TodayFmt
-- QA structured (PRIMARY INPUT): $QaStructured
-- QA inbox (CROSS-CHECK ONLY): $QaInbox
 - previous handoff: $PreviousHandoff
 - reports: $ReportsDir
 
 Tasks:
 1. Read TODAY_STRATEGY_FORMAT.md
-2. Treat QA_STRUCTURED.md as the primary planning input.
-3. Use QA_INBOX.md only to cross-check whether any important issue was missed in QA_STRUCTURED.md.
-4. If QA_STRUCTURED.md and QA_INBOX.md disagree materially, report that mismatch inside the strategy.
-5. Create or update exactly: $TodayStrategy
-6. Keep the plan small, safe, and Codex-executable
-7. Do not implement code
-8. Do not modify any other file
+2. Create or update exactly: $TodayStrategy
+3. Use QA_STRUCTURED.md as the primary input, and QA_INBOX.md only as a cross-check source.
+4. If QA_STRUCTURED.md and QA_INBOX.md differ materially, report that mismatch inside the strategy.
+5. Keep the plan small, safe, and Codex-executable.
+6. Do not implement code.
+7. Do not modify any other file.
 "@
 }
 
@@ -723,6 +648,13 @@ Do not widen scope.
 function New-GitterPromptContent {
     param([int]$SelectedStepNumber)
 
+    $gitterHint = if (Test-Path $GitterToml) {
+        "Use agent configuration if relevant: $GitterToml"
+    }
+    else {
+        "No gitter.toml file was found; still inspect the git diff carefully."
+    }
+
     return @"
 You are running the gitter role for this repository after Step $SelectedStepNumber.
 
@@ -733,22 +665,17 @@ Read first:
 4. $HarnessRules
 5. $TodayStrategy
 
-Read if available:
-- gitter config: $GitterToml
+Context:
+- Step Number: $SelectedStepNumber
+- $gitterHint
 
 Tasks:
-1. Inspect the current git diff created by Step $SelectedStepNumber.
-2. Stage only the meaningful files produced by that step.
-3. Do NOT stage unrelated files outside the step scope.
-4. Do NOT stage prompt files under .codex/prompts/ unless explicitly required.
-5. Create one concise, accurate conventional commit message for Step $SelectedStepNumber.
-6. Commit the step result now.
-7. If there is nothing meaningful to commit, stop and report that clearly.
-
-Output:
-- commit message used
-- committed files
-- files intentionally not committed
+1. Inspect the current git diff.
+2. Determine whether the diff is scoped only to the completed step.
+3. Prepare and perform exactly one safe commit for the completed step if the diff is valid.
+4. Use a concise conventional commit message.
+5. Do not modify code or documentation content as part of this role.
+6. If the diff is empty or unsafe, report clearly and do not force a commit.
 "@
 }
 
@@ -818,11 +745,66 @@ Tasks:
 "@
 }
 
+function Get-StagePromptFilePath {
+    param([string]$StageSlug)
+    return (Join-Path $PromptDir ("{0}-{1}.prompt.txt" -f $DateString, $StageSlug))
+}
+
+function Invoke-QaStructurerMode {
+    $promptFile = Get-StagePromptFilePath -StageSlug 'qa-structurer'
+    $promptContent = New-QaStructurerPromptContent
+
+    Write-PromptFile -FilePath $promptFile -Content $promptContent
+    Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName 'qa-structurer'
+}
+
+function Invoke-PlannerMode {
+    Assert-QaStructuredReadyForPlanning
+
+    $promptFile = Get-StagePromptFilePath -StageSlug 'planner'
+    $promptContent = New-PlannerPromptContent
+
+    Write-PromptFile -FilePath $promptFile -Content $promptContent
+    Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName 'planner'
+}
+
+function Invoke-GitterMode {
+    param([int]$SelectedStepNumber)
+
+    $promptFile = Get-StagePromptFilePath -StageSlug ("gitter-step{0}" -f $SelectedStepNumber)
+    $promptContent = New-GitterPromptContent -SelectedStepNumber $SelectedStepNumber
+
+    Write-PromptFile -FilePath $promptFile -Content $promptContent
+    Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName ("gitter-step-{0}" -f $SelectedStepNumber)
+}
+
+function Invoke-CuratorMode {
+    $promptFile = Get-StagePromptFilePath -StageSlug 'curator'
+    $promptContent = New-CuratorPromptContent
+
+    Write-PromptFile -FilePath $promptFile -Content $promptContent
+    Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName 'curator'
+}
+
+function Invoke-HandoffMode {
+    Assert-PreHandoffReadiness
+
+    $promptFile = Get-StagePromptFilePath -StageSlug 'handoff'
+    $promptContent = New-HandoffPromptContent
+
+    Write-PromptFile -FilePath $promptFile -Content $promptContent
+    Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName 'handoff'
+
+    if (-not $DryRun) {
+        Assert-PostHandoffReadiness
+    }
+}
+
 function Get-StepPurposeHint {
     param([int]$SelectedStepNumber)
 
     if (-not (Test-Path $TodayStrategy)) {
-        return "implementation"
+        return 'implementation'
     }
 
     $content = Get-Content $TodayStrategy -Raw -Encoding UTF8
@@ -830,24 +812,46 @@ function Get-StepPurposeHint {
     $match = [regex]::Match($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
 
     if (-not $match.Success) {
-        return "implementation"
+        return 'implementation'
     }
 
     $stepBody = $match.Groups[1].Value
 
     if ($stepBody -match '(?i)expected output\s*[\r\n-:\s]*analysis note') {
-        return "analysis"
+        return 'analysis'
     }
 
     if ($stepBody -match '(?i)expected output\s*[\r\n-:\s]*report') {
-        return "analysis"
+        return 'analysis'
     }
 
     if ($stepBody -match '(?i)\bgoal\b[\r\n-:\s]*.*\btrace\b') {
-        return "analysis"
+        return 'analysis'
     }
 
-    return "implementation"
+    return 'implementation'
+}
+
+function Get-ChangedFileSnapshot {
+    param([string]$WorkDir)
+
+    return @(Get-ChangedFileList -WorkDir $WorkDir | Sort-Object -Unique)
+}
+
+function Get-NewlyChangedFiles {
+    param(
+        [string[]]$Before,
+        [string[]]$After
+    )
+
+    $beforeNormalized = @($Before | ForEach-Object { Normalize-RepoPath -Path $_ })
+    return @(
+    $After |
+            Where-Object {
+                (Normalize-RepoPath -Path $_) -notin $beforeNormalized
+            } |
+            Sort-Object -Unique
+    )
 }
 
 function Assert-StepProducedExpectedArtifact {
@@ -892,63 +896,6 @@ function Assert-StepProducedExpectedArtifact {
     }
 }
 
-function Invoke-QAStructurerMode {
-    $qaStructurerPromptFile = Get-PromptFilePath -PromptName "qa-structurer"
-    $qaStructurerPromptContent = New-QAStructurerPromptContent
-
-    Write-PromptFile -FilePath $qaStructurerPromptFile -Content $qaStructurerPromptContent
-    Invoke-CodexFromPrompt -PromptFile $qaStructurerPromptFile -WorkDir $RootDir -StageName "qa-structurer"
-
-    if (-not $DryRun) {
-        Assert-QAStructuredReadyForPlanning
-    }
-}
-
-function Invoke-PlannerMode {
-    Assert-QAStructuredReadyForPlanning
-
-    $plannerPromptFile = Get-PromptFilePath -PromptName "planner"
-    $plannerPromptContent = New-PlannerPromptContent
-
-    Write-PromptFile -FilePath $plannerPromptFile -Content $plannerPromptContent
-    Invoke-CodexFromPrompt -PromptFile $plannerPromptFile -WorkDir $RootDir -StageName "planner"
-}
-
-function Invoke-GitterAfterStep {
-    param(
-        [int]$SelectedStepNumber,
-        [string[]]$BeforeChangedFiles
-    )
-
-    if ($DryRun) {
-        Add-ExecutedStage -StageName ("gitter-step-{0} (dryrun)" -f $SelectedStepNumber)
-        return
-    }
-
-    $afterChangedFiles = Get-ChangedFileSnapshot -WorkDir $RootDir
-    $newlyChanged = @(Get-NewlyChangedFiles -Before $BeforeChangedFiles -After $afterChangedFiles)
-
-    $meaningfulChanges = @(
-    $newlyChanged |
-            Where-Object {
-                -not (Test-StartsWithNormalizedPath -Path $_ -Prefix 'docs\ops\') -and
-                        -not (Test-StartsWithNormalizedPath -Path $_ -Prefix '.codex\prompts\')
-            }
-    )
-
-    if ($meaningfulChanges.Count -eq 0) {
-        Write-Host "[Skip] No meaningful step diff found for gitter after step-$SelectedStepNumber." -ForegroundColor Yellow
-        Add-ExecutedStage -StageName ("gitter-step-{0} (skip)" -f $SelectedStepNumber)
-        return
-    }
-
-    $gitterPromptFile = Get-PromptFilePath -PromptName ("step{0}-gitter" -f $SelectedStepNumber)
-    $gitterPromptContent = New-GitterPromptContent -SelectedStepNumber $SelectedStepNumber
-
-    Write-PromptFile -FilePath $gitterPromptFile -Content $gitterPromptContent
-    Invoke-CodexFromPrompt -PromptFile $gitterPromptFile -WorkDir $RootDir -StageName ("gitter-step-{0}" -f $SelectedStepNumber)
-}
-
 function Invoke-StepMode {
     param([int]$SelectedStepNumber)
 
@@ -960,41 +907,17 @@ function Invoke-StepMode {
         -SkipGitCheck:$SkipGitStatusCheck `
         -AdditionalAllowedPaths (Get-AllowedChangedFiles -WorkDir $RootDir -CurrentScriptPath $ScriptPath)
 
-    $stepPromptFile = Get-PromptFilePath -PromptName ("step{0}" -f $SelectedStepNumber)
-    $stepPromptContent = New-StepPromptContent -SelectedStepNumber $SelectedStepNumber
+    $promptFile = Get-StagePromptFilePath -StageSlug ("step{0}" -f $SelectedStepNumber)
+    $promptContent = New-StepPromptContent -SelectedStepNumber $SelectedStepNumber
 
-    Write-PromptFile -FilePath $stepPromptFile -Content $stepPromptContent
-    Invoke-CodexFromPrompt -PromptFile $stepPromptFile -WorkDir $RootDir -StageName ("step-{0}" -f $SelectedStepNumber)
+    Write-PromptFile -FilePath $promptFile -Content $promptContent
+    Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName ("step-{0}" -f $SelectedStepNumber)
 
     $afterChangedFiles = Get-ChangedFileSnapshot -WorkDir $RootDir
     Assert-StepProducedExpectedArtifact `
         -SelectedStepNumber $SelectedStepNumber `
         -BeforeChangedFiles $beforeChangedFiles `
         -AfterChangedFiles $afterChangedFiles
-
-    Invoke-GitterAfterStep -SelectedStepNumber $SelectedStepNumber -BeforeChangedFiles $beforeChangedFiles
-}
-
-function Invoke-CuratorMode {
-    $curatorPromptFile = Get-PromptFilePath -PromptName "curator"
-    $curatorPromptContent = New-CuratorPromptContent
-
-    Write-PromptFile -FilePath $curatorPromptFile -Content $curatorPromptContent
-    Invoke-CodexFromPrompt -PromptFile $curatorPromptFile -WorkDir $RootDir -StageName "curator"
-}
-
-function Invoke-HandoffMode {
-    Assert-PreHandoffReadiness
-
-    $handoffPromptFile = Get-PromptFilePath -PromptName "handoff"
-    $handoffPromptContent = New-HandoffPromptContent
-
-    Write-PromptFile -FilePath $handoffPromptFile -Content $handoffPromptContent
-    Invoke-CodexFromPrompt -PromptFile $handoffPromptFile -WorkDir $RootDir -StageName "handoff"
-
-    if (-not $DryRun) {
-        Assert-PostHandoffReadiness
-    }
 }
 
 function Wait-ForQaCheckpoint {
@@ -1018,104 +941,67 @@ function Wait-ForQaCheckpoint {
     }
 }
 
-function Get-UnresolvedCarryOverText {
-    $sections = New-Object System.Collections.Generic.List[string]
-
-    if (Test-Path $QaStructured) {
-        $qaStructuredText = Get-Content $QaStructured -Raw -Encoding UTF8
-        if (-not [string]::IsNullOrWhiteSpace($qaStructuredText)) {
-            $sections.Add("## Carry-over from previous structured QA`n") | Out-Null
-            $sections.Add($qaStructuredText.Trim()) | Out-Null
-        }
-    }
-
-    if (Test-Path $DailyHandoff) {
-        $handoffText = Get-Content $DailyHandoff -Raw -Encoding UTF8
-        $carryMatch = [regex]::Match(
-                $handoffText,
-                '(?is)^##\s*6\.\s*Carry-over Candidates.*?(?=^##\s*\d+\.|\z)',
-                [System.Text.RegularExpressions.RegexOptions]::Multiline
-        )
-
-        if ($carryMatch.Success) {
-            $sections.Add("`n## Carry-over candidates from previous handoff`n") | Out-Null
-            $sections.Add($carryMatch.Value.Trim()) | Out-Null
-        }
-    }
-
-    return ($sections -join "`n")
+function Get-TomorrowDateString {
+    return (Get-Date $DateString).AddDays(1).ToString('yyyy-MM-dd')
 }
 
-function Ensure-NextDayCarryOverArtifacts {
+function Initialize-NextDayCarryOverDraft {
     if ($DryRun) {
         return
     }
 
-    $carryText = Get-UnresolvedCarryOverText
-    if ([string]::IsNullOrWhiteSpace($carryText)) {
-        return
-    }
+    $tomorrow = Get-TomorrowDateString
+    $nextDir = Join-Path $OpsDir $tomorrow
+    $nextQaInbox = Join-Path $nextDir 'QA_INBOX.md'
+    $nextQaStructured = Join-Path $nextDir 'QA_STRUCTURED.md'
+    $nextTodayStrategy = Join-Path $nextDir 'TODAY_STRATEGY.md'
+    $nextDailyHandoff = Join-Path $nextDir 'DAILY_HANDOFF.md'
 
-    New-DirectoryIfMissing -Path $NextDayDir
+    New-DirectoryIfMissing -Path $nextDir
 
-    $nextQaInboxContent = @"
+    if (Test-QaStructuredHasStructuredItems) {
+        $carryOverHeader = @"
 # QA_INBOX
 
 ## Date
-$NextDateString
-
-## Carry-over from $DateString
-
-    $carryText
+$tomorrow
 
 ## Raw Notes
-
--
+- Carry-over from $DateString session:
+  - Review the previous day's QA_STRUCTURED.md and DAILY_HANDOFF.md for unfinished items.
 "@
 
-    $nextQaStructuredContent = @"
+        New-TextFileIfMissing -Path $nextQaInbox -DefaultContent $carryOverHeader
+
+        $structuredHeader = @"
 # QA_STRUCTURED
 
 ## Date
-$NextDateString
+$tomorrow
 
 ## Normalized Issues
 
 ### Item 1
-- category:
-- surface:
-- symptom:
-- user impact:
-- requested change:
-- scope hint:
-- priority:
-- selected today:
-- status:
-- carry over: yes
-- notes: seeded automatically from previous day carry-over
+- category: carry-over
+- surface: to-be-decided
+- symptom: Review unfinished items carried from $DateString
+- requested change: Re-evaluate deferred / partial / blocked work from previous session
+- impact: medium
+- priority: P1
+- selected today: no
+- carry-over candidate: yes
+- status: pending
+- notes: Source from previous DAILY_HANDOFF and QA_STRUCTURED
 "@
 
-    New-TextFileIfMissing -Path $NextQaInbox -DefaultContent $nextQaInboxContent
-    New-TextFileIfMissing -Path $NextQaStructured -DefaultContent $nextQaStructuredContent
-    New-TextFileIfMissing -Path $NextTodayStrategy -DefaultContent @"
-# TODAY_STRATEGY
-
-## Date
-$NextDateString
-
-## Note
-Seeded automatically from previous-day carry-over.
-"@
-    New-TextFileIfMissing -Path $NextDailyHandoff -DefaultContent @"
-# DAILY_HANDOFF
-
-## Date
-$NextDateString
-"@
+        New-TextFileIfMissing -Path $nextQaStructured -DefaultContent $structuredHeader
+        New-TextFileIfMissing -Path $nextTodayStrategy -DefaultContent "# TODAY_STRATEGY`n"
+        New-TextFileIfMissing -Path $nextDailyHandoff -DefaultContent "# DAILY_HANDOFF`n"
+    }
 }
 
 function Invoke-WorkdayMode {
-    Invoke-QAStructurerMode
+    Invoke-QaStructurerMode
     Invoke-PlannerMode
 
     if (-not (Test-Path $TodayStrategy)) {
@@ -1130,12 +1016,13 @@ function Invoke-WorkdayMode {
 
     foreach ($plannedStep in $plannedSteps) {
         Invoke-StepMode -SelectedStepNumber $plannedStep
+        Invoke-GitterMode -SelectedStepNumber $plannedStep
         Wait-ForQaCheckpoint -CompletedStepNumber $plannedStep
     }
 
     Invoke-CuratorMode
     Invoke-HandoffMode
-    Ensure-NextDayCarryOverArtifacts
+    Initialize-NextDayCarryOverDraft
 }
 
 # ==========================================
@@ -1161,9 +1048,8 @@ foreach ($file in $requiredFiles) {
 # ==========================================
 New-DirectoryIfMissing -Path $OpsDir
 New-DirectoryIfMissing -Path $TodayDir
-New-DirectoryIfMissing -Path $ReportsDir
 New-DirectoryIfMissing -Path $PromptRootDir
-New-DirectoryIfMissing -Path $PromptDateDir
+New-DirectoryIfMissing -Path $PromptDir
 
 New-TextFileIfMissing -Path $FailuresFile -DefaultContent "# HARNESS_FAILURES`n"
 
@@ -1178,47 +1064,57 @@ $DateString
 -
 "@
 
-New-TextFileIfMissing -Path $QaStructured -DefaultContent (New-QAStructuredDefaultContent)
+New-TextFileIfMissing -Path $QaStructured -DefaultContent @"
+# QA_STRUCTURED
+
+## Date
+$DateString
+
+## Normalized Issues
+
+"@
 
 $PreviousHandoff = Get-LatestPreviousHandoffFile -OpsRoot $OpsDir -CurrentDate $DateString
 
 # ==========================================
 # 6. Execute by mode
 # ==========================================
-$runStatus = "SUCCESS"
+$runStatus = 'SUCCESS'
 $errorMessage = $null
 
 try {
     switch ($Mode) {
-        "planner" {
+        'planner' {
             Invoke-PlannerMode
         }
-        "qa-structurer" {
-            Invoke-QAStructurerMode
+        'qa-structurer' {
+            Invoke-QaStructurerMode
         }
-        "step" {
+        'step' {
             Invoke-StepMode -SelectedStepNumber $StepNumber
         }
-        "curator" {
+        'curator' {
             Invoke-CuratorMode
         }
-        "handoff" {
+        'handoff' {
             Invoke-HandoffMode
         }
-        "all" {
-            Invoke-QAStructurerMode
+        'all' {
+            Invoke-QaStructurerMode
             Invoke-PlannerMode
             Invoke-StepMode -SelectedStepNumber $StepNumber
+            Invoke-GitterMode -SelectedStepNumber $StepNumber
             Invoke-CuratorMode
             Invoke-HandoffMode
+            Initialize-NextDayCarryOverDraft
         }
-        "workday" {
+        'workday' {
             Invoke-WorkdayMode
         }
     }
 }
 catch {
-    $runStatus = "FAILED"
+    $runStatus = 'FAILED'
     $errorMessage = $_.Exception.Message
     throw
 }
