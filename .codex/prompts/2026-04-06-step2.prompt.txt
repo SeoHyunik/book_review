@@ -1,0 +1,37 @@
+You are executing exactly one planned development step for this repository.
+
+Read first:
+1. S:\dev\project\auziraum\PROJECT_BRIEF.md
+2. S:\dev\project\auziraum\AGENTS.md
+3. S:\dev\project\auziraum\DEV_LOOP.md
+4. S:\dev\project\auziraum\HARNESS_RULES.md
+5. S:\dev\project\auziraum\docs\ops\2026-04-06\TODAY_STRATEGY.md
+
+Today: 2026-04-06
+Step Number: 2
+
+Critical rules:
+- Read TODAY_STRATEGY.md and locate exactly Step 2
+- Execute ONLY that step
+- If Step 2 does not exist, stop and report that clearly
+- Do NOT execute any other step
+- Do NOT modify TODAY_STRATEGY.md, DAILY_HANDOFF.md, QA_INBOX.md, QA_STRUCTURED.md, or HARNESS_FAILURES.md
+- Do NOT modify unrelated files
+- Keep changes minimal, safe, and scoped to the selected step
+- Follow any Forbidden Scope and Validation instructions written for Step 2
+
+Execution flow:
+1. Read TODAY_STRATEGY.md carefully
+2. Extract the exact goal / target area / likely files / forbidden scope / validation for Step 2
+3. Analyze the code paths needed for only that step
+4. Implement only the smallest safe change for that step
+5. Run relevant validation for that step if available
+6. Report:
+   - what changed
+   - why it changed
+   - what was not changed
+   - risks
+   - next possible step
+
+Do not generate handoff or curator outputs in this run.
+Do not widen scope.

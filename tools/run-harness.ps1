@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("planner", "step", "curator", "handoff", "all")]
+    [ValidateSet("planner", "step", "curator", "handoff", "all", "workday")]
     [string]$Mode = "planner",
 
     [string]$RootDir = (Get-Location).Path,
@@ -9,6 +9,8 @@ param(
     [int]$StepNumber = 1,
 
     [switch]$SkipGitStatusCheck,
+
+    [switch]$PauseForQa,
 
     [switch]$DryRun
 )
@@ -41,6 +43,8 @@ $QaInbox         = Join-Path $TodayDir "QA_INBOX.md"
 $QaStructured    = Join-Path $TodayDir "QA_STRUCTURED.md"
 $TodayStrategy   = Join-Path $TodayDir "TODAY_STRATEGY.md"
 $DailyHandoff    = Join-Path $TodayDir "DAILY_HANDOFF.md"
+
+$ScriptPath      = $MyInvocation.MyCommand.Path
 
 # ==========================================
 # 2. Codex CLI args
@@ -118,6 +122,31 @@ function Test-GitAvailable {
     }
 }
 
+function Get-RelativePath {
+    param(
+        [string]$BasePath,
+        [string]$TargetPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($BasePath) -or [string]::IsNullOrWhiteSpace($TargetPath)) {
+        return $null
+    }
+
+    $baseFull = [System.IO.Path]::GetFullPath($BasePath)
+    $targetFull = [System.IO.Path]::GetFullPath($TargetPath)
+
+    if (-not $baseFull.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $baseFull += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    $baseUri = [System.Uri]::new($baseFull)
+    $targetUri = [System.Uri]::new($targetFull)
+    $relativeUri = $baseUri.MakeRelativeUri($targetUri)
+    $relativePath = [System.Uri]::UnescapeDataString($relativeUri.ToString())
+
+    return ($relativePath -replace '/', '\')
+}
+
 function Get-ChangedFileList {
     param([string]$WorkDir)
 
@@ -143,11 +172,31 @@ function Get-ChangedFileList {
     }
 }
 
+function Get-AllowedChangedFiles {
+    param(
+        [string]$WorkDir,
+        [string]$CurrentScriptPath
+    )
+
+    $allowed = @()
+
+    if (-not [string]::IsNullOrWhiteSpace($CurrentScriptPath)) {
+        $relativeScriptPath = Get-RelativePath -BasePath $WorkDir -TargetPath $CurrentScriptPath
+        if (-not [string]::IsNullOrWhiteSpace($relativeScriptPath)) {
+            $allowed += $relativeScriptPath
+            $allowed += ($relativeScriptPath -replace '\\', '/')
+        }
+    }
+
+    return $allowed
+}
+
 function Assert-StepExecutionReady {
     param(
         [string]$TodayStrategyPath,
         [string]$WorkDir,
-        [switch]$SkipGitCheck
+        [switch]$SkipGitCheck,
+        [string[]]$AdditionalAllowedPaths = @()
     )
 
     if (-not (Test-Path $TodayStrategyPath)) {
@@ -163,14 +212,58 @@ function Assert-StepExecutionReady {
         return
     }
 
+    $normalizedAllowed = @($AdditionalAllowedPaths | Where-Object { $_ } | ForEach-Object {
+        ($_ -replace '/', '\').ToLowerInvariant()
+    })
+
     $unexpected = @($changedFiles | Where-Object {
-        ($_ -notmatch '^docs[/\\]ops[/\\]') -and ($_ -notmatch '^\.codex[/\\]prompts[/\\]')
+        $normalizedCurrent = ($_ -replace '/', '\').ToLowerInvariant()
+        (($_ -notmatch '^docs[/\\]ops[/\\]') -and ($_ -notmatch '^\.codex[/\\]prompts[/\\]')) -and
+                ($normalizedCurrent -notin $normalizedAllowed)
     })
 
     if ($unexpected.Count -gt 0) {
         $joined = ($unexpected -join ', ')
         throw "Step execution blocked because non-ops changes already exist in the worktree: $joined"
     }
+}
+
+function Get-PlannedStepNumbers {
+    param([string]$TodayStrategyPath)
+
+    if (-not (Test-Path $TodayStrategyPath)) {
+        return @()
+    }
+
+    $content = Get-Content $TodayStrategyPath -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        return @()
+    }
+
+    $matches = [regex]::Matches(
+            $content,
+            '(?im)^\s{0,3}(?:#{1,6}\s*)?(?:step|phase)\s*[-:]?\s*(\d+)\b'
+    )
+
+    if ($matches.Count -eq 0) {
+        return @()
+    }
+
+    return @(
+    $matches |
+            ForEach-Object { [int]$_.Groups[1].Value } |
+            Sort-Object -Unique
+    )
+}
+
+function Test-StepExists {
+    param(
+        [string]$TodayStrategyPath,
+        [int]$TargetStepNumber
+    )
+
+    $stepNumbers = Get-PlannedStepNumbers -TodayStrategyPath $TodayStrategyPath
+    return ($stepNumbers -contains $TargetStepNumber)
 }
 
 function Invoke-CodexFromPrompt {
@@ -195,6 +288,116 @@ function Invoke-CodexFromPrompt {
     }
 
     Invoke-Expression $cmd
+}
+
+function New-StepPromptContent {
+    param([int]$SelectedStepNumber)
+
+    return @"
+You are executing exactly one planned development step for this repository.
+
+Read first:
+1. $ProjectBrief
+2. $AgentsFile
+3. $DevLoop
+4. $HarnessRules
+5. $TodayStrategy
+
+Today: $DateString
+Step Number: $SelectedStepNumber
+
+Critical rules:
+- Read TODAY_STRATEGY.md and locate exactly Step $SelectedStepNumber
+- Execute ONLY that step
+- If Step $SelectedStepNumber does not exist, stop and report that clearly
+- Do NOT execute any other step
+- Do NOT modify TODAY_STRATEGY.md, DAILY_HANDOFF.md, QA_INBOX.md, QA_STRUCTURED.md, or HARNESS_FAILURES.md
+- Do NOT modify unrelated files
+- Keep changes minimal, safe, and scoped to the selected step
+- Follow any Forbidden Scope and Validation instructions written for Step $SelectedStepNumber
+
+Execution flow:
+1. Read TODAY_STRATEGY.md carefully
+2. Extract the exact goal / target area / likely files / forbidden scope / validation for Step $SelectedStepNumber
+3. Analyze the code paths needed for only that step
+4. Implement only the smallest safe change for that step
+5. Run relevant validation for that step if available
+6. Report:
+   - what changed
+   - why it changed
+   - what was not changed
+   - risks
+   - next possible step
+
+Do not generate handoff or curator outputs in this run.
+Do not widen scope.
+"@
+}
+
+function Get-StepPromptFilePath {
+    param([int]$SelectedStepNumber)
+
+    return (Join-Path $PromptDir "$DateString-step$SelectedStepNumber.prompt.txt")
+}
+
+function Invoke-StepMode {
+    param([int]$SelectedStepNumber)
+
+    $stepPromptFile = Get-StepPromptFilePath -SelectedStepNumber $SelectedStepNumber
+    $stepPromptContent = New-StepPromptContent -SelectedStepNumber $SelectedStepNumber
+
+    Write-PromptFile -FilePath $stepPromptFile -Content $stepPromptContent
+
+    Assert-StepExecutionReady `
+        -TodayStrategyPath $TodayStrategy `
+        -WorkDir $RootDir `
+        -SkipGitCheck:$SkipGitStatusCheck `
+        -AdditionalAllowedPaths (Get-AllowedChangedFiles -WorkDir $RootDir -CurrentScriptPath $ScriptPath)
+
+    Invoke-CodexFromPrompt -PromptFile $stepPromptFile -WorkDir $RootDir
+}
+
+function Wait-ForQaCheckpoint {
+    param([int]$CompletedStepNumber)
+
+    if (-not $PauseForQa) {
+        return
+    }
+
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor DarkYellow
+    Write-Host "QA Checkpoint" -ForegroundColor DarkYellow
+    Write-Host "==========================================" -ForegroundColor DarkYellow
+    Write-Host "Step $CompletedStepNumber execution finished." -ForegroundColor Yellow
+    Write-Host "Run your QA, then press Enter to continue to the next step." -ForegroundColor Yellow
+    Write-Host "Press Ctrl+C to stop here and resume later." -ForegroundColor Yellow
+    Write-Host ""
+
+    if (-not $DryRun) {
+        Read-Host | Out-Null
+    }
+}
+
+function Invoke-WorkdayMode {
+    Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
+
+    if (-not (Test-Path $TodayStrategy)) {
+        throw "TODAY_STRATEGY.md not found after planner run: $TodayStrategy"
+    }
+
+    $plannedSteps = @(Get-PlannedStepNumbers -TodayStrategyPath $TodayStrategy | Where-Object { $_ -ge $StepNumber })
+
+    if ($plannedSteps.Count -eq 0) {
+        throw "No planned steps were found in TODAY_STRATEGY.md starting from Step $StepNumber"
+    }
+
+    foreach ($plannedStep in $plannedSteps) {
+        Invoke-StepMode -SelectedStepNumber $plannedStep
+        Wait-ForQaCheckpoint -CompletedStepNumber $plannedStep
+    }
+
+    Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
+    Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
 }
 
 # ==========================================
@@ -284,45 +487,7 @@ Tasks:
 5. Do not modify any other file
 "@
 
-$StepPrompt = @"
-You are executing exactly one planned development step for this repository.
-
-Read first:
-1. $ProjectBrief
-2. $AgentsFile
-3. $DevLoop
-4. $HarnessRules
-5. $TodayStrategy
-
-Today: $DateString
-Step Number: $StepNumber
-
-Critical rules:
-- Read TODAY_STRATEGY.md and locate exactly Step $StepNumber
-- Execute ONLY that step
-- If Step $StepNumber does not exist, stop and report that clearly
-- Do NOT execute any other step
-- Do NOT modify TODAY_STRATEGY.md, DAILY_HANDOFF.md, QA_INBOX.md, QA_STRUCTURED.md, or HARNESS_FAILURES.md
-- Do NOT modify unrelated files
-- Keep changes minimal, safe, and scoped to the selected step
-- Follow any Forbidden Scope and Validation instructions written for Step $StepNumber
-
-Execution flow:
-1. Read TODAY_STRATEGY.md carefully
-2. Extract the exact goal / target area / likely files / forbidden scope / validation for Step $StepNumber
-3. Analyze the code paths needed for only that step
-4. Implement only the smallest safe change for that step
-5. Run relevant validation for that step if available
-6. Report:
-   - what changed
-   - why it changed
-   - what was not changed
-   - risks
-   - next possible step
-
-Do not generate handoff or curator outputs in this run.
-Do not widen scope.
-"@
+$StepPrompt = New-StepPromptContent -SelectedStepNumber $StepNumber
 
 $CuratorPrompt = @"
 You are running the curator role for this repository.
@@ -390,7 +555,7 @@ Tasks:
 # 7. Write prompt files
 # ==========================================
 $PlannerPromptFile = Join-Path $PromptDir "$DateString-planner.prompt.txt"
-$StepPromptFile    = Join-Path $PromptDir "$DateString-step$StepNumber.prompt.txt"
+$StepPromptFile    = Get-StepPromptFilePath -SelectedStepNumber $StepNumber
 $CuratorPromptFile = Join-Path $PromptDir "$DateString-curator.prompt.txt"
 $HandoffPromptFile = Join-Path $PromptDir "$DateString-handoff.prompt.txt"
 
@@ -407,8 +572,7 @@ switch ($Mode) {
         Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
     }
     "step" {
-        Assert-StepExecutionReady -TodayStrategyPath $TodayStrategy -WorkDir $RootDir -SkipGitCheck:$SkipGitStatusCheck
-        Invoke-CodexFromPrompt -PromptFile $StepPromptFile -WorkDir $RootDir
+        Invoke-StepMode -SelectedStepNumber $StepNumber
     }
     "curator" {
         Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
@@ -418,9 +582,11 @@ switch ($Mode) {
     }
     "all" {
         Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
-        Assert-StepExecutionReady -TodayStrategyPath $TodayStrategy -WorkDir $RootDir -SkipGitCheck:$SkipGitStatusCheck
-        Invoke-CodexFromPrompt -PromptFile $StepPromptFile -WorkDir $RootDir
+        Invoke-StepMode -SelectedStepNumber $StepNumber
         Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
         Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
+    }
+    "workday" {
+        Invoke-WorkdayMode
     }
 }

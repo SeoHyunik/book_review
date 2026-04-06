@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security"
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security"
       th:fragment="layout(content)"
       th:with="resolvedPageTitle=${pageTitleKey != null ? #messages.msg(pageTitleKey) : (pageTitle != null ? pageTitle : #messages.msg('app.name'))}, resolvedPageDescription=${pageDescriptionKey != null ? #messages.msg(pageDescriptionKey) : (pageDescription != null ? pageDescription : #messages.msg('app.description'))}, resolvedOgTitle=${ogTitleKey != null ? #messages.msg(ogTitleKey) : (ogTitle != null ? ogTitle : resolvedPageTitle)}, resolvedOgDescription=${ogDescriptionKey != null ? #messages.msg(ogDescriptionKey) : (ogDescription != null ? ogDescription : resolvedPageDescription)}"
       th:attr="lang=${#locale.language}">
