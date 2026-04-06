@@ -346,6 +346,10 @@ function Test-TextLooksCorrupted {
         return $true
     }
 
+    if ($Content.Contains('�')) {
+        return $true
+    }
+
     if ($Content.Contains('ï»¿')) {
         return $true
     }
@@ -370,6 +374,111 @@ function Assert-ReadableDailyOpsFiles {
             throw "Readable UTF-8 validation failed for daily ops document: $path"
         }
     }
+}
+
+function Get-OpsDocumentDateValue {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return $null
+    }
+
+    $content = Get-ReadableFileText -Path $Path
+    $patterns = @(
+        '(?im)^\s*##\s*(?:1\.\s*)?Date\s*$\s*(\d{4}-\d{2}-\d{2})\b',
+        '(?im)^\s*##\s*Date\s*$\s*(\d{4}-\d{2}-\d{2})\b'
+    )
+
+    foreach ($pattern in $patterns) {
+        $match = [regex]::Match($content, $pattern)
+        if ($match.Success) {
+            return $match.Groups[1].Value
+        }
+    }
+
+    return $null
+}
+
+function Test-OpsDocumentHasRequiredSections {
+    param(
+        [string]$Content,
+        [string[]]$RequiredSectionPatterns
+    )
+
+    foreach ($pattern in $RequiredSectionPatterns) {
+        if (-not ($Content -match $pattern)) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+function Assert-OpsDocumentDatesMatchCurrent {
+    param(
+        [string[]]$Paths,
+        [string]$ExpectedDate
+    )
+
+    foreach ($path in $Paths) {
+        $actualDate = Get-OpsDocumentDateValue -Path $path
+        if ([string]::IsNullOrWhiteSpace($actualDate)) {
+            throw "Daily ops document is missing a readable date header: $path"
+        }
+
+        if ($actualDate -ne $ExpectedDate) {
+            throw "Daily ops document date mismatch for $path. Expected $ExpectedDate but found $actualDate"
+        }
+    }
+}
+
+function Assert-OpsDocumentStructure {
+    param(
+        [string]$Path,
+        [string[]]$RequiredSectionPatterns
+    )
+
+    $content = Get-ReadableFileText -Path $Path
+    if (-not (Test-OpsDocumentHasRequiredSections -Content $content -RequiredSectionPatterns $RequiredSectionPatterns)) {
+        throw "Required section check failed for daily ops document: $Path"
+    }
+}
+
+function Assert-DailyOpsContextConsistency {
+    $dateScopedFiles = @(
+        $QaInbox,
+        $QaStructured,
+        $TodayStrategy,
+        $DailyHandoff
+    )
+
+    Assert-OpsDocumentDatesMatchCurrent -Paths $dateScopedFiles -ExpectedDate $DateString
+
+    Assert-OpsDocumentStructure `
+        -Path $TodayStrategy `
+        -RequiredSectionPatterns @(
+            '(?im)^\s*##\s*2\.\s*Strategy Objective\s*$',
+            '(?im)^\s*##\s*4\.\s*Carry-over from Previous Session\s*$',
+            '(?im)^\s*##\s*5\.\s*Inputs for Today''s Planning\s*$',
+            '(?im)^\s*##\s*11\.\s*Selected Work for Today\s*$',
+            '(?im)^\s*##\s*12\.\s*Step Breakdown\s*$',
+            '(?im)^\s*##\s*15\.\s*Risks and Constraints\s*$',
+            '(?im)^\s*##\s*17\.\s*Definition of Done for Today\s*$',
+            '(?im)^\s*##\s*18\.\s*Handoff Requirement\s*$'
+        )
+
+    Assert-OpsDocumentStructure `
+        -Path $DailyHandoff `
+        -RequiredSectionPatterns @(
+            '(?im)^\s*##\s*2\.\s*Summary of Today\s*$',
+            '(?im)^\s*##\s*3\.\s*Completed Work\s*$',
+            '(?im)^\s*##\s*6\.\s*Carry-over Candidates \(CRITICAL\)\s*$',
+            '(?im)^\s*##\s*8\.\s*New Findings / Observations\s*$',
+            '(?im)^\s*##\s*10\.\s*Documentation State\s*$',
+            '(?im)^\s*##\s*11\.\s*Harness Improvements \(Very Important\)\s*$',
+            '(?im)^\s*##\s*13\.\s*Next Recommended Steps\s*$',
+            '(?im)^\s*##\s*15\.\s*Required Reading for Next Session\s*$'
+        )
 }
 
 function Test-QaInboxHasActionableItems {
@@ -403,6 +512,8 @@ function Test-QaStructuredHasStructuredItems {
 }
 
 function Assert-QaStructuredReadyForPlanning {
+    Assert-DailyOpsContextConsistency
+
     $qaInboxHasActionableItems = Test-QaInboxHasActionableItems
     if (-not $qaInboxHasActionableItems) {
         return
@@ -423,11 +534,13 @@ function Assert-QaStructuredReadyForPlanning {
 
 function Assert-PreHandoffReadiness {
     Assert-QaStructuredReadyForPlanning
+    Assert-DailyOpsContextConsistency
     Assert-ReadableDailyOpsFiles -Paths $ReadableDocsToCheckBeforeHandoff
 }
 
 function Assert-PostHandoffReadiness {
     $required = @($ReadableDocsToCheckBeforeHandoff + $DailyHandoff)
+    Assert-DailyOpsContextConsistency
     Assert-ReadableDailyOpsFiles -Paths $required
 }
 
