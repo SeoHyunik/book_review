@@ -65,3 +65,25 @@ Reject daily ops output unless all required files exist and are readable, with n
 
 **Prevention**
 Add a pre-handoff validation that checks daily ops file completeness and flags encoding corruption immediately
+
+---
+
+### [2026-04-06] QA Structure Not Enforced Before Planning
+
+**Type**
+harness failure
+
+**What Happened**
+`QA_INBOX.md` contains actionable user issues, but `QA_STRUCTURED.md` is empty, so the daily planning flow has to rely on raw notes instead of a normalized issue set.
+
+**Root Cause**
+No enforced step converts raw QA into a structured summary before strategy generation.
+
+**Impact**
+Priority selection becomes noisier, and repeated user issues are easier to miss or mis-rank.
+
+**Rule / Fix**
+Daily QA must be normalized into a structured review artifact before strategy planning begins.
+
+**Prevention**
+Require a non-empty `QA_STRUCTURED.md` whenever `QA_INBOX.md` has actionable items.

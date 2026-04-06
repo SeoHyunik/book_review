@@ -10,149 +10,164 @@
 
 ### What Was Done
 
-오늘은 제품 코드나 템플릿을 변경하지 않았고, 오늘자 전략과 QA 문맥을 읽어 다음 세션이 이어질 수 있도록 일일 핸드오프를 정리했다.
-또한 `DAILY_HANDOFF_FORMAT.md`, `TODAY_STRATEGY.md`, `QA_INBOX.md`, `QA_STRUCTURED.md`, `HARNESS_FAILURES.md`를 확인해 오늘의 보류 항목과 리스크를 사실대로 분리했다.
+- Daily context was reconstructed from `PROJECT_BRIEF.md`, `AGENTS.md`, `DEV_LOOP.md`, `HARNESS_RULES.md`, the current QA notes, and the step-1 analysis report.
+- `docs/reports/2026-04-06-step-1-public-interaction-path.md` confirms the public interaction path was traced from controller to service to template without making code changes.
+- The required daily handoff file was written to the date-scoped ops directory only.
 
 ---
 
 ## 3. Completed Work
 
-- 없음.
-  - 오늘 정의된 Step 1, Step 2는 아직 실행되지 않았고, 실제 코드 변경도 없었다.
+- Step 1: Trace the public interaction path
+  - `/` redirects through `PageController` to `/news`.
+  - `/news` renders through `NewsController.list()` and `templates/news/list.html`.
+  - Anonymous detail access is gated through `AnonymousDetailViewGateService`.
+  - Shared UI surfaces were identified in `templates/fragments/layout.html` and `GlobalUiModelAttributes`.
+
+- Daily ops handoff generation
+  - The handoff was updated in `docs/ops/2026-04-06/DAILY_HANDOFF.md`.
+  - No other files were modified.
 
 ---
 
 ## 4. Partially Completed Work
 
-- 없음.
-  - 오늘은 실행 단계에 들어가지 않았고, 진행 중이던 코드 작업도 없었다.
+- Step 2: Apply the smallest safe public UI fix
+  - Current progress: the likely UI touch points are known.
+  - What remains: decide the narrowest safe change and implement it in the shared template path.
+  - Why incomplete: today's work stopped after trace and handoff preparation; no code edits were made.
+
+- QA normalization
+  - Current progress: raw QA issues are captured in `QA_INBOX.md`.
+  - What remains: populate `QA_STRUCTURED.md` with a normalized issue set.
+  - Why incomplete: the structured QA file is still empty, so planning still depends on raw notes.
 
 ---
 
 ## 5. Deferred Work
 
 - Query noise tuning
-  - reason for deferral: 오늘 전략에서도 별도 재검증이 필요한 항목으로 남아 있고, public interaction path 안정화보다 우선순위가 낮다.
-  - when to reconsider: public page 신뢰성과 기본 UI 표면이 정리된 뒤
+  - reason for deferral: not part of today's narrow public UI pass.
+  - when to reconsider: after the public interaction path work is resumed and the next bounded step is selected.
 
 - AI Summary Korean Tone Cleanup
-  - reason for deferral: summary 페이지 전반의 톤/카피 정리는 범위가 넓어서 오늘의 첫 bounded step과 분리하는 것이 안전하다.
-  - when to reconsider: AI summary detail page를 별도 작업으로 잡을 때
+  - reason for deferral: important, but separate from the current UI reliability surface.
+  - when to reconsider: when the AI summary page becomes the selected work item.
 
 - SEO Foundation Minimal Pass
-  - reason for deferral: archive/topic/public route 메타와 탐색 구조 정리는 별도 계획이 필요한 범위다.
-  - when to reconsider: public page 안정화 이후
+  - reason for deferral: broader than today's bounded step.
+  - when to reconsider: in a dedicated planning step.
 
 - Retention Policy Decision
-  - reason for deferral: today-only / archive / delete 정책은 제품 판단이 필요하고, 단일 UI 수정과 섞기 어렵다.
-  - when to reconsider: 보존 정책을 전용 의제로 다룰 때
+  - reason for deferral: needs product-level judgment, not a small implementation change.
+  - when to reconsider: when archive/delete policy becomes the selected scope.
 
 - Admin Usage Follow-up
-  - reason for deferral: admin 사용량 페이지 정리는 운영 정책과 화면 정리를 함께 봐야 한다.
-  - when to reconsider: 관리 화면 작업을 별도 세션으로 잡을 때
+  - reason for deferral: operational/admin work should not be mixed into the current public UI pass.
+  - when to reconsider: when admin reliability is explicitly scheduled.
 
 ---
 
 ## 6. Carry-over Candidates (CRITICAL)
 
 - Public interaction path reliability pass
-  - origin: Step 1 / QA
+  - origin: Step 1 / report
   - previous status: partial
-  - why it should continue: 메인 페이지, header/footer, archive, AI summary detail로 이어지는 실제 경로를 먼저 확인해야 이후 변경의 blast radius를 줄일 수 있다.
-  - risk if ignored: 잘못된 전제 위에서 UI 또는 렌더링 수정을 진행할 수 있다.
+  - why it should continue: the path is now traced, but the next safe UI step still needs to be isolated.
+  - risk if ignored: the public surface stays fragile and later UI work may widen unintentionally.
   - suggested priority: high
 
 - Main-page table and visible chrome polish
-  - origin: Step 2 / QA
+  - origin: QA
   - previous status: deferred
-  - why it should continue: 메인 페이지 하단 뉴스 테이블, header, footer, 버튼 품질은 사용자에게 바로 보이는 문제다.
-  - risk if ignored: 첫 인상과 사용성이 계속 떨어진다.
+  - why it should continue: the main page table, header, footer, and button styling are the most visible user complaints.
+  - risk if ignored: first-impression quality remains poor.
   - suggested priority: high
 
 - Korean tone and locale cleanup
   - origin: QA
   - previous status: deferred
-  - why it should continue: 최초 진입 언어, AI 요약 상세페이지 문구, 아카이브 페이지 한국어 어색함이 함께 묶여 있다.
-  - risk if ignored: 한국어-first 제품 정체성이 약해진다.
+  - why it should continue: the current Korean text quality is part of the reported UX problem.
+  - risk if ignored: the product continues to feel machine-translated and less trustworthy.
   - suggested priority: medium
 
 - Query noise tuning validation
-  - origin: previous session carry-over
+  - origin: prior session carry-over
   - previous status: partial
-  - why it should continue: provider query noise가 실제 recall에 미치는 영향을 다시 확인해야 한다.
-  - risk if ignored: 뉴스 수집 품질이 흔들릴 수 있다.
+  - why it should continue: query routing was traced, but the recall issue still needs proof at the result level.
+  - risk if ignored: search and news selection quality may stay unstable.
   - suggested priority: high
 
 - SEO minimal pass
   - origin: strategy
   - previous status: deferred
-  - why it should continue: 검색 유입과 archive/topic navigation은 제품 방향상 중요하다.
-  - risk if ignored: 탐색성과 검색 노출 개선이 계속 지연된다.
+  - why it should continue: archive/topic navigation is part of the product direction.
+  - risk if ignored: discoverability improvements remain blocked.
   - suggested priority: medium
 
 ---
 
 ## 7. Dropped / Rejected Work
 
-- 없음.
-  - 오늘은 작업을 폐기하거나 제외할 만큼 진행된 항목이 없었다.
+- None today.
+  - No scope was explicitly dropped or rejected; remaining items were deferred rather than removed.
 
 ---
 
 ## 8. New Findings / Observations
 
-- 오늘자 전략은 reliability와 UX/UI polish를 우선하면서도, query tuning과 SEO 같은 넓은 과제를 분리하려는 방향으로 정리되어 있다.
-- `docs/ops/2026-04-06/DAILY_HANDOFF.md`는 세션 시작 시점에 존재하지 않았기 때문에, 오늘 핸드오프는 새로 생성해야 했다.
-- `docs/reports/`에는 오늘 기준으로 바로 활용할 만한 새 보고서가 없었다.
-- `TODAY_STRATEGY.md`와 `HARNESS_FAILURES.md`에는 한국어 mojibake가 남아 있어, 다음 세션에서 문맥 해석 시 주의가 필요하다.
+- The public interaction path is already layered in the expected controller -> service -> template shape, so the next change should stay narrow and template-focused.
+- `layout.html` and `GlobalUiModelAttributes` are shared surfaces, so even a small UI change can affect multiple pages.
+- `QA_STRUCTURED.md` is still empty even though `QA_INBOX.md` contains actionable issues, so planning quality is still lower than it should be.
+- `TODAY_STRATEGY.md` and `HARNESS_FAILURES.md` currently show mojibake in the existing working context, which should be treated as a documentation-quality problem.
 
 ---
 
 ## 9. Risks Identified
 
-- public page reliability 작업은 실제 경로 확인 없이 들어가면 수정 범위가 예상보다 넓어질 수 있다.
-- UI polish 작업은 메인 페이지, header/footer, 버튼, summary page까지 쉽게 확장될 수 있어 scope creep 위험이 있다.
-- Korean locale cleanup은 카피 전반으로 퍼질 수 있어, 단일 화면 수정과 섞지 않는 편이 안전하다.
-- daily ops 문서의 encoding noise가 남아 있으면 다음 세션에서 전략 해석 오류가 반복될 수 있다.
+- Public UI work can easily expand from a small fix into a broader redesign.
+- Shared layout changes can create side effects across the main page, detail pages, and any anonymous/public views.
+- Korean tone cleanup and locale cleanup may spread into copy-edit scope creep if not bounded tightly.
+- Encoding noise in daily ops files can keep reducing trust in the planning context if it is not corrected.
 
 ---
 
 ## 10. Documentation State
 
 - updated docs: `docs/ops/2026-04-06/DAILY_HANDOFF.md`
-- outdated docs: `docs/ops/2026-04-06/TODAY_STRATEGY.md`, `docs/ops/HARNESS_FAILURES.md`
-- mismatches intentionally left unresolved: 오늘자 전략/하네스 문서의 mojibake는 이번 세션에서 수정하지 않았다
+- current usable context: `docs/ops/2026-04-06/TODAY_STRATEGY.md`, `docs/ops/2026-04-06/QA_INBOX.md`, `docs/ops/2026-04-06/QA_STRUCTURED.md`, `docs/ops/HARNESS_FAILURES.md`
+- unresolved documentation issues: `TODAY_STRATEGY.md` and `HARNESS_FAILURES.md` still contain unreadable mojibake in the current state, and `QA_STRUCTURED.md` is empty
 
 ---
 
 ## 11. Harness Improvements (Very Important)
 
-- no harness improvement today
-- improvement candidate remains: daily ops 문서는 생성 전에 unreadable UTF-8, broken bullets, missing required files를 자동으로 거부하는 검증이 필요하다
+- No harness improvement was implemented today.
+- Improvement candidate: add a pre-handoff validation that rejects daily ops output if required files are missing, `QA_STRUCTURED.md` is empty when actionable QA exists, or the generated text contains mojibake / broken bullets.
 
 ---
 
 ## 12. Known Mismatches (Code vs Docs)
 
-- `TODAY_STRATEGY.md`의 한국어가 mojibake 상태라 문서 신뢰도가 낮다.
-- `HARNESS_FAILURES.md`는 오늘도 daily ops 문서의 encoding corruption과 handoff 누락을 문제로 기록하고 있다.
-- `docs/reports/`에는 오늘 전략을 뒷받침할 최신 분석 보고서가 없다.
+- The code trace is clear, but the daily ops context still has encoding corruption in `TODAY_STRATEGY.md` and `HARNESS_FAILURES.md`.
+- `QA_INBOX.md` contains actionable issues, but `QA_STRUCTURED.md` has not been normalized yet.
+- No code change was made today, so the repository implementation still matches the previous analyzed state.
 
 ---
 
 ## 13. Next Recommended Steps
 
-- Step 1: public interaction path를 실제 controller/service/template 흐름 기준으로 추적한다.
-- Step 2: 가장 좁은 public surface 하나만 선택해 reliability 또는 UI polish의 최소 변경을 적용한다.
-- Step 3: 한국어 톤 정리와 SEO는 별도 bounded step으로 분리해서 다룬다.
+- Step 2: choose one narrow public UI fix and implement only that surface.
+- Normalize `QA_STRUCTURED.md` so planning no longer depends on raw notes alone.
+- If UI work is paused, validate query noise tuning with concrete result-level evidence instead.
 
 ---
 
 ## 14. Priority for Next Session
 
-1. public interaction path trace 및 reliability 확인
-2. main page / summary page 중 가장 좁은 UI surface의 최소 polish
-3. Korean tone cleanup 또는 SEO minimal pass는 그 다음
+1. Public interaction path follow-up: choose and implement the smallest safe UI fix.
+2. QA normalization: fill `QA_STRUCTURED.md` with a normalized issue set.
+3. Query noise tuning validation or SEO minimal pass, depending on which issue is selected next.
 
 ---
 
@@ -162,30 +177,29 @@
 - `AGENTS.md`
 - `HARNESS_RULES.md`
 - `DEV_LOOP.md`
-- `docs/ops/2026-04-06/TODAY_STRATEGY.md`
-- `docs/ops/2026-04-06/DAILY_HANDOFF.md`
+- latest `TODAY_STRATEGY.md`
+- this `DAILY_HANDOFF.md`
 
 ---
 
 ## 16. Open Questions / Clarifications Needed
 
-- Step 1의 첫 대상은 메인 페이지, header/footer, archive page, AI summary detail page 중 어디가 우선인지 추가 확인이 필요하다.
-- 오늘의 UI polish는 테이블 패딩과 chrome 정리부터 시작할지, 아니면 detail page 톤까지 같이 볼지 범위 결정을 해야 한다.
+- Which single public UI surface should Step 2 target first: the main news table, the shared header/footer, or the detail page chrome?
+- Should the next planning pass prioritize query noise validation or the visible UI polish work from QA?
 
 ---
 
 ## 17. Notes for Agents
 
-- Korean user text와 기존 Korean comments는 그대로 유지해야 한다.
-- public page 작업은 controller → service → provider → repository 흐름을 먼저 확인한 뒤 들어가야 한다.
-- broad rewrite나 locale 전면 정리는 오늘 범위가 아니다.
+- Keep the change surface minimal and avoid mixing UI polish, localization, and ranking fixes in one step.
+- Treat shared layout files as high-blast-radius surfaces.
+- Preserve existing Korean text unless a bounded localization pass is explicitly selected.
 
 ---
 
 ## 18. Definition of a Clean Handoff
 
-- 다음 세션은 다시 전체 재분석 없이 시작할 수 있다.
-- carry-over 항목이 명확하다.
-- 다음 한 걸음이 좁고 안전하다.
-- 리스크와 문서 상태가 보인다.
-- 아직 끝나지 않은 작업이 무엇인지 분명하다.
+- The next session can start without re-analysis.
+- Carry-over items are explicit and prioritized.
+- Risks and known mismatches are visible.
+- The next safe step is obvious.
