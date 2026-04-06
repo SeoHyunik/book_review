@@ -87,3 +87,25 @@ Daily QA must be normalized into a structured review artifact before strategy pl
 
 **Prevention**
 Require a non-empty `QA_STRUCTURED.md` whenever `QA_INBOX.md` has actionable items.
+
+---
+
+### [2026-04-06] Stale Ops Context Is Not Being Revalidated
+
+**Type**
+harness failure
+
+**What Happened**
+Daily ops notes can carry forward stale or contradictory claims about current-file state, so handoff context may describe missing or unreadable artifacts even after the files exist.
+
+**Root Cause**
+There is no required revalidation pass that compares ops notes against the live date-scoped files before the handoff is trusted.
+
+**Impact**
+The team can inherit an unreliable working context, which slows planning and makes repeated doc issues harder to spot.
+
+**Rule / Fix**
+Before handoff, recheck the current date-scoped ops files and reject notes that still claim missing, empty, or corrupted artifacts when the live files do not match.
+
+**Prevention**
+Add a pre-handoff consistency check that compares summary notes with the actual `docs/ops/YYYY-MM-DD/` files and flags stale claims immediately.
