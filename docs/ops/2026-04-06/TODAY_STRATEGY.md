@@ -8,17 +8,16 @@
 
 ## 2. Strategy Objective
 
-오늘은 공용 화면에서 사용자가 바로 느끼는 불편을 좁은 범위로 정리한다. 먼저 메인/아카이브/헤더의 실제 렌더링 경로를 추적하고, 그 결과를 바탕으로 가장 작은 UI 및 언어 정리만 진행한다. 전면 개편이나 기능 확장은 하지 않는다.
+오늘은 사용자 QA에서 직접 지적된 공용 화면 문제를 좁은 범위로 정리한다. 먼저 공용 진입 경로와 렌더링 흐름을 확인하고, 그 다음 가장 안전한 한두 개의 템플릿/로케일 수정만 수행한다.
 
 ---
 
 ## 3. Current Context Summary
 
-- Spring Boot + Thymeleaf 모놀리스 방향은 유지되고 있다.
+- Spring Boot + Thymeleaf 모놀리스를 유지한다.
 - 2026-04-03 세션에서 provider query noise tuning은 부분 완료 상태로 남아 있다.
-- 오늘 QA에서는 공용 화면이 딱딱하고, 최초 진입 언어가 영어로 먼저 나오며, 클릭할 때 전체 페이지가 새로고침되는 체감이 강하게 보고되었다.
-- 메인 하단 뉴스 테이블, 버튼, header/footer, archive page, AI 시장 요약 상세페이지가 모두 UX 불만 지점으로 올라왔다.
-- `docs/reports/`에는 오늘 바로 재사용할 만한 최신 보고서가 보이지 않는다.
+- 오늘 QA는 UI/UX 불만이 많지만, 전부를 한 번에 처리하면 범위가 커진다.
+- 현재 우선순위는 공용 화면의 첫 인상과 진입 안정성을 먼저 정리하는 것이다.
 
 ---
 
@@ -26,31 +25,31 @@
 
 - Query noise tuning
   - previous status: partial
-  - why it was not completed: provider query 범위만 좁힌 상태이고 selector / ranking / UI / AI summary 쪽은 아직 검증이 덜 됐다.
+  - why it was not completed: provider query 쪽만 정리되고 selector, ranking, UI, AI summary까지 함께 검증되지 않았다.
   - still relevant: yes
   - decision today: defer again
 
 - AI Summary Korean Tone Cleanup
   - previous status: deferred
-  - why it was not completed: query tuning과 분리된 별도 작업으로 남겨 두었다.
+  - why it was not completed: query tuning과 분리된 후속 작업으로 남아 있었다.
   - still relevant: yes
   - decision today: defer again
 
 - SEO Foundation Minimal Pass
   - previous status: deferred
-  - why it was not completed: public route 메타와 콘텐츠 구조 보강이 별도 단계로 필요하다.
+  - why it was not completed: public route와 메타 정리를 별도 step으로 잡아야 한다.
   - still relevant: yes
   - decision today: defer again
 
 - Retention Policy Decision
   - previous status: deferred
-  - why it was not completed: today-only / archive / delete 정책은 제품 결정이 필요하다.
+  - why it was not completed: today-only / archive / delete 정책은 제품 판단이 필요하다.
   - still relevant: yes
   - decision today: defer again
 
 - Admin Usage Follow-up
   - previous status: deferred
-  - why it was not completed: 사용량 / 비용 정합성은 UI 정리와 다른 축이다.
+  - why it was not completed: 사용량 정합성은 UI 개선과 다른 축의 작업이다.
   - still relevant: yes
   - decision today: defer again
 
@@ -66,69 +65,64 @@
 - `docs/ops/2026-04-06/QA_INBOX.md`
 - `docs/ops/2026-04-06/QA_STRUCTURED.md`
 - `docs/ops/2026-04-03/DAILY_HANDOFF.md`
-- `docs/reports/`
-- 오늘자 사용자 QA 메모
+- `docs/reports/` with no usable new report files found
 
 ---
 
 ## 6. User-Observed Issues
 
-- 메인 페이지 하단 뉴스 테이블의 좌측 패딩이 부족하고 출처 표기가 거칠다.
+- 메인 페이지 하단 뉴스 테이블의 좌측 여백이 부족하다.
   - where: 메인 페이지 하단 뉴스 테이블
-  - why it matters: 가독성이 낮고 정보 신뢰도가 떨어진다.
+  - why it matters: 제목 가독성이 떨어지고 표가 답답해 보인다.
 
-- 화면의 일부를 눌러도 전체 페이지가 새로고침된다.
-  - where: 공용 UI 전반
-  - why it matters: 사용자는 부분 갱신형 인터랙션을 기대하고 있으며, 현재 경험은 낡아 보인다.
+- 출처 표기가 너무 뭉뚱그려져 있다.
+  - where: 메인 페이지 하단 뉴스 테이블
+  - why it matters: NAVER만 보이면 실제 언론사 출처를 구분할 수 없다.
 
-- 최초 진입 시 기본 언어가 영어로 먼저 나온다.
+- 첫 진입 시 한국어가 아니라 영문이 먼저 나온다.
   - where: 초기 진입 상태
-  - why it matters: 한국어 서비스 정체성과 바로 충돌한다.
+  - why it matters: 한국어 우선 사용자 경험과 어긋난다.
 
-- AI 시장 요약 상세페이지가 밋밋하고 문장이 기계적으로 느껴진다.
+- 클릭 시 전체 페이지가 새로고침된다.
+  - where: 공용 화면 전반
+  - why it matters: 사용자가 부분 갱신을 기대하는 흐름에서 끊김이 발생한다.
+
+- AI 시장 요약 상세페이지가 밋밋하고 한국어 어투가 기계적이다.
   - where: AI market summary detail page
-  - why it matters: 핵심 상품의 체감 품질을 낮춘다.
+  - why it matters: 핵심 제품 페이지의 신뢰감과 몰입감이 약해진다.
 
-- archive page와 header/footer, 버튼 스타일이 전반적으로 세련되지 않다.
-  - where: archive page, header, footer, action buttons
-  - why it matters: 첫인상과 반복 방문 품질을 동시에 떨어뜨린다.
-
-- 관리자 자동 수집 흐름이 멈춘 것으로 보인다.
-  - where: admin auto-collection flow
-  - why it matters: 콘텐츠 공급이 멈추면 공용 화면 개선 효과도 제한된다.
+- header, footer, 버튼 모양이 세련되지 않다.
+  - where: header / footer / action buttons
+  - why it matters: 공용 화면 전체의 품질 인상이 낮아진다.
 
 ---
 
 ## 7. Code / System Findings
 
-- 이전 세션의 결과는 provider query 범위를 좁히는 bounded change로 정리됐고, selector / ranking / UI / AI summary와 섞지 말아야 한다는 경계가 남아 있다.
-- 오늘 QA는 최소 3개의 분리된 축을 드러냈다. public rendering, locale/default state, content generation tone은 같은 문제가 아니라 별도 축이다.
-- Spring Boot + Thymeleaf 모놀리스 구조상, 오늘은 먼저 실제 렌더링 경로를 확인한 뒤 template 단위의 작은 수정만 하는 편이 안전하다.
-- `docs/reports/`에 바로 참조할 최신 보고서가 없어, 오늘 계획은 QA와 handoff를 1차 근거로 삼는 편이 맞다.
+- 공용 페이지 문제는 한 번에 다 고치기보다, 먼저 실제 렌더링 경로를 확인한 뒤 template 단위로 좁히는 편이 안전하다.
+- default language, 표 열 여백, 출처 표기, 전체 페이지 새로고침은 서로 다른 원인일 가능성이 높다.
+- query tuning carry-over는 여전히 중요하지만, 오늘 QA에서 직접 눈에 띈 UX 문제보다 우선순위는 낮다.
+- `docs/reports/`에서 오늘 전략에 직접 연결되는 최신 분석 파일은 확인되지 않았다.
 
 ---
 
 ## 8. Candidate Work Buckets
 
 - reliability
-  - why it exists: 공용 화면에서 “클릭하면 전체가 새로고침된다”는 체감은 사용자 신뢰를 직접 깎는다.
-  - scope: 메인/헤더/아카이브의 실제 렌더링 경로를 추적하고, 부분 갱신 가능 여부를 확인한다.
+  - why it exists: 공용 진입 경로와 기본 상태가 흔들리면 사용자가 바로 이탈한다.
+  - scope: 초기 언어, 전체 페이지 새로고침, 공용 화면 렌더링 경로 확인.
 
 - UX/UI polish
-  - why it exists: 메인 테이블, 버튼, header/footer, archive page가 모두 밋밋하고 거칠다.
-  - scope: 패딩, 출처 라벨, 버튼 모양, 기본 레이아웃 톤을 최소 범위에서 정리한다.
+  - why it exists: 메인 테이블, header/footer, 버튼 품질, AI summary detail이 모두 시각적으로 약하다.
+  - scope: 가장 좁은 템플릿 수정만 선택해서 적용.
 
 - localization/content tone
-  - why it exists: 최초 진입 언어와 AI 요약 문체가 한국어 서비스 기대치와 맞지 않는다.
-  - scope: 기본 언어 및 대표 문구의 한국어 우선 정렬 여부를 확인한다.
+  - why it exists: 한국어 우선 진입과 AI 문구의 자연스러움이 핵심 사용자 경험이다.
+  - scope: 기본 언어와 문구 품질을 최소 범위에서 정리.
 
 - query/ranking validation
-  - why it exists: query tuning은 아직 carry-over 상태다.
-  - scope: provider query와 결과 정합성을 별도 검증 대상으로 유지한다.
-
-- ops/data hygiene
-  - why it exists: 관리자 수집과 보관 정책은 공용 UX와 독립된 운영 과제다.
-  - scope: 수집 정지, retention, usage parity는 별도 단계에서 다룬다.
+  - why it exists: 이전 세션의 carry-over 이슈가 아직 남아 있다.
+  - scope: provider query 경로와 결과 정합성 확인.
 
 ---
 
@@ -138,30 +132,34 @@
 2. UX/UI polish
 3. localization/content tone
 4. query/ranking validation
-5. ops/data hygiene
 
 ---
 
 ## 10. Selection Logic
 
-- carry-over 중 query tuning은 여전히 중요하지만, 오늘 QA의 직접 불편은 공용 화면 체감 품질이다.
-- 그래서 오늘은 검색/랭킹 쪽을 다시 열지 않고, 사용자가 바로 보는 메인 경로의 신뢰성과 최소 UI 정리로 범위를 좁힌다.
-- AI tone, SEO, retention, admin follow-up은 모두 중요하지만 오늘 한 번에 묶으면 범위가 커져서 안전성이 떨어진다.
-- trade-off는 명확하다. 오늘은 넓게 고치지 않고, 대신 공용 화면의 핵심 경로를 좁고 안전하게 정리한다.
+- 오늘 QA는 공용 화면 품질에 집중되어 있어 reliability와 UX/UI polish가 먼저다.
+- carry-over인 query tuning은 중요하지만, 오늘은 직접 눈에 보이는 사용자 문제를 먼저 줄이는 쪽이 더 가치가 크다.
+- 한국어 톤 문제는 중요하지만, 오늘의 최소 안전 변경 범위에서는 로케일/진입 상태 정도로만 제한한다.
+- SEO, retention, admin usage는 각각 의미가 있지만 오늘 step에 섞으면 범위가 커진다.
 
 ---
 
 ## 11. Selected Work for Today
 
 - bucket name: reliability
-  - goal: 메인/헤더/아카이브 중 실제로 가장 많이 보이는 공용 경로에서 전체 새로고침 체감이 왜 생기는지 확인하고, 가능한 경우 부분 갱신 지점만 좁혀 본다.
-  - why selected: 사용자 체감이 가장 크고, 다른 UI 개선보다 우선해 원인 경로를 알아야 한다.
-  - why not deferred: 지금 미루면 오늘 QA의 핵심 불만을 계속 방치하게 된다.
+  - goal: 공용 진입 경로와 초기 상태를 확인해 전체 페이지 새로고침과 기본 언어 문제의 원인을 좁힌다.
+  - why selected: 사용자 체감도가 높고, 이후 UI 수정의 전제 조건이기 때문이다.
+  - why not deferred: 지금 확인하지 않으면 다른 UI 수정이 정확한 범위로 들어가지 않는다.
 
 - bucket name: UX/UI polish
-  - goal: 확인된 범위 안에서만 메인 테이블 패딩, 출처 표기, 버튼 시각 품질, 기본 한국어 진입 상태를 최소 변경으로 다듬는다.
-  - why selected: 신뢰성 경로와 같은 템플릿에 붙어 있을 가능성이 높아, 함께 확인하는 편이 효율적이다.
-  - why not deferred: 공용 화면의 첫인상은 오늘 바로 개선 가능한 낮은 위험의 영역이다.
+  - goal: 확인된 template에서 테이블 여백, 출처 표기, 버튼 품질 중 가장 좁은 한두 개만 수정한다.
+  - why selected: 오늘 QA의 가장 직접적인 불만이 시각 품질이기 때문이다.
+  - why not deferred: 공용 화면 인상 개선을 너무 늦추면 제품 신뢰감이 계속 떨어진다.
+
+- bucket name: localization/content tone
+  - goal: 첫 진입 한국어 기본값과 기계적인 문구 문제를 최소 범위에서 정리한다.
+  - why selected: 한국어 우선 사용자에게 바로 드러나는 문제이기 때문이다.
+  - why not deferred: UX 수정과 분리하면 다시 후순위로 밀릴 가능성이 높다.
 
 ---
 
@@ -170,7 +168,7 @@
 ### Step 1. Trace the public interaction path
 
 **Goal**
-- 메인 페이지, archive page, header/footer가 어떤 controller/template 경로로 렌더링되는지 확인하고, 전체 새로고침 체감의 실제 원인을 좁힌다.
+- 메인 페이지, header/footer, archive page, AI summary detail page가 어떤 controller/template 경로로 렌더링되는지 확인한다.
 
 **Target Area**
 - controller
@@ -183,12 +181,12 @@
 - `src/main/resources/templates/**`
 
 **Forbidden Scope**
-- query/ranking 로직 재설계
-- 전면 리팩터링
+- query/ranking 로직 변경
 - DB schema 변경
+- 광범위한 리팩토링
 
 **Validation**
-- 실제 호출 경로와 템플릿 연결을 문서화하고, 수정 대상이 한두 개 템플릿으로 제한되는지 확인한다.
+- 실제 요청 경로와 template 바인딩을 확인하고, 수정 대상이 정확히 어디인지 기록한다.
 
 **Expected Output**
 - analysis note
@@ -196,23 +194,23 @@
 ### Step 2. Apply the smallest safe UI and locale fix
 
 **Goal**
-- 확인된 템플릿 범위 안에서만 패딩, 출처 표기, 버튼 시각 품질, 기본 한국어 진입 상태를 최소 변경으로 정리한다.
+- 확인된 template 범위 안에서 기본 언어, 테이블 여백, 출처 표기 중 가장 안전한 항목만 최소 수정한다.
 
 **Target Area**
 - template
-- static assets if needed
+- static assets if truly required
 
 **Likely Files**
 - `src/main/resources/templates/**`
 - `src/main/resources/static/**`
 
 **Forbidden Scope**
-- archive / admin / AI summary 전체 재설계
-- 새로운 dependency 추가
-- 기능 확장
+- admin flow 전체 개편
+- AI summary 알고리즘 변경
+- 새 dependency 추가
 
 **Validation**
-- 화면이 깨지지 않는지 확인하고, 수정 전보다 가독성과 초기 진입 언어가 명확히 개선됐는지 점검한다.
+- 수정 후 공용 페이지가 깨지지 않는지 확인하고, 변경 범위가 템플릿 안으로 제한되었는지 점검한다.
 
 **Expected Output**
 - code
@@ -228,8 +226,6 @@
 4. reviewer
 5. dockeeper
 6. gitter
-
-이 순서를 유지한다. 오늘 범위는 좁지만, 실제 렌더링 경로를 먼저 확인해야 안전하게 수정할 수 있다.
 
 ---
 
@@ -252,51 +248,51 @@
 
 - Codex must:
   - trace first
-  - edit only after the path is understood
-  - validate before handing off
+  - keep the change surface minimal
+  - validate before handoff
 
 ---
 
 ## 15. Risks and Constraints
 
-- scope creep risk: UI polish can easily expand into broad redesign if not constrained.
+- scope creep risk: UI polish can expand into redesign if not constrained.
 - regression risk: partial update work can break navigation or state handling if done too widely.
-- language risk: default Korean requirement should not be mixed accidentally into the UI polish step.
-- documentation risk: if later code inspection contradicts this plan, the code wins and the mismatch must be reported.
+- language risk: Korean default behavior should not be mixed accidentally with unrelated styling changes.
+- documentation risk: if code inspection later contradicts this plan, the code wins and the mismatch must be reported.
 
 ---
 
 ## 16. Deferrals
 
 - Query noise tuning
-  - reason: still relevant but not the highest user-visible issue today.
+  - reason: still relevant, but not the best use of today's narrow step.
   - revisit: after the public interaction path is stabilized.
 
 - AI Summary Korean Tone Cleanup
-  - reason: belongs to content/locale work, not the smallest safe fix for today.
-  - revisit: after the homepage interaction path is verified.
+  - reason: important, but not safe to mix broadly with today’s first pass.
+  - revisit: when the summary page is selected as the main step.
 
 - SEO Foundation Minimal Pass
-  - reason: useful, but broader than today's narrow execution scope.
-  - revisit: in the next planning pass after UI reliability work.
+  - reason: useful, but broader than today's bounded UI work.
+  - revisit: in a dedicated planning pass.
 
 - Retention Policy Decision
-  - reason: needs product-level decision, not just a technical fix.
-  - revisit: when archive/retention work is selected as a dedicated step.
+  - reason: needs product-level judgment, not a narrow code fix.
+  - revisit: when archive/retention is selected as its own work item.
 
 - Admin Usage Follow-up
-  - reason: operational and data-parity work should not be mixed into this UI step.
-  - revisit: when the team is ready to attack admin reliability explicitly.
+  - reason: operational parity work should not be mixed into this UI step.
+  - revisit: when admin reliability is explicitly scheduled.
 
 ---
 
 ## 17. Definition of Done for Today
 
-- 선택한 좁은 범위의 단계가 완료된다.
-- unrelated files는 건드리지 않는다.
-- carry-over 항목을 명시적으로 평가한다.
-- 사용자가 바로 보는 불편이 줄거나, 최소한 원인이 명확히 추적된다.
-- 다음 세션이 추측 없이 이어질 수 있는 handoff를 만들 수 있다.
+- selected steps are completed safely
+- unrelated files are not modified
+- carry-over items are explicitly accounted for
+- the user-visible issues addressed today are clear
+- a clean handoff can be written without ambiguity
 
 ---
 

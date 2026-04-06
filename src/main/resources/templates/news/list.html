@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security"
+<html lang="ko" xmlns:th="http://www.thymeleaf.org" xmlns:sec="https://www.thymeleaf.org/extras/spring-security"
       th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content" th:with="featuredStoredSummary=${featuredStoredMarketSummary}, featuredAiSummary=${featuredAiMarketSummary}, featuredSummary=${featuredMarketSummary}, featuredForecast=${marketForecastSnapshot}">
     <style>
@@ -910,7 +910,8 @@
     <section class="mb-4" th:if="${featuredStoredSummary != null or featuredAiSummary != null or featuredSummary != null or featuredNews != null}"
              th:with="activeFeaturedSummary=${featuredStoredSummary != null ? featuredStoredSummary : (featuredAiSummary != null ? featuredAiSummary : featuredSummary)},
                       featuredSignal=${activeFeaturedSummary != null ? (activeFeaturedSummary.dominantSentiment != null and activeFeaturedSummary.dominantSentiment.name() == 'POSITIVE' ? 'bullish' : (activeFeaturedSummary.dominantSentiment != null and activeFeaturedSummary.dominantSentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed')) : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'POSITIVE' ? 'bullish' : (featuredNews.primarySentiment != null and featuredNews.primarySentiment.name() == 'NEGATIVE' ? 'bearish' : 'mixed'))},
-                      featuredDetailHref=${featuredStoredSummary != null and featuredStoredSummary.snapshotId != null and !#strings.isEmpty(featuredStoredSummary.snapshotId) ? '/market-summary/' + featuredStoredSummary.snapshotId : (activeFeaturedSummary != null ? '/market-summary/current' : '/news/' + featuredNews.id)}">
+                      featuredDetailHref=${featuredStoredSummary != null and featuredStoredSummary.snapshotId != null and !#strings.isEmpty(featuredStoredSummary.snapshotId) ? '/market-summary/' + featuredStoredSummary.snapshotId : (activeFeaturedSummary != null ? '/market-summary/current' : '/news/' + featuredNews.id)},
+                      featuredSourceLabel=${#strings.replace(featuredNews.displaySource ?: featuredNews.source ?: '-', 'NAVER-', '')}">
         <div class="card border-0 overflow-hidden news-surface featured-card"
              th:classappend="${featuredSignal == 'bullish' ? ' featured-card--bullish' : (featuredSignal == 'bearish' ? ' featured-card--bearish' : ' featured-card--mixed')}">
             <div class="card-body p-4">
@@ -929,7 +930,7 @@
                             </div>
                             <div class="featured-support">
                                 <span class="fw-medium"
-                                      th:text="${activeFeaturedSummary != null ? #messages.msg('news.featured.marketSummary.sources', activeFeaturedSummary.sourceCount) : (featuredNews.source ?: '-')}">Source</span>
+                                      th:text="${activeFeaturedSummary != null ? #messages.msg('news.featured.marketSummary.sources', activeFeaturedSummary.sourceCount) : featuredSourceLabel}">Source</span>
                                 <span class="featured-support-dot">&middot;</span>
                                 <span th:text="${activeFeaturedSummary != null ? #messages.msg('news.featured.marketSummary.window', activeFeaturedSummary.windowHours) : @uiDateTimeFormatter.formatKst(featuredNews.publishedAt)}">Published At</span>
                                 <th:block th:if="${activeFeaturedSummary != null}">
@@ -1099,7 +1100,8 @@
                             <div class="small fw-medium news-priority" th:if="${news.priorityScore > 0}" th:text="#{news.priority(${news.priorityScore})}">Priority 0</div>
                         </td>
                         <td class="news-col-meta news-col-source py-3 fw-medium news-secondary"
-                            th:text="${news.displaySource ?: news.source ?: '-'}"></td>
+                            th:with="sourceLabel=${#strings.replace(news.displaySource ?: news.source ?: '-', 'NAVER-', '')}"
+                            th:text="${sourceLabel}"></td>
                         <td class="news-col-meta text-nowrap py-3 news-secondary" th:text="${@uiDateTimeFormatter.formatKst(news.publishedAt)}"></td>
                         <td class="news-col-status py-3 news-status-cell" th:switch="${news.status != null ? news.status.name() : 'UNKNOWN'}">
                             <span th:case="'ANALYZED'" class="badge ui-pill rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle" th:text="#{status.analyzed}">Analyzed</span>

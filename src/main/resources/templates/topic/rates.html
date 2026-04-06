@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org"
+<html lang="ko" xmlns:th="http://www.thymeleaf.org"
       th:replace="~{fragments/layout :: layout(~{::content})}">
 <th:block th:fragment="content">
     <style>
@@ -192,7 +192,8 @@
                     <div class="topic-news-title mb-1"
                          th:text="${news.displayTitle != null and !#strings.isEmpty(news.displayTitle) ? news.displayTitle : (news.title ?: #messages.msg('news.untitled'))}">News title</div>
                     <div class="topic-news-meta">
-                        <span th:text="${news.source ?: '-'}">Source</span>
+                        <span th:with="sourceLabel=${#strings.replace(news.displaySource ?: news.source ?: '-', 'NAVER-', '')}"
+                              th:text="${sourceLabel}">Source</span>
                         <span class="mx-2">&middot;</span>
                         <span th:text="${@uiDateTimeFormatter.formatKst(news.publishedAt)}">Published</span>
                     </div>
