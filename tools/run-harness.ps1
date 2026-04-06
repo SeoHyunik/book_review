@@ -434,7 +434,8 @@ function Write-StageCompletion {
 
     $elapsed = (Get-Date) - $StartedAt
     Write-Host ""
-    Write-Host ("[OK] {0} finished in {1:mm\\:ss}" -f $StageName, $elapsed) -ForegroundColor Green
+    $elapsedText = $elapsed.ToString("mm\:ss")
+    Write-Host ("[OK] {0} finished in {1}" -f $StageName, $elapsedText) -ForegroundColor Green
 }
 
 function Write-FinalRunSummary {
@@ -455,7 +456,7 @@ function Write-FinalRunSummary {
     Write-Host "==========================================" -ForegroundColor $summaryColor
     Write-Host ("Mode      : {0}" -f $ModeName) -ForegroundColor $summaryColor
     Write-Host ("Date      : {0}" -f $DateString) -ForegroundColor $summaryColor
-    Write-Host ("Elapsed   : {0:hh\\:mm\\:ss}" -f $elapsed) -ForegroundColor $summaryColor
+    Write-Host ("Elapsed   : {0}" -f $elapsedText) -ForegroundColor $summaryColor
     Write-Host ("Stages     : {0}" -f $executed) -ForegroundColor $summaryColor
 
     if ($ModeName -eq 'workday' -or $ModeName -eq 'planner' -or $ModeName -eq 'all') {
