@@ -23,6 +23,7 @@ $ErrorActionPreference = "Stop"
 
 $RunStartedAt = Get-Date
 $ExecutedStages = New-Object System.Collections.Generic.List[string]
+$StepOutcomes = New-Object System.Collections.Generic.List[object]
 
 # ==========================================
 # 1. Core paths
@@ -48,12 +49,12 @@ $TodayStrategy   = Join-Path $TodayDir "TODAY_STRATEGY.md"
 $DailyHandoff    = Join-Path $TodayDir "DAILY_HANDOFF.md"
 
 $ScriptPath      = $MyInvocation.MyCommand.Path
+$DailyOpsDocNames = @('QA_INBOX.md', 'QA_STRUCTURED.md', 'TODAY_STRATEGY.md', 'DAILY_HANDOFF.md')
+$ReadableDocsToCheckBeforeHandoff = @($QaInbox, $QaStructured, $TodayStrategy)
 
 # ==========================================
 # 2. Codex CLI args
 # ==========================================
-# Non-interactive execution:
-# codex exec --dangerously-bypass-approvals-and-sandbox -C "<workdir>"
 $CodexBaseArgs = 'exec --dangerously-bypass-approvals-and-sandbox -C "{WORKDIR}"'
 
 # ==========================================
@@ -147,7 +148,17 @@ function Get-RelativePath {
     $relativeUri = $baseUri.MakeRelativeUri($targetUri)
     $relativePath = [System.Uri]::UnescapeDataString($relativeUri.ToString())
 
-    return ($relativePath -replace '/', '\')
+    return ($relativePath -replace '/', '\\')
+}
+
+function Normalize-RelativePath {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $null
+    }
+
+    return (($Path -replace '/', '\\').Trim() -replace '^\.\\', '').ToLowerInvariant()
 }
 
 function Get-ChangedFileList {
@@ -194,6 +205,101 @@ function Get-AllowedChangedFiles {
     return $allowed
 }
 
+function Get-NewChangedFiles {
+    param(
+        [string[]]$Before = @(),
+        [string[]]$After = @()
+    )
+
+    $beforeSet = @{}
+    foreach ($item in $Before) {
+        $normalized = Normalize-RelativePath -Path $item
+        if ($normalized) {
+            $beforeSet[$normalized] = $true
+        }
+    }
+
+    $result = New-Object System.Collections.Generic.List[string]
+    foreach ($item in $After) {
+        $normalized = Normalize-RelativePath -Path $item
+        if (-not $normalized) {
+            continue
+        }
+        if (-not $beforeSet.ContainsKey($normalized)) {
+            $result.Add($item) | Out-Null
+        }
+    }
+
+    return @($result)
+}
+
+function Test-IsOpsOrPromptFile {
+    param([string]$RelativePath)
+
+    $normalized = Normalize-RelativePath -Path $RelativePath
+    if (-not $normalized) {
+        return $false
+    }
+
+    return ($normalized -match '^docs\\ops\\' -or $normalized -match '^\.codex\\prompts\\')
+}
+
+function Test-IsDailyOpsDoc {
+    param([string]$RelativePath)
+
+    $normalized = Normalize-RelativePath -Path $RelativePath
+    if (-not $normalized) {
+        return $false
+    }
+
+    if ($normalized -notmatch '^docs\\ops\\\d{4}-\d{2}-\d{2}\\') {
+        return $false
+    }
+
+    foreach ($name in $DailyOpsDocNames) {
+        $normalizedName = $name.ToLowerInvariant()
+        if ($normalized.EndsWith("\\$normalizedName")) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
+function Test-IsReportsFile {
+    param([string]$RelativePath)
+
+    $normalized = Normalize-RelativePath -Path $RelativePath
+    if (-not $normalized) {
+        return $false
+    }
+
+    return ($normalized -match '^docs\\reports\\')
+}
+
+function Get-CodeLikeChangedFiles {
+    param(
+        [string[]]$ChangedFiles = @(),
+        [string[]]$AdditionalAllowedPaths = @()
+    )
+
+    $normalizedAllowed = @($AdditionalAllowedPaths | Where-Object { $_ } | ForEach-Object { Normalize-RelativePath -Path $_ })
+
+    return @($ChangedFiles | Where-Object {
+        $normalized = Normalize-RelativePath -Path $_
+        if (-not $normalized) {
+            return $false
+        }
+        if ($normalized -in $normalizedAllowed) {
+            return $false
+        }
+        if (Test-IsOpsOrPromptFile -RelativePath $_) {
+            return $false
+        }
+        return $true
+    })
+}
+
 function Assert-StepExecutionReady {
     param(
         [string]$TodayStrategyPath,
@@ -215,15 +321,7 @@ function Assert-StepExecutionReady {
         return
     }
 
-    $normalizedAllowed = @($AdditionalAllowedPaths | Where-Object { $_ } | ForEach-Object {
-        ($_ -replace '/', '\').ToLowerInvariant()
-    })
-
-    $unexpected = @($changedFiles | Where-Object {
-        $normalizedCurrent = ($_ -replace '/', '\').ToLowerInvariant()
-        (($_ -notmatch '^docs[/\\]ops[/\\]') -and ($_ -notmatch '^\.codex[/\\]prompts[/\\]')) -and
-                ($normalizedCurrent -notin $normalizedAllowed)
-    })
+    $unexpected = @(Get-CodeLikeChangedFiles -ChangedFiles $changedFiles -AdditionalAllowedPaths $AdditionalAllowedPaths)
 
     if ($unexpected.Count -gt 0) {
         $joined = ($unexpected -join ', ')
@@ -259,14 +357,93 @@ function Get-PlannedStepNumbers {
     )
 }
 
-function Test-StepExists {
+function Get-StepSectionContent {
     param(
         [string]$TodayStrategyPath,
-        [int]$TargetStepNumber
+        [int]$SelectedStepNumber
     )
 
-    $stepNumbers = Get-PlannedStepNumbers -TodayStrategyPath $TodayStrategyPath
-    return ($stepNumbers -contains $TargetStepNumber)
+    if (-not (Test-Path $TodayStrategyPath)) {
+        return $null
+    }
+
+    $content = Get-Content $TodayStrategyPath -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($content)) {
+        return $null
+    }
+
+    $pattern = '(?ims)^\s{0,3}(?:#{1,6}\s*)?(?:step|phase)\s*[-:]?\s*' + [regex]::Escape($SelectedStepNumber.ToString()) + '\b.*?(?=^\s{0,3}(?:#{1,6}\s*)?(?:step|phase)\s*[-:]?\s*\d+\b|\z)'
+    $match = [regex]::Match($content, $pattern)
+
+    if ($match.Success) {
+        return $match.Value
+    }
+
+    return $null
+}
+
+function Test-StepAllowsAnalysisArtifact {
+    param(
+        [string]$TodayStrategyPath,
+        [int]$SelectedStepNumber
+    )
+
+    $section = Get-StepSectionContent -TodayStrategyPath $TodayStrategyPath -SelectedStepNumber $SelectedStepNumber
+    if ([string]::IsNullOrWhiteSpace($section)) {
+        return $false
+    }
+
+    $lower = $section.ToLowerInvariant()
+    return ($lower -match 'expected output' -and ($lower -match 'analysis note' -or $lower -match 'report'))
+}
+
+function Get-ReadableFileText {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        throw "Required file not found: $Path"
+    }
+
+    $content = Get-Content $Path -Raw -Encoding UTF8
+    if ($null -eq $content) {
+        throw "File could not be read as UTF-8 text: $Path"
+    }
+
+    return $content
+}
+
+function Test-TextLooksCorrupted {
+    param([string]$Content)
+
+    if ([string]::IsNullOrWhiteSpace($Content)) {
+        return $false
+    }
+
+    return (
+    $Content.Contains([char]0xFFFD) -or
+            $Content -match 'Ã.|Â.|ì.|ë.|ê.|ìž|ìš|ì•|ì„|í•|í—' -or
+            $Content -match '\?\?\?'
+    )
+}
+
+function Assert-ReadableDailyOpsFiles {
+    param([string[]]$Paths)
+
+    foreach ($path in $Paths) {
+        $content = Get-ReadableFileText -Path $path
+        if (Test-TextLooksCorrupted -Content $content) {
+            throw "Readable UTF-8 validation failed for daily ops document: $path"
+        }
+    }
+}
+
+function Assert-PreHandoffReadiness {
+    Assert-ReadableDailyOpsFiles -Paths $ReadableDocsToCheckBeforeHandoff
+}
+
+function Assert-PostHandoffReadiness {
+    $required = @($ReadableDocsToCheckBeforeHandoff + $DailyHandoff)
+    Assert-ReadableDailyOpsFiles -Paths $required
 }
 
 function Invoke-CodexFromPrompt {
@@ -323,11 +500,12 @@ Critical rules:
 
 Execution flow:
 1. Read TODAY_STRATEGY.md carefully
-2. Extract the exact goal / target area / likely files / forbidden scope / validation for Step $SelectedStepNumber
+2. Extract the exact goal / target area / likely files / forbidden scope / validation / expected output for Step $SelectedStepNumber
 3. Analyze the code paths needed for only that step
-4. Implement only the smallest safe change for that step
-5. Run relevant validation for that step if available
-6. Report:
+4. If the step expects implementation, implement only the smallest safe change for that step
+5. If the step expects an analysis note or report instead of implementation, do NOT no-op; create exactly one analysis artifact under docs/reports/ that documents the traced path and findings for Step $SelectedStepNumber
+6. Run relevant validation for that step if available
+7. Report:
    - what changed
    - why it changed
    - what was not changed
@@ -345,11 +523,64 @@ function Get-StepPromptFilePath {
     return (Join-Path $PromptDir "$DateString-step$SelectedStepNumber.prompt.txt")
 }
 
+function Add-StepOutcome {
+    param(
+        [int]$StepNumber,
+        [bool]$RequiresAnalysisArtifact,
+        [string[]]$AllNewFiles,
+        [string[]]$CodeLikeFiles,
+        [string[]]$ArtifactFiles
+    )
+
+    $StepOutcomes.Add([pscustomobject]@{
+        StepNumber = $StepNumber
+        RequiresAnalysisArtifact = $RequiresAnalysisArtifact
+        AllNewFiles = @($AllNewFiles)
+        CodeLikeFiles = @($CodeLikeFiles)
+        ArtifactFiles = @($ArtifactFiles)
+    }) | Out-Null
+}
+
+function Assert-StepProducedExpectedChange {
+    param(
+        [int]$SelectedStepNumber,
+        [string[]]$NewChangedFiles,
+        [bool]$AllowsAnalysisArtifact,
+        [string[]]$AdditionalAllowedPaths = @()
+    )
+
+    $codeLikeFiles = @(Get-CodeLikeChangedFiles -ChangedFiles $NewChangedFiles -AdditionalAllowedPaths $AdditionalAllowedPaths)
+    $artifactFiles = @($NewChangedFiles | Where-Object {
+        Test-IsReportsFile -RelativePath $_
+    })
+
+    if ($AllowsAnalysisArtifact) {
+        if ($codeLikeFiles.Count -eq 0 -and $artifactFiles.Count -eq 0) {
+            throw "No implementation files or analysis artifact were created after step-$SelectedStepNumber. The step may have been skipped."
+        }
+    }
+    else {
+        if ($codeLikeFiles.Count -eq 0) {
+            throw "No non-ops file changes detected after step-$SelectedStepNumber. Implementation may have been skipped."
+        }
+    }
+
+    Add-StepOutcome `
+        -StepNumber $SelectedStepNumber `
+        -RequiresAnalysisArtifact $AllowsAnalysisArtifact `
+        -AllNewFiles $NewChangedFiles `
+        -CodeLikeFiles $codeLikeFiles `
+        -ArtifactFiles $artifactFiles
+}
+
 function Invoke-StepMode {
     param([int]$SelectedStepNumber)
 
     $stepPromptFile = Get-StepPromptFilePath -SelectedStepNumber $SelectedStepNumber
     $stepPromptContent = New-StepPromptContent -SelectedStepNumber $SelectedStepNumber
+    $allowedChangedPaths = @(Get-AllowedChangedFiles -WorkDir $RootDir -CurrentScriptPath $ScriptPath)
+    $beforeChangedFiles = @(Get-ChangedFileList -WorkDir $RootDir)
+    $allowsAnalysisArtifact = Test-StepAllowsAnalysisArtifact -TodayStrategyPath $TodayStrategy -SelectedStepNumber $SelectedStepNumber
 
     Write-PromptFile -FilePath $stepPromptFile -Content $stepPromptContent
 
@@ -357,9 +588,22 @@ function Invoke-StepMode {
         -TodayStrategyPath $TodayStrategy `
         -WorkDir $RootDir `
         -SkipGitCheck:$SkipGitStatusCheck `
-        -AdditionalAllowedPaths (Get-AllowedChangedFiles -WorkDir $RootDir -CurrentScriptPath $ScriptPath)
+        -AdditionalAllowedPaths $allowedChangedPaths
 
     Invoke-CodexFromPrompt -PromptFile $stepPromptFile -WorkDir $RootDir -StageName ("step-{0}" -f $SelectedStepNumber)
+
+    if ($DryRun) {
+        return
+    }
+
+    $afterChangedFiles = @(Get-ChangedFileList -WorkDir $RootDir)
+    $newChangedFiles = @(Get-NewChangedFiles -Before $beforeChangedFiles -After $afterChangedFiles)
+
+    Assert-StepProducedExpectedChange `
+        -SelectedStepNumber $SelectedStepNumber `
+        -NewChangedFiles $newChangedFiles `
+        -AllowsAnalysisArtifact:$allowsAnalysisArtifact `
+        -AdditionalAllowedPaths $allowedChangedPaths
 }
 
 function Wait-ForQaCheckpoint {
@@ -401,10 +645,17 @@ function Invoke-WorkdayMode {
         Wait-ForQaCheckpoint -CompletedStepNumber $plannedStep
     }
 
+    if (-not $DryRun) {
+        Assert-PreHandoffReadiness
+    }
+
     Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir -StageName "curator"
     Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir -StageName "handoff"
-}
 
+    if (-not $DryRun) {
+        Assert-PostHandoffReadiness
+    }
+}
 
 function Add-ExecutedStage {
     param([string]$StageName)
@@ -438,6 +689,19 @@ function Write-StageCompletion {
     Write-Host ("[OK] {0} finished in {1}" -f $StageName, $elapsedText) -ForegroundColor Green
 }
 
+function Write-StepOutcomeSummary {
+    if ($StepOutcomes.Count -eq 0) {
+        return
+    }
+
+    Write-Host ("Step Results:") -ForegroundColor DarkCyan
+    foreach ($outcome in $StepOutcomes) {
+        $kind = if ($outcome.RequiresAnalysisArtifact) { "analysis-or-impl" } else { "implementation" }
+        $files = if ($outcome.AllNewFiles.Count -gt 0) { $outcome.AllNewFiles -join ', ' } else { '(none)' }
+        Write-Host ("  - step-{0} [{1}] => {2}" -f $outcome.StepNumber, $kind, $files) -ForegroundColor DarkCyan
+    }
+}
+
 function Write-FinalRunSummary {
     param(
         [string]$ModeName,
@@ -457,18 +721,22 @@ function Write-FinalRunSummary {
     Write-Host ("Mode      : {0}" -f $ModeName) -ForegroundColor $summaryColor
     Write-Host ("Date      : {0}" -f $DateString) -ForegroundColor $summaryColor
     Write-Host ("Elapsed   : {0}" -f $elapsedText) -ForegroundColor $summaryColor
-    Write-Host ("Stages     : {0}" -f $executed) -ForegroundColor $summaryColor
+    Write-Host ("Stages    : {0}" -f $executed) -ForegroundColor $summaryColor
 
     if ($ModeName -eq 'workday' -or $ModeName -eq 'planner' -or $ModeName -eq 'all') {
-        Write-Host ("Strategy   : {0}" -f $TodayStrategy) -ForegroundColor $summaryColor
+        Write-Host ("Strategy  : {0}" -f $TodayStrategy) -ForegroundColor $summaryColor
     }
 
     if ($ModeName -eq 'workday' -or $ModeName -eq 'handoff' -or $ModeName -eq 'all') {
-        Write-Host ("Handoff    : {0}" -f $DailyHandoff) -ForegroundColor $summaryColor
+        Write-Host ("Handoff   : {0}" -f $DailyHandoff) -ForegroundColor $summaryColor
+    }
+
+    if ($StepOutcomes.Count -gt 0) {
+        Write-StepOutcomeSummary
     }
 
     if (-not [string]::IsNullOrWhiteSpace($ErrorMessage)) {
-        Write-Host ("Error      : {0}" -f $ErrorMessage) -ForegroundColor Red
+        Write-Host ("Error     : {0}" -f $ErrorMessage) -ForegroundColor Red
     }
 
     Write-Host "==========================================" -ForegroundColor $summaryColor
@@ -499,6 +767,7 @@ foreach ($file in $requiredFiles) {
 New-DirectoryIfMissing -Path $OpsDir
 New-DirectoryIfMissing -Path $TodayDir
 New-DirectoryIfMissing -Path $PromptDir
+New-DirectoryIfMissing -Path $ReportsDir
 
 New-TextFileIfMissing -Path $FailuresFile -DefaultContent "# HARNESS_FAILURES`n"
 
@@ -609,6 +878,7 @@ Ops rules:
 - MUST write only to: $DailyHandoff
 - MUST NOT overwrite the format file
 - If the file already exists, update it carefully instead of creating a duplicate file
+- MUST NOT claim a step was completed unless a real implementation file or analysis artifact was changed during this run
 
 Read if available:
 - format: $HandoffFmt
@@ -623,7 +893,8 @@ Tasks:
 2. Create or update exactly: $DailyHandoff
 3. Distinguish completed / partial / deferred / risks / next steps
 4. Do not invent finished work
-5. Do not modify any other file
+5. If this run produced no implementation change for a step, say so explicitly
+6. Do not modify any other file
 "@
 
 # ==========================================
@@ -657,13 +928,25 @@ try {
             Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir -StageName "curator"
         }
         "handoff" {
+            if (-not $DryRun) {
+                Assert-PreHandoffReadiness
+            }
             Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir -StageName "handoff"
+            if (-not $DryRun) {
+                Assert-PostHandoffReadiness
+            }
         }
         "all" {
             Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir -StageName "planner"
             Invoke-StepMode -SelectedStepNumber $StepNumber
+            if (-not $DryRun) {
+                Assert-PreHandoffReadiness
+            }
             Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir -StageName "curator"
             Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir -StageName "handoff"
+            if (-not $DryRun) {
+                Assert-PostHandoffReadiness
+            }
         }
         "workday" {
             Invoke-WorkdayMode
@@ -678,4 +961,3 @@ catch {
 finally {
     Write-FinalRunSummary -ModeName $Mode -Status $runStatus -ErrorMessage $errorMessage
 }
-
