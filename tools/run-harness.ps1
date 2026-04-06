@@ -242,6 +242,10 @@ function Test-IsAllowedDirtyPath {
         return $true
     }
 
+    if (Test-StartsWithNormalizedPath -Path $RepoRelativePath -Prefix 'docs\reports\') {
+        return $true
+    }
+
     if (Test-StartsWithNormalizedPath -Path $RepoRelativePath -Prefix '.codex\prompts\') {
         return $true
     }
