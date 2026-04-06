@@ -21,6 +21,9 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 $ErrorActionPreference = "Stop"
 
+$RunStartedAt = Get-Date
+$ExecutedStages = New-Object System.Collections.Generic.List[string]
+
 # ==========================================
 # 1. Core paths
 # ==========================================
@@ -269,25 +272,27 @@ function Test-StepExists {
 function Invoke-CodexFromPrompt {
     param(
         [string]$PromptFile,
-        [string]$WorkDir
+        [string]$WorkDir,
+        [string]$StageName = "codex"
     )
 
     $codexArgs = $CodexBaseArgs.Replace('{WORKDIR}', $WorkDir)
     $cmd = "Get-Content `"$PromptFile`" -Raw | codex $codexArgs"
 
-    Write-Host ""
-    Write-Host "==========================================" -ForegroundColor Cyan
-    Write-Host "Codex Command" -ForegroundColor Cyan
-    Write-Host "==========================================" -ForegroundColor Cyan
+    Write-StageBanner -Title ("Running {0}" -f $StageName) -Color "Cyan"
     Write-Host $cmd
     Write-Host ""
 
     if ($DryRun) {
         Write-Host "[DryRun] Execution skipped." -ForegroundColor Yellow
+        Add-ExecutedStage -StageName ("{0} (dryrun)" -f $StageName)
         return
     }
 
+    $stageStartedAt = Get-Date
     Invoke-Expression $cmd
+    Add-ExecutedStage -StageName $StageName
+    Write-StageCompletion -StageName $StageName -StartedAt $stageStartedAt
 }
 
 function New-StepPromptContent {
@@ -354,7 +359,7 @@ function Invoke-StepMode {
         -SkipGitCheck:$SkipGitStatusCheck `
         -AdditionalAllowedPaths (Get-AllowedChangedFiles -WorkDir $RootDir -CurrentScriptPath $ScriptPath)
 
-    Invoke-CodexFromPrompt -PromptFile $stepPromptFile -WorkDir $RootDir
+    Invoke-CodexFromPrompt -PromptFile $stepPromptFile -WorkDir $RootDir -StageName ("step-{0}" -f $SelectedStepNumber)
 }
 
 function Wait-ForQaCheckpoint {
@@ -379,7 +384,7 @@ function Wait-ForQaCheckpoint {
 }
 
 function Invoke-WorkdayMode {
-    Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
+    Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir -StageName "planner"
 
     if (-not (Test-Path $TodayStrategy)) {
         throw "TODAY_STRATEGY.md not found after planner run: $TodayStrategy"
@@ -396,8 +401,76 @@ function Invoke-WorkdayMode {
         Wait-ForQaCheckpoint -CompletedStepNumber $plannedStep
     }
 
-    Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
-    Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
+    Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir -StageName "curator"
+    Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir -StageName "handoff"
+}
+
+
+function Add-ExecutedStage {
+    param([string]$StageName)
+
+    if (-not [string]::IsNullOrWhiteSpace($StageName)) {
+        $ExecutedStages.Add($StageName) | Out-Null
+    }
+}
+
+function Write-StageBanner {
+    param(
+        [string]$Title,
+        [string]$Color = "Cyan"
+    )
+
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor $Color
+    Write-Host $Title -ForegroundColor $Color
+    Write-Host "==========================================" -ForegroundColor $Color
+}
+
+function Write-StageCompletion {
+    param(
+        [string]$StageName,
+        [DateTime]$StartedAt
+    )
+
+    $elapsed = (Get-Date) - $StartedAt
+    Write-Host ""
+    Write-Host ("[OK] {0} finished in {1:mm\\:ss}" -f $StageName, $elapsed) -ForegroundColor Green
+}
+
+function Write-FinalRunSummary {
+    param(
+        [string]$ModeName,
+        [string]$Status,
+        [string]$ErrorMessage = $null
+    )
+
+    $elapsed = (Get-Date) - $RunStartedAt
+    $executed = if ($ExecutedStages.Count -gt 0) { $ExecutedStages -join ' -> ' } else { '(none)' }
+    $summaryColor = if ($Status -eq 'SUCCESS') { 'Green' } else { 'Red' }
+
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor $summaryColor
+    Write-Host ("HARNESS RUN {0}" -f $Status) -ForegroundColor $summaryColor
+    Write-Host "==========================================" -ForegroundColor $summaryColor
+    Write-Host ("Mode      : {0}" -f $ModeName) -ForegroundColor $summaryColor
+    Write-Host ("Date      : {0}" -f $DateString) -ForegroundColor $summaryColor
+    Write-Host ("Elapsed   : {0:hh\\:mm\\:ss}" -f $elapsed) -ForegroundColor $summaryColor
+    Write-Host ("Stages     : {0}" -f $executed) -ForegroundColor $summaryColor
+
+    if ($ModeName -eq 'workday' -or $ModeName -eq 'planner' -or $ModeName -eq 'all') {
+        Write-Host ("Strategy   : {0}" -f $TodayStrategy) -ForegroundColor $summaryColor
+    }
+
+    if ($ModeName -eq 'workday' -or $ModeName -eq 'handoff' -or $ModeName -eq 'all') {
+        Write-Host ("Handoff    : {0}" -f $DailyHandoff) -ForegroundColor $summaryColor
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ErrorMessage)) {
+        Write-Host ("Error      : {0}" -f $ErrorMessage) -ForegroundColor Red
+    }
+
+    Write-Host "==========================================" -ForegroundColor $summaryColor
+    Write-Host ""
 }
 
 # ==========================================
@@ -567,26 +640,40 @@ Write-PromptFile -FilePath $HandoffPromptFile -Content $HandoffPrompt
 # ==========================================
 # 8. Execute by mode
 # ==========================================
-switch ($Mode) {
-    "planner" {
-        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
-    }
-    "step" {
-        Invoke-StepMode -SelectedStepNumber $StepNumber
-    }
-    "curator" {
-        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
-    }
-    "handoff" {
-        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
-    }
-    "all" {
-        Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir
-        Invoke-StepMode -SelectedStepNumber $StepNumber
-        Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir
-        Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir
-    }
-    "workday" {
-        Invoke-WorkdayMode
+$runStatus = "SUCCESS"
+$errorMessage = $null
+
+try {
+    switch ($Mode) {
+        "planner" {
+            Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir -StageName "planner"
+        }
+        "step" {
+            Invoke-StepMode -SelectedStepNumber $StepNumber
+        }
+        "curator" {
+            Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir -StageName "curator"
+        }
+        "handoff" {
+            Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir -StageName "handoff"
+        }
+        "all" {
+            Invoke-CodexFromPrompt -PromptFile $PlannerPromptFile -WorkDir $RootDir -StageName "planner"
+            Invoke-StepMode -SelectedStepNumber $StepNumber
+            Invoke-CodexFromPrompt -PromptFile $CuratorPromptFile -WorkDir $RootDir -StageName "curator"
+            Invoke-CodexFromPrompt -PromptFile $HandoffPromptFile -WorkDir $RootDir -StageName "handoff"
+        }
+        "workday" {
+            Invoke-WorkdayMode
+        }
     }
 }
+catch {
+    $runStatus = "FAILED"
+    $errorMessage = $_.Exception.Message
+    throw
+}
+finally {
+    Write-FinalRunSummary -ModeName $Mode -Status $runStatus -ErrorMessage $errorMessage
+}
+
