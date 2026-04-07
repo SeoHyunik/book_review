@@ -48,6 +48,7 @@ $QaInbox         = Join-Path $TodayDir "QA_INBOX.md"
 $QaStructured    = Join-Path $TodayDir "QA_STRUCTURED.md"
 $TodayStrategy   = Join-Path $TodayDir "TODAY_STRATEGY.md"
 $DailyHandoff    = Join-Path $TodayDir "DAILY_HANDOFF.md"
+$WorkdayStateFile = Join-Path $TodayDir ".workday-state.json"
 
 $ScriptPath      = $MyInvocation.MyCommand.Path
 $GitterToml      = Join-Path $AgentsDir "gitter.toml"
@@ -96,6 +97,63 @@ function Write-PromptFile {
     $parent = Split-Path $FilePath -Parent
     New-DirectoryIfMissing -Path $parent
     [System.IO.File]::WriteAllText($FilePath, $Content, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Get-WorkdayState {
+    if (-not (Test-Path $WorkdayStateFile)) {
+        return @{
+            date = $DateString
+            qa_structurer_done = $false
+            planner_done = $false
+            completed_steps = @()
+            gitter_steps = @()
+            curator_done = $false
+            handoff_done = $false
+        }
+    }
+
+    try {
+        $state = Get-Content $WorkdayStateFile -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable
+
+        if (-not $state.ContainsKey('date')) { $state.date = $DateString }
+        if (-not $state.ContainsKey('qa_structurer_done')) { $state.qa_structurer_done = $false }
+        if (-not $state.ContainsKey('planner_done')) { $state.planner_done = $false }
+        if (-not $state.ContainsKey('completed_steps')) { $state.completed_steps = @() }
+        if (-not $state.ContainsKey('gitter_steps')) { $state.gitter_steps = @() }
+        if (-not $state.ContainsKey('curator_done')) { $state.curator_done = $false }
+        if (-not $state.ContainsKey('handoff_done')) { $state.handoff_done = $false }
+
+        $state.completed_steps = @($state.completed_steps | ForEach-Object { [int]$_ } | Sort-Object -Unique)
+        $state.gitter_steps = @($state.gitter_steps | ForEach-Object { [int]$_ } | Sort-Object -Unique)
+
+        return $state
+    }
+    catch {
+        return @{
+            date = $DateString
+            qa_structurer_done = $false
+            planner_done = $false
+            completed_steps = @()
+            gitter_steps = @()
+            curator_done = $false
+            handoff_done = $false
+        }
+    }
+}
+
+function Save-WorkdayState {
+    param([hashtable]$State)
+
+    if ($DryRun) {
+        return
+    }
+
+    $State.date = $DateString
+    $State.completed_steps = @($State.completed_steps | ForEach-Object { [int]$_ } | Sort-Object -Unique)
+    $State.gitter_steps = @($State.gitter_steps | ForEach-Object { [int]$_ } | Sort-Object -Unique)
+
+    $json = $State | ConvertTo-Json -Depth 5
+    [System.IO.File]::WriteAllText($WorkdayStateFile, $json, [System.Text.UTF8Encoding]::new($false))
 }
 
 function Get-LatestPreviousHandoffFile {
@@ -880,6 +938,12 @@ function Invoke-QaStructurerMode {
 
     Write-PromptFile -FilePath $promptFile -Content $promptContent
     Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName 'qa-structurer'
+
+    if (-not $DryRun) {
+        $state = Get-WorkdayState
+        $state.qa_structurer_done = $true
+        Save-WorkdayState -State $state
+    }
 }
 
 function Invoke-PlannerMode {
@@ -893,6 +957,9 @@ function Invoke-PlannerMode {
 
     if (-not $DryRun) {
         Assert-DailyOpsContextConsistency -IncludeTodayStrategy
+        $state = Get-WorkdayState
+        $state.planner_done = $true
+        Save-WorkdayState -State $state
     }
 }
 
@@ -904,6 +971,14 @@ function Invoke-GitterMode {
 
     Write-PromptFile -FilePath $promptFile -Content $promptContent
     Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName ("gitter-step-{0}" -f $SelectedStepNumber)
+
+    if (-not $DryRun) {
+        $state = Get-WorkdayState
+        if ($state.gitter_steps -notcontains $SelectedStepNumber) {
+            $state.gitter_steps += $SelectedStepNumber
+            Save-WorkdayState -State $state
+        }
+    }
 }
 
 function Invoke-CuratorMode {
@@ -912,6 +987,12 @@ function Invoke-CuratorMode {
 
     Write-PromptFile -FilePath $promptFile -Content $promptContent
     Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName 'curator'
+
+    if (-not $DryRun) {
+        $state = Get-WorkdayState
+        $state.curator_done = $true
+        Save-WorkdayState -State $state
+    }
 }
 
 function Invoke-HandoffMode {
@@ -925,6 +1006,9 @@ function Invoke-HandoffMode {
 
     if (-not $DryRun) {
         Assert-PostHandoffReadiness
+        $state = Get-WorkdayState
+        $state.handoff_done = $true
+        Save-WorkdayState -State $state
     }
 }
 
@@ -1046,6 +1130,14 @@ function Invoke-StepMode {
         -SelectedStepNumber $SelectedStepNumber `
         -BeforeChangedFiles $beforeChangedFiles `
         -AfterChangedFiles $afterChangedFiles
+
+    if (-not $DryRun) {
+        $state = Get-WorkdayState
+        if ($state.completed_steps -notcontains $SelectedStepNumber) {
+            $state.completed_steps += $SelectedStepNumber
+            Save-WorkdayState -State $state
+        }
+    }
 }
 
 function Wait-ForQaCheckpoint {
@@ -1129,8 +1221,25 @@ $tomorrow
 }
 
 function Invoke-WorkdayMode {
-    Invoke-QaStructurerMode
-    Invoke-PlannerMode
+    $state = Get-WorkdayState
+
+    if ($state.qa_structurer_done) {
+        Write-Host "[SKIP] qa-structurer already done" -ForegroundColor Yellow
+        Add-ExecutedStage -StageName 'qa-structurer (skipped)'
+    }
+    else {
+        Invoke-QaStructurerMode
+        $state = Get-WorkdayState
+    }
+
+    if ($state.planner_done) {
+        Write-Host "[SKIP] planner already done" -ForegroundColor Yellow
+        Add-ExecutedStage -StageName 'planner (skipped)'
+    }
+    else {
+        Invoke-PlannerMode
+        $state = Get-WorkdayState
+    }
 
     if (-not (Test-Path $TodayStrategy)) {
         throw "TODAY_STRATEGY.md not found after planner run: $TodayStrategy"
@@ -1143,17 +1252,54 @@ function Invoke-WorkdayMode {
     }
 
     foreach ($plannedStep in $plannedSteps) {
-        Invoke-StepMode -SelectedStepNumber $plannedStep
-        Invoke-GitterMode -SelectedStepNumber $plannedStep
+        $state = Get-WorkdayState
+
+        if ($state.completed_steps -contains $plannedStep) {
+            Write-Host ("[SKIP] step-{0} already done" -f $plannedStep) -ForegroundColor Yellow
+            Add-ExecutedStage -StageName ("step-{0} (skipped)" -f $plannedStep)
+        }
+        else {
+            Invoke-StepMode -SelectedStepNumber $plannedStep
+        }
+
+        $state = Get-WorkdayState
+
+        if ($state.gitter_steps -contains $plannedStep) {
+            Write-Host ("[SKIP] gitter-step-{0} already done" -f $plannedStep) -ForegroundColor Yellow
+            Add-ExecutedStage -StageName ("gitter-step-{0} (skipped)" -f $plannedStep)
+        }
+        else {
+            Invoke-GitterMode -SelectedStepNumber $plannedStep
+        }
+
         Wait-ForQaCheckpoint -CompletedStepNumber $plannedStep
     }
 
-    Invoke-CuratorMode
-    Invoke-HandoffMode
+    $state = Get-WorkdayState
+
+    if ($state.curator_done) {
+        Write-Host "[SKIP] curator already done" -ForegroundColor Yellow
+        Add-ExecutedStage -StageName 'curator (skipped)'
+    }
+    else {
+        Invoke-CuratorMode
+    }
+
+    $state = Get-WorkdayState
+
+    if ($state.handoff_done) {
+        Write-Host "[SKIP] handoff already done" -ForegroundColor Yellow
+        Add-ExecutedStage -StageName 'handoff (skipped)'
+    }
+    else {
+        Invoke-HandoffMode
+    }
+
     Initialize-NextDayCarryOverDraft
 }
 
 # ==========================================
+# 4. Validation# ==========================================
 # 4. Validation
 # ==========================================
 $requiredFiles = @(
