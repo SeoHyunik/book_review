@@ -441,40 +441,55 @@ function Assert-OpsDocumentStructure {
 }
 
 function Assert-DailyOpsContextConsistency {
+    param(
+        [switch]$IncludeTodayStrategy,
+        [switch]$IncludeDailyHandoff
+    )
+
     $dateScopedFiles = @(
         $QaInbox,
-        $QaStructured,
-        $TodayStrategy,
-        $DailyHandoff
+        $QaStructured
     )
+
+    if ($IncludeTodayStrategy) {
+        $dateScopedFiles += $TodayStrategy
+    }
+
+    if ($IncludeDailyHandoff) {
+        $dateScopedFiles += $DailyHandoff
+    }
 
     Assert-OpsDocumentDatesMatchCurrent -Paths $dateScopedFiles -ExpectedDate $DateString
 
-    Assert-OpsDocumentStructure `
-        -Path $TodayStrategy `
-        -RequiredSectionPatterns @(
-        '(?im)^\s*##\s*2\.\s*Strategy Objective\s*$',
-        '(?im)^\s*##\s*4\.\s*Carry-over from Previous Session\s*$',
-        '(?im)^\s*##\s*5\.\s*Inputs for Today''s Planning\s*$',
-        '(?im)^\s*##\s*11\.\s*Selected Work for Today\s*$',
-        '(?im)^\s*##\s*12\.\s*Step Breakdown\s*$',
-        '(?im)^\s*##\s*15\.\s*Risks and Constraints\s*$',
-        '(?im)^\s*##\s*17\.\s*Definition of Done for Today\s*$',
-        '(?im)^\s*##\s*18\.\s*Handoff Requirement\s*$'
-    )
+    if ($IncludeTodayStrategy) {
+        Assert-OpsDocumentStructure `
+            -Path $TodayStrategy `
+            -RequiredSectionPatterns @(
+            '(?im)^\s*##\s*2\.\s*Strategy Objective\s*$',
+            '(?im)^\s*##\s*4\.\s*Carry-over from Previous Session\s*$',
+            '(?im)^\s*##\s*5\.\s*Inputs for Today''s Planning\s*$',
+            '(?im)^\s*##\s*11\.\s*Selected Work for Today\s*$',
+            '(?im)^\s*##\s*12\.\s*Step Breakdown\s*$',
+            '(?im)^\s*##\s*15\.\s*Risks and Constraints\s*$',
+            '(?im)^\s*##\s*17\.\s*Definition of Done for Today\s*$',
+            '(?im)^\s*##\s*18\.\s*Handoff Requirement\s*$'
+        )
+    }
 
-    Assert-OpsDocumentStructure `
-        -Path $DailyHandoff `
-        -RequiredSectionPatterns @(
-        '(?im)^\s*##\s*2\.\s*Summary of Today\s*$',
-        '(?im)^\s*##\s*3\.\s*Completed Work\s*$',
-        '(?im)^\s*##\s*6\.\s*Carry-over Candidates \(CRITICAL\)\s*$',
-        '(?im)^\s*##\s*8\.\s*New Findings / Observations\s*$',
-        '(?im)^\s*##\s*10\.\s*Documentation State\s*$',
-        '(?im)^\s*##\s*11\.\s*Harness Improvements \(Very Important\)\s*$',
-        '(?im)^\s*##\s*13\.\s*Next Recommended Steps\s*$',
-        '(?im)^\s*##\s*15\.\s*Required Reading for Next Session\s*$'
-    )
+    if ($IncludeDailyHandoff) {
+        Assert-OpsDocumentStructure `
+            -Path $DailyHandoff `
+            -RequiredSectionPatterns @(
+            '(?im)^\s*##\s*2\.\s*Summary of Today\s*$',
+            '(?im)^\s*##\s*3\.\s*Completed Work\s*$',
+            '(?im)^\s*##\s*6\.\s*Carry-over Candidates \(CRITICAL\)\s*$',
+            '(?im)^\s*##\s*8\.\s*New Findings / Observations\s*$',
+            '(?im)^\s*##\s*10\.\s*Documentation State\s*$',
+            '(?im)^\s*##\s*11\.\s*Harness Improvements \(Very Important\)\s*$',
+            '(?im)^\s*##\s*13\.\s*Next Recommended Steps\s*$',
+            '(?im)^\s*##\s*15\.\s*Required Reading for Next Session\s*$'
+        )
+    }
 }
 
 function Test-QaInboxHasActionableItems {
@@ -530,13 +545,13 @@ function Assert-QaStructuredReadyForPlanning {
 
 function Assert-PreHandoffReadiness {
     Assert-QaStructuredReadyForPlanning
-    Assert-DailyOpsContextConsistency
+    Assert-DailyOpsContextConsistency -IncludeTodayStrategy
     Assert-ReadableDailyOpsFiles -Paths $ReadableDocsToCheckBeforeHandoff
 }
 
 function Assert-PostHandoffReadiness {
     $required = @($ReadableDocsToCheckBeforeHandoff + $DailyHandoff)
-    Assert-DailyOpsContextConsistency
+    Assert-DailyOpsContextConsistency -IncludeTodayStrategy -IncludeDailyHandoff
     Assert-ReadableDailyOpsFiles -Paths $required
 }
 
@@ -875,6 +890,10 @@ function Invoke-PlannerMode {
 
     Write-PromptFile -FilePath $promptFile -Content $promptContent
     Invoke-CodexFromPrompt -PromptFile $promptFile -WorkDir $RootDir -StageName 'planner'
+
+    if (-not $DryRun) {
+        Assert-DailyOpsContextConsistency -IncludeTodayStrategy
+    }
 }
 
 function Invoke-GitterMode {
