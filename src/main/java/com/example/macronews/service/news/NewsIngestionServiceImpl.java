@@ -338,8 +338,13 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         List<ExternalNewsItem> freshOnly = selected.stream()
                 .filter(this::isFreshEnoughForBatch)
                 .toList();
-        if (freshOnly.size() != selected.size()) {
-            log.info("[INGEST] final freshness gate removed={} kept={}",
+        if (selected.isEmpty()) {
+            log.warn("[INGEST] final freshness gate reason=selector-returned-empty selected=0 kept=0 removed=0");
+        } else if (freshOnly.isEmpty()) {
+            log.warn("[INGEST] final freshness gate reason=removed-all selected={} kept=0 removed={}",
+                    selected.size(), selected.size());
+        } else if (freshOnly.size() != selected.size()) {
+            log.info("[INGEST] final freshness gate reason=partial-filter removed={} kept={}",
                     selected.size() - freshOnly.size(), freshOnly.size());
         }
         log.info("[INGEST] selected sourceSummary={}", summarizeSources(freshOnly));

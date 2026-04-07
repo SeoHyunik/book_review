@@ -107,6 +107,11 @@ public class NewsSourceProviderSelector {
         log.info("[NEWS-SOURCE] finalSelection fresh={} semiFresh={}",
                 Math.min(freshCandidates.size(), resolvedLimit),
                 Math.min(semiFreshCandidates.size(), Math.max(resolvedLimit - freshCandidates.size(), 0)));
+        if (freshCandidates.isEmpty() && semiFreshCandidates.isEmpty()) {
+            log.warn("[NEWS-SOURCE] zero-result reason=no-provider-output preferredPriority={} fallbackPriority={} preferredProviders={} fallbackProviders={} requested={}",
+                    preferredPriority, fallbackPriority, summarizeProviders(preferredProviders),
+                    summarizeProviders(fallbackProviders), resolvedLimit);
+        }
         return finalizeSelection(freshCandidates, semiFreshCandidates, resolvedLimit);
     }
 
