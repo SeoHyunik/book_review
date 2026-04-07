@@ -109,3 +109,25 @@ Before handoff, recheck the current date-scoped ops files and reject notes that 
 
 **Prevention**
 Add a pre-handoff consistency check that compares summary notes with the actual `docs/ops/YYYY-MM-DD/` files and flags stale claims immediately.
+
+---
+
+### [2026-04-07] Daily Ops Consistency Checks Still Too Weak
+
+**Type**
+harness failure
+
+**What Happened**
+Today’s date-scoped ops chain still shows inconsistent handoff state: the raw QA notes, structured QA, strategy, and handoff artifacts do not have a hard enforced consistency gate, and `DAILY_HANDOFF.md` is still empty at the day boundary.
+
+**Root Cause**
+There is no mandatory final validation that checks the current date-scoped ops files for existence, readability, and mutual alignment before the session is considered complete.
+
+**Impact**
+The next session can inherit incomplete or contradictory working context, which repeats the same planning and handoff friction.
+
+**Rule / Fix**
+Before closing a day, verify that `QA_INBOX.md`, `QA_STRUCTURED.md`, `TODAY_STRATEGY.md`, and `DAILY_HANDOFF.md` all exist, are readable, and agree on the current work state.
+
+**Prevention**
+Add a pre-handoff gate that fails fast when the date-scoped ops set is missing, empty, corrupted, or internally inconsistent.

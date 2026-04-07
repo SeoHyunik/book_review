@@ -8,16 +8,16 @@
 ## 2. Strategy Objective
 
 Stabilize admin automatic ingestion diagnostics so the zero-result path can be explained from logs without changing ingestion behavior.
-Keep the work limited to observability and leave freshness-policy changes for a separate decision.
+Keep the work limited to observability and leave freshness-policy changes as a separate decision.
 
 ---
 
 ## 3. Current Context Summary
 
-- Public UI follow-up from 2026-04-06 is still open, but it is not the most urgent issue today.
-- Today's QA points to a production-relevant admin ingestion failure: providers are configured, yet the run ends with zero usable items.
-- The traced run shows Naver returning only stale items, NewsAPI hitting `429` and skipping follow-up calls, and GNews returning `400`.
-- The operator-visible problem is not only the empty result; it is that the failure path is not sufficiently attributable from the current logs.
+- The admin automatic ingestion failure is reproducible and now traced to concrete code locations.
+- Scheduler entry and skip state, controller entry, provider selection, final freshness filtering, and provider-specific failures are all visible in the current report set.
+- The main gap is not behavior uncertainty; it is the lack of one operator-facing explanation that ties the empty result to the correct failure reason.
+- No code changes have been made yet.
 
 ---
 
@@ -26,7 +26,7 @@ Keep the work limited to observability and leave freshness-policy changes for a 
 - Public interaction path follow-up
   - previous status: partial
   - why it was not completed: the session ended after trace-and-review work, with no implementation step started
-  - still relevant: yes, but lower priority than today's P1 ingestion issue
+  - still relevant: yes, but lower priority than today's admin ingestion issue
   - decision today: defer again
 
 - Main-page table and visible chrome polish
@@ -60,6 +60,7 @@ Keep the work limited to observability and leave freshness-policy changes for a 
 - `docs/ops/2026-04-07/QA_INBOX.md`
 - `docs/ops/2026-04-06/DAILY_HANDOFF.md`
 - `docs/reports/2026-04-06-admin-auto-ingestion-real-logs.md`
+- `docs/reports/2026-04-07-step-1-admin-auto-ingestion-trace-points.md`
 - user instruction for a small, safe, Codex-executable plan
 
 ---
@@ -77,7 +78,7 @@ Keep the work limited to observability and leave freshness-policy changes for a 
   - why it matters: the same empty outcome can come from provider config, upstream rejection, or freshness filtering, and those cases need to be distinguishable
 
 - Scheduler visibility is not explicit enough in the inbox notes
-  - symptom: QA_INBOX asks for `runId`, `started`, and `skipped reason` visibility, but the structured issue does not separate it
+  - symptom: `QA_INBOX.md` asks for `runId`, `started`, and `skipped reason` visibility
   - where it appears: scheduler entry path
   - why it matters: the same failure investigation needs clear entry and skip tracing, not only provider-level logs
 
@@ -85,12 +86,13 @@ Keep the work limited to observability and leave freshness-policy changes for a 
 
 ## 7. Code / System Findings
 
-- The traced run ends with provider outcomes of `EMPTY` and a final `selected sourceSummary={}` before the batch completes at zero processed items.
-- Naver spends work on queries but still merges to `usableItems=0` because every sampled item is stale.
-- NewsAPI hits `429` and then suppresses follow-up calls in the same cycle, which makes the empty return look identical to a normal empty provider unless the reason is surfaced.
-- GNews returns `400` and is also reduced to an empty provider outcome.
-- QA_INBOX contains an additional scheduler-trace request (`runId`, `started`, `skipped reason`) that is not isolated as a separate structured issue; I treat it as supporting detail for Item 1, not a separate work item.
-- The final freshness gate question remains unresolved as a product decision, so changing selection policy in the same step would be too risky.
+- `ScheduledNewsIngestionJob.java` owns scheduler entry and skip state.
+- `AdminNewsController.java` owns admin manual and automatic ingestion entry.
+- `NewsSourceProviderSelector.java` plans providers and emits the final candidate counts.
+- `NewsIngestionServiceImpl.java` applies the final freshness filtering.
+- `NaverNewsSourceProvider.java`, `NewsApiServiceImpl.java`, and `GNewsSourceProvider.java` contain the provider-specific failure sites.
+- The observed failure taxonomy includes `scheduler-disabled`, `auto-ingestion-already-running`, `news-source-not-configured`, provider disabled or incomplete configuration, provider upstream failure or upstream rate limit, provider returned only stale items, selector produced zero fresh and zero semi-fresh candidates, and final freshness gate removal.
+- `QA_INBOX.md` treats scheduler trace visibility as supporting detail, while `QA_STRUCTURED.md` folds it into the main observability issue. I treat those as consistent, not materially conflicting.
 
 ---
 
@@ -98,7 +100,7 @@ Keep the work limited to observability and leave freshness-policy changes for a 
 
 - reliability / observability
   - why it exists: the current admin ingestion failure is real, reproducible, and not explainable enough from logs
-  - scope: expose provider config state, per-provider failure reasons, scheduler entry/skip state, and selector output for the zero-result path
+  - scope: expose provider config state, per-provider failure reasons, scheduler entry or skip state, and selector output for the zero-result path
 
 - product decision
   - why it exists: the final freshness gate behavior is unclear and should not be changed implicitly
@@ -120,100 +122,73 @@ Keep the work limited to observability and leave freshness-policy changes for a 
 
 ## 10. Selection Logic
 
-- Item 1 is selected because it is P1, production-facing, and already has concrete evidence from the log trace.
-- Item 2 is not selected because it is a product-policy decision, not an observability gap, and changing it without explicit agreement would expand scope.
-- The public UI carry-over items from 2026-04-06 are deferred again because today's QA reveals a higher-impact admin ingestion issue.
-- The QA inbox adds scheduler trace visibility as supporting detail, but it does not justify a separate bucket today.
+- Item 1 is selected because it is the highest-impact, best-evidenced production issue and can be addressed without changing ingestion semantics.
+- Item 2 is not selected because it is a policy decision; changing it now would widen scope and risk behavior drift.
+- The public UI carry-over items remain relevant, but they are lower priority than today's admin ingestion visibility problem.
+- The scheduler trace request in `QA_INBOX.md` does not add a new bucket; it fits inside the same observability work.
 - Trade-off: keep the step focused on making the failure path legible, not on altering ingestion behavior.
 
 ---
 
 ## 11. Selected Work for Today
 
-- bucket name: reliability / observability
-  - goal: expose the zero-result ingestion path clearly enough that operators can see provider config state, per-provider failure reasons, scheduler entry and skip state, and selector output
-  - why selected: this is the highest-impact, best-evidenced issue and can be fixed with a minimal, safe change surface
-  - why not deferred: the current logs are insufficient for root-cause attribution, so postponing this keeps the admin flow opaque
+- reliability / observability
+  - goal: emit a single clear explanation for provider-empty outcomes and the final zero-result selector path
+  - why selected: operators need attribution now, and the trace report identifies the smallest safe change surface
+  - why not deferred: leaving the current logs as-is keeps the admin flow opaque and slows incident triage
 
 ---
 
 ## 12. Step Breakdown
 
-### Step 1. Confirm trace points and failure taxonomy
+### Step 1. Add minimal operator-grade diagnostics
 
 **Goal**
-- Map the exact zero-result path from scheduler entry through provider selection and identify the smallest log sites that need to speak for themselves
+- Emit reason-bearing logs for provider-empty outcomes and the final zero-result path
 
 **Target Area**
-- service / provider / controller
+- service / provider
 
 **Likely Files**
 - `NewsSourceProviderSelector`
 - `NewsIngestionServiceImpl`
-- `AdminNewsController`
 - `NaverNewsSourceProvider`
 - `NewsApiServiceImpl`
 - `GNewsSourceProvider`
+- `AdminNewsController` only if the existing admin log line needs one small context field
 
 **Forbidden Scope**
 - no freshness-threshold changes
-- no provider-retry changes
-- no API contract changes
+- no retry behavior changes
+- no request-limit changes
 - no new data model
+- no API contract changes
 
 **Validation**
-- Compare the planned trace points against the real logs in `docs/reports/2026-04-06-admin-auto-ingestion-real-logs.md`
-- Cross-check against the day-scoped QA notes
+- Compare the new log output against `docs/reports/2026-04-06-admin-auto-ingestion-real-logs.md`
+- Confirm the zero-result run now states the provider failure reason, selector empty state, and final outcome
 
 **Expected Output**
-- a minimal implementation plan and targeted edit list
+- code changes with a focused log-verified trace
 
-### Step 2. Add minimal operator-grade diagnostics
-
-**Goal**
-- Emit one traced explanation for each provider-empty outcome and one final selector summary that makes the zero-result path attributable
-
-**Target Area**
-- service / provider / controller
-
-**Likely Files**
-- `NewsSourceProviderSelector`
-- `NewsIngestionServiceImpl`
-- `AdminNewsController`
-- `NaverNewsSourceProvider`
-- `NewsApiServiceImpl`
-- `GNewsSourceProvider`
-
-**Forbidden Scope**
-- do not change selection semantics
-- do not change freshness logic
-- do not change request limits
-- do not change fallback behavior
-
-**Validation**
-- Verify the new logs show provider config state, upstream failure reason, and selector final outcome on the zero-result run
-
-**Expected Output**
-- code changes plus a focused log-verified trace
-
-### Step 3. Re-review and handoff
+### Step 2. Re-review and handoff
 
 **Goal**
-- Verify the change is minimal, the behavior is unchanged, and the remaining freshness-gate decision is still explicitly deferred
+- Verify the behavior is unchanged and record carry-over cleanly
 
 **Target Area**
 - docs / tests
 
 **Likely Files**
-- relevant tests only if an existing test can assert the new logging path
-- otherwise no test expansion
+- `docs/ops/2026-04-07/DAILY_HANDOFF.md`
+- existing tests only if a low-cost assertion already covers the path
 
 **Forbidden Scope**
 - no unrelated cleanup
 
 **Validation**
-- Targeted review of the diff
-- Fresh daily handoff
+- Diff review
+- Check that the new logs match the traced failure taxonomy
 
 **Expected Output**
 - review notes and `docs/ops/2026-04-07/DAILY_HANDOFF.md`
@@ -260,7 +235,7 @@ Default:
 - Scope drift into freshness-policy changes or provider selection redesign
 - Scheduler trace may require one extra log site outside the provider selector
 - Logging changes can become noisy if too much context is added
-- QA_INBOX and QA_STRUCTURED are not perfectly aligned, so the implementation should stay focused on the shared core requirement
+- `QA_INBOX.md` and `QA_STRUCTURED.md` are not perfectly aligned, so the implementation should stay focused on the shared core requirement
 
 ---
 

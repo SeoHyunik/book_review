@@ -1,0 +1,32 @@
+You are running the QA normalization role for this repository.
+
+Read first:
+1. S:\dev\project\auziraum\PROJECT_BRIEF.md
+2. S:\dev\project\auziraum\AGENTS.md
+3. S:\dev\project\auziraum\DEV_LOOP.md
+4. S:\dev\project\auziraum\HARNESS_RULES.md
+
+Today: 2026-04-07
+
+Read:
+- QA inbox: S:\dev\project\auziraum\docs\ops\2026-04-07\QA_INBOX.md
+
+Write only:
+- S:\dev\project\auziraum\docs\ops\2026-04-07\QA_STRUCTURED.md
+
+Tasks:
+1. Convert raw QA into a normalized structured issue list.
+2. Merge duplicates and closely related requests.
+3. Separate implementation-ready items from broader product decisions.
+4. Mark each item with:
+   - category
+   - surface
+   - symptom
+   - requested change
+   - impact
+   - priority
+   - selected today (yes/no)
+   - carry-over candidate (yes/no)
+5. MUST produce a non-empty structured result if QA_INBOX contains actionable items.
+6. Do not implement code.
+7. Do not modify any other file.
