@@ -346,11 +346,7 @@ function Test-TextLooksCorrupted {
         return $true
     }
 
-    if ($Content.Contains('�')) {
-        return $true
-    }
-
-    if ($Content.Contains('ï»¿')) {
+    if ($Content.Contains(([string][char]0x00EF) + ([string][char]0x00BB) + ([string][char]0x00BF))) {
         return $true
     }
 
@@ -358,7 +354,7 @@ function Test-TextLooksCorrupted {
         return $true
     }
 
-    if ($Content.Contains('ì') -and $Content.Contains('ë') -and $Content.Contains('ê')) {
+    if ($Content.Contains([char]0x00EC) -and $Content.Contains([char]0x00EB) -and $Content.Contains([char]0x00EA)) {
         return $true
     }
 
@@ -457,28 +453,28 @@ function Assert-DailyOpsContextConsistency {
     Assert-OpsDocumentStructure `
         -Path $TodayStrategy `
         -RequiredSectionPatterns @(
-            '(?im)^\s*##\s*2\.\s*Strategy Objective\s*$',
-            '(?im)^\s*##\s*4\.\s*Carry-over from Previous Session\s*$',
-            '(?im)^\s*##\s*5\.\s*Inputs for Today''s Planning\s*$',
-            '(?im)^\s*##\s*11\.\s*Selected Work for Today\s*$',
-            '(?im)^\s*##\s*12\.\s*Step Breakdown\s*$',
-            '(?im)^\s*##\s*15\.\s*Risks and Constraints\s*$',
-            '(?im)^\s*##\s*17\.\s*Definition of Done for Today\s*$',
-            '(?im)^\s*##\s*18\.\s*Handoff Requirement\s*$'
-        )
+        '(?im)^\s*##\s*2\.\s*Strategy Objective\s*$',
+        '(?im)^\s*##\s*4\.\s*Carry-over from Previous Session\s*$',
+        '(?im)^\s*##\s*5\.\s*Inputs for Today''s Planning\s*$',
+        '(?im)^\s*##\s*11\.\s*Selected Work for Today\s*$',
+        '(?im)^\s*##\s*12\.\s*Step Breakdown\s*$',
+        '(?im)^\s*##\s*15\.\s*Risks and Constraints\s*$',
+        '(?im)^\s*##\s*17\.\s*Definition of Done for Today\s*$',
+        '(?im)^\s*##\s*18\.\s*Handoff Requirement\s*$'
+    )
 
     Assert-OpsDocumentStructure `
         -Path $DailyHandoff `
         -RequiredSectionPatterns @(
-            '(?im)^\s*##\s*2\.\s*Summary of Today\s*$',
-            '(?im)^\s*##\s*3\.\s*Completed Work\s*$',
-            '(?im)^\s*##\s*6\.\s*Carry-over Candidates \(CRITICAL\)\s*$',
-            '(?im)^\s*##\s*8\.\s*New Findings / Observations\s*$',
-            '(?im)^\s*##\s*10\.\s*Documentation State\s*$',
-            '(?im)^\s*##\s*11\.\s*Harness Improvements \(Very Important\)\s*$',
-            '(?im)^\s*##\s*13\.\s*Next Recommended Steps\s*$',
-            '(?im)^\s*##\s*15\.\s*Required Reading for Next Session\s*$'
-        )
+        '(?im)^\s*##\s*2\.\s*Summary of Today\s*$',
+        '(?im)^\s*##\s*3\.\s*Completed Work\s*$',
+        '(?im)^\s*##\s*6\.\s*Carry-over Candidates \(CRITICAL\)\s*$',
+        '(?im)^\s*##\s*8\.\s*New Findings / Observations\s*$',
+        '(?im)^\s*##\s*10\.\s*Documentation State\s*$',
+        '(?im)^\s*##\s*11\.\s*Harness Improvements \(Very Important\)\s*$',
+        '(?im)^\s*##\s*13\.\s*Next Recommended Steps\s*$',
+        '(?im)^\s*##\s*15\.\s*Required Reading for Next Session\s*$'
+    )
 }
 
 function Test-QaInboxHasActionableItems {
