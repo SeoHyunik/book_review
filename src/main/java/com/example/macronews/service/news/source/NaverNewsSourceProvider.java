@@ -159,7 +159,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     @Override
     public List<ExternalNewsItem> fetchTopHeadlines(int limit, NewsFreshnessBucket bucket) {
         if (!isConfigured()) {
-            log.info("[NAVER] provider disabled or incomplete configuration");
+            log.info("[NAVER] provider empty reason=not-configured enabled={} clientIdPresent={} clientSecretPresent={}",
+                    enabled, hasClientId(), hasClientSecret());
             return List.of();
         }
 
@@ -175,6 +176,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         List<ExternalNewsItem> merged = deduplicateAndLimit(candidates, resolvedLimit);
         log.info("[NAVER] bucket={} merged usableItems={} requestedLimit={} queries={}",
                 bucket, merged.size(), resolvedLimit, queries.size());
+        if (merged.isEmpty()) {
+            log.info("[NAVER] provider empty reason=no-usable-items bucket={} requestedLimit={} queries={} configured={}",
+                    bucket, resolvedLimit, queries.size(), isConfigured());
+        }
         return merged;
     }
 
@@ -217,8 +222,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     null
             ));
             if (result == null || result.statusCode() < 200 || result.statusCode() >= 300) {
-                log.warn("[NAVER] query failed query='{}' pageStart={} status={}",
-                        query, pageStart, result == null ? -1 : result.statusCode());
+                int statusCode = result == null ? -1 : result.statusCode();
+                String reason = statusCode == 429 ? "rate-limit" : "upstream-rejection";
+                log.warn("[NAVER] provider empty reason={} bucket={} query='{}' pageStart={} status={}",
+                        reason, bucket, query, pageStart, statusCode);
                 break;
             }
 
@@ -236,7 +243,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private NaverParseResult parseItems(String query, int pageStart, String body, long maxAgeHours, NewsFreshnessBucket bucket) {
         if (!StringUtils.hasText(body)) {
-            log.info("[NAVER] bucket={} query='{}' pageStart={} rawItems=0 bodyEmpty=true", bucket, query, pageStart);
+            log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 bodyEmpty=true",
+                    bucket, query, pageStart);
             return new NaverParseResult(List.of(), 0);
         }
 
@@ -244,7 +252,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             JsonNode root = objectMapper.readTree(body);
             JsonNode items = root.path("items");
             if (!items.isArray()) {
-                log.info("[NAVER] bucket={} query='{}' pageStart={} rawItems=0 itemsArray=false", bucket, query, pageStart);
+                log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 itemsArray=false",
+                        bucket, query, pageStart);
                 return new NaverParseResult(List.of(), 0);
             }
 
@@ -311,6 +320,16 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} filteredByRelevance={} missingUsableLink={} emptyTitle={}",
                     bucket, query, pageStart, mapped.size(), nullPublishedAtCount, invalidPubDateCount, staleItemCount,
                     filteredByRelevanceCount, missingUrlCount, emptyTitleCount);
+            if (mapped.isEmpty() && rawItemCount > 0) {
+                String reason = staleItemCount == rawItemCount
+                        ? "stale-only-input"
+                        : (nullPublishedAtCount == rawItemCount || invalidPubDateCount == rawItemCount
+                                ? "unusable-input"
+                                : "no-usable-items");
+                log.info("[NAVER] provider empty reason={} bucket={} query='{}' pageStart={} rawItems={} staleItems={} nullPublishedAt={} invalidPubDate={} filteredByRelevance={} missingUsableLink={} emptyTitle={}",
+                        reason, bucket, query, pageStart, rawItemCount, staleItemCount, nullPublishedAtCount,
+                        invalidPubDateCount, filteredByRelevanceCount, missingUrlCount, emptyTitleCount);
+            }
             return new NaverParseResult(mapped, rawItemCount);
         } catch (Exception ex) {
             log.warn("[NAVER] failed to parse response bucket={} query='{}' pageStart={}", bucket, query, pageStart, ex);

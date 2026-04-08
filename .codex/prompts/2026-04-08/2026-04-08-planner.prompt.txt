@@ -1,0 +1,36 @@
+You are running the planner role for this repository.
+
+Read first:
+1. S:\dev\project\auziraum\PROJECT_BRIEF.md
+2. S:\dev\project\auziraum\AGENTS.md
+3. S:\dev\project\auziraum\DEV_LOOP.md
+4. S:\dev\project\auziraum\HARNESS_RULES.md
+
+Today: 2026-04-08
+
+Ops rules:
+- Daily docs must be created in docs/ops/YYYY-MM-DD/
+- NEVER create TODAY_STRATEGY.md in root or directly under docs/ops/
+- MUST read the strategy format before writing
+- MUST write only to: S:\dev\project\auziraum\docs\ops\2026-04-08\TODAY_STRATEGY.md
+- If the file already exists, update it carefully instead of creating a second file
+
+Primary planning input:
+- QA structured: S:\dev\project\auziraum\docs\ops\2026-04-08\QA_STRUCTURED.md
+
+Cross-check input:
+- QA inbox: S:\dev\project\auziraum\docs\ops\2026-04-08\QA_INBOX.md
+
+Read if available:
+- format: S:\dev\project\auziraum\docs\ops\TODAY_STRATEGY_FORMAT.md
+- previous handoff: S:\dev\project\auziraum\docs\ops\2026-04-07\DAILY_HANDOFF.md
+- reports: S:\dev\project\auziraum\docs\reports
+
+Tasks:
+1. Read TODAY_STRATEGY_FORMAT.md
+2. Create or update exactly: S:\dev\project\auziraum\docs\ops\2026-04-08\TODAY_STRATEGY.md
+3. Use QA_STRUCTURED.md as the primary input, and QA_INBOX.md only as a cross-check source.
+4. If QA_STRUCTURED.md and QA_INBOX.md differ materially, report that mismatch inside the strategy.
+5. Keep the plan small, safe, and Codex-executable.
+6. Do not implement code.
+7. Do not modify any other file.

@@ -75,7 +75,7 @@ public class GNewsSourceProvider implements NewsSourceProvider {
     @Override
     public List<ExternalNewsItem> fetchTopHeadlines(int limit, NewsFreshnessBucket bucket) {
         if (!isConfigured()) {
-            log.info("[GNEWS] provider unavailable enabled={} apiKeyPresent={} configuredBaseUrl={}",
+            log.info("[GNEWS] provider empty reason=not-configured enabled={} apiKeyPresent={} configuredBaseUrl={}",
                     enabled, StringUtils.hasText(apiKey), normalizeConfiguredBaseUrl(baseUrl));
             return List.of();
         }
@@ -105,8 +105,9 @@ public class GNewsSourceProvider implements NewsSourceProvider {
                 null
         ));
         if (result == null || result.statusCode() < 200 || result.statusCode() >= 300) {
-            log.warn("[GNEWS] bucket={} enabled={} requestFamily={} status={} configuredBaseUrl={} requestUrl={}",
-                    bucket, enabled, resolveRequestFamily(normalizedBaseUrl),
+            String reason = result != null && result.statusCode() == 429 ? "rate-limit" : "upstream-rejection";
+            log.warn("[GNEWS] provider empty reason={} bucket={} enabled={} requestFamily={} status={} configuredBaseUrl={} requestUrl={}",
+                    reason, bucket, enabled, resolveRequestFamily(normalizedBaseUrl),
                     result == null ? -1 : result.statusCode(), normalizedBaseUrl, sanitizedUrl);
             return List.of();
         }
@@ -120,6 +121,7 @@ public class GNewsSourceProvider implements NewsSourceProvider {
 
     private List<ExternalNewsItem> parseArticles(String body, int limit, NewsFreshnessBucket bucket) {
         if (!StringUtils.hasText(body)) {
+            log.info("[GNEWS] provider empty reason=upstream-empty-response bucket={} limit={}", bucket, limit);
             return List.of();
         }
 
@@ -127,6 +129,8 @@ public class GNewsSourceProvider implements NewsSourceProvider {
             JsonNode root = objectMapper.readTree(body);
             JsonNode articles = root.path("articles");
             if (!articles.isArray()) {
+                log.info("[GNEWS] provider empty reason=upstream-empty-response bucket={} limit={} articlesArray=false",
+                        bucket, limit);
                 return List.of();
             }
 
@@ -169,6 +173,13 @@ public class GNewsSourceProvider implements NewsSourceProvider {
                     .toList();
             log.info("[GNEWS] bucket={} parsedItems={} skippedNullPublishedAt={} skippedStale={} limit={}",
                     bucket, limited.size(), skippedNullPublishedAt, skippedStale, limit);
+            if (limited.isEmpty() && articles.size() > 0) {
+                String reason = skippedStale == articles.size() && skippedStale > 0
+                        ? "stale-only-input"
+                        : "no-eligible-articles";
+                log.info("[GNEWS] provider empty reason={} bucket={} parsedItems=0 skippedNullPublishedAt={} skippedStale={} limit={}",
+                        reason, bucket, skippedNullPublishedAt, skippedStale, limit);
+            }
             return limited;
         } catch (Exception ex) {
             log.warn("[GNEWS] failed to parse response bucket={}", bucket, ex);

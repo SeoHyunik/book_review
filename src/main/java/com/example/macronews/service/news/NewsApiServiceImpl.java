@@ -109,7 +109,8 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
     public List<ExternalNewsItem> fetchDomesticTopHeadlines(int limit, NewsFreshnessBucket bucket) {
         if (!isConfigured()) {
-            log.warn("news.api.key is missing; returning empty top-headlines list");
+            log.warn("[NEWSAPI] provider empty reason=not-configured enabled={} apiKeyPresent={}",
+                    enabled, StringUtils.hasText(apiKey));
             return List.of();
         }
 
@@ -132,7 +133,8 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
     public List<ExternalNewsItem> fetchForeignTopHeadlines(int limit, NewsFreshnessBucket bucket) {
         if (!isConfigured()) {
-            log.warn("news.api.key is missing; returning empty top-headlines list");
+            log.warn("[NEWSAPI] provider empty reason=not-configured enabled={} apiKeyPresent={}",
+                    enabled, StringUtils.hasText(apiKey));
             return List.of();
         }
 
@@ -233,11 +235,13 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
         if (result == null || result.statusCode() < 200 || result.statusCode() >= 300) {
             if (result != null && result.statusCode() == 429) {
                 cycleContext.markRateLimitEncountered();
-                log.warn("[NEWSAPI] 429 received cycle={} feed={} requestFamily={} bucket={} first429InCycle=true",
+                log.warn("[NEWSAPI] provider empty reason=rate-limit cycle={} feed={} requestFamily={} bucket={} first429InCycle=true",
                         cycleContext.entryPoint(), feedName, requestFamily, bucket);
                 return List.of();
             }
-            log.warn("{} call failed. status={}", feedName, result == null ? -1 : result.statusCode());
+            log.warn("[NEWSAPI] provider empty reason=upstream-rejection cycle={} feed={} requestFamily={} bucket={} status={}",
+                    cycleContext.entryPoint(), feedName, requestFamily, bucket,
+                    result == null ? -1 : result.statusCode());
             return List.of();
         }
 
@@ -262,6 +266,7 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
 
     private List<ExternalNewsItem> parseArticles(String body, int limit, NewsFreshnessBucket bucket) {
         if (!StringUtils.hasText(body)) {
+            log.info("[NEWSAPI] provider empty reason=upstream-empty-response bucket={} limit={}", bucket, limit);
             return List.of();
         }
 
@@ -269,6 +274,8 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
             JsonNode root = objectMapper.readTree(body);
             JsonNode articles = root.path("articles");
             if (!articles.isArray()) {
+                log.info("[NEWSAPI] provider empty reason=upstream-empty-response bucket={} limit={} articlesArray=false",
+                        bucket, limit);
                 return List.of();
             }
 
@@ -318,6 +325,13 @@ public class NewsApiServiceImpl implements NewsApiService, NewsSourceProvider {
             if (skippedNullPublishedAt > 0 || skippedStale > 0) {
                 log.info("[NEWSAPI] bucket={} parsedItems={} skippedNullPublishedAt={} skippedStale={} limit={}",
                         bucket, limited.size(), skippedNullPublishedAt, skippedStale, limit);
+            }
+            if (limited.isEmpty() && articles.size() > 0) {
+                String reason = skippedStale == articles.size() && skippedStale > 0
+                        ? "stale-only-input"
+                        : "no-eligible-articles";
+                log.info("[NEWSAPI] provider empty reason={} bucket={} parsedItems=0 skippedNullPublishedAt={} skippedStale={} keywordFilters={} limit={}",
+                        reason, bucket, skippedNullPublishedAt, skippedStale, resolvedFilterKeywords.size(), limit);
             }
             return limited;
         } catch (Exception ex) {

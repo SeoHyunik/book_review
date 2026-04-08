@@ -75,11 +75,12 @@ public class NewsSourceProviderSelector {
 
         int preferredFresh = collectCandidates(
                 freshCandidates, null, preferredProviders, preferredPriority, resolvedLimit, true, NewsFreshnessBucket.FRESH);
+        int fallbackFresh = 0;
         if (preferredFresh == 0 && !preferredProviders.isEmpty() && !fallbackProviders.isEmpty()) {
             log.info("[NEWS-SOURCE] preferred provider returned 0 fresh items; falling back to secondary providers");
         }
         if (freshCandidates.size() < resolvedLimit) {
-            collectCandidates(
+            fallbackFresh = collectCandidates(
                     freshCandidates, null, fallbackProviders, fallbackPriority, resolvedLimit,
                     false, NewsFreshnessBucket.FRESH);
         }
@@ -92,13 +93,15 @@ public class NewsSourceProviderSelector {
         }
 
         int remaining = resolvedLimit - freshCandidates.size();
+        int preferredSemiFresh = 0;
         if (remaining > 0) {
-            collectCandidates(semiFreshCandidates, freshCandidates, preferredProviders, preferredPriority,
+            preferredSemiFresh = collectCandidates(semiFreshCandidates, freshCandidates, preferredProviders, preferredPriority,
                     remaining, true, NewsFreshnessBucket.SEMI_FRESH);
         }
         remaining = resolvedLimit - freshCandidates.size() - semiFreshCandidates.size();
+        int fallbackSemiFresh = 0;
         if (remaining > 0) {
-            collectCandidates(semiFreshCandidates, freshCandidates, fallbackProviders, fallbackPriority,
+            fallbackSemiFresh = collectCandidates(semiFreshCandidates, freshCandidates, fallbackProviders, fallbackPriority,
                     remaining, false, NewsFreshnessBucket.SEMI_FRESH);
         }
 
@@ -108,9 +111,10 @@ public class NewsSourceProviderSelector {
                 Math.min(freshCandidates.size(), resolvedLimit),
                 Math.min(semiFreshCandidates.size(), Math.max(resolvedLimit - freshCandidates.size(), 0)));
         if (freshCandidates.isEmpty() && semiFreshCandidates.isEmpty()) {
-            log.warn("[NEWS-SOURCE] zero-result reason=no-provider-output preferredPriority={} fallbackPriority={} preferredProviders={} fallbackProviders={} requested={}",
+            log.warn("[NEWS-SOURCE] zero-result summary reason=no-provider-output preferredPriority={} fallbackPriority={} preferredProviders={} fallbackProviders={} preferredFreshReturned={} fallbackFreshReturned={} preferredSemiFreshReturned={} fallbackSemiFreshReturned={} requested={}",
                     preferredPriority, fallbackPriority, summarizeProviders(preferredProviders),
-                    summarizeProviders(fallbackProviders), resolvedLimit);
+                    summarizeProviders(fallbackProviders), preferredFresh, fallbackFresh,
+                    preferredSemiFresh, fallbackSemiFresh, resolvedLimit);
         }
         return finalizeSelection(freshCandidates, semiFreshCandidates, resolvedLimit);
     }
