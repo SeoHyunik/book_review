@@ -3,10 +3,10 @@
 
                         ],
     "planner_done":  false,
-    "handoff_done":  false,
+    "handoff_done":  true,
     "qa_structurer_done":  false,
     "gitter_steps":  [
-                         1
+
                      ],
     "date":  "2026-04-08",
     "curator_done":  false

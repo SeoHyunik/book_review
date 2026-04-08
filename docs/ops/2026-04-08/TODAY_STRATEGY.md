@@ -7,14 +7,15 @@
 
 ## 2. Strategy Objective
 Stabilize admin auto-ingestion diagnostics so the zero-result path can be explained from logs without changing ingestion behavior.
-In parallel, tighten daily ops continuity so the next session can recover carry-over state without re-reading stale context.
+In parallel, tighten daily ops continuity so QA, strategy, and handoff stay on the same carry-over state and encoding or format problems are flagged early.
 
 ---
 
 ## 3. Current Context Summary
 - Admin auto-ingestion still reaches a zero-result state without a single operator-facing explanation that ties together provider config, upstream failure, stale-only input, selector emptiness, and the final freshness gate.
 - The 2026-04-07 trace report already narrowed the execution path and the smallest safe edit surface.
-- Today's QA structured file contains two implementation-ready items; the QA inbox only repeats the carry-over reminder, so it is a cross-check source rather than a separate planning input.
+- Today's QA structured file contains two implementation-ready items: admin zero-result diagnostics and daily ops consistency.
+- The QA inbox only repeats the carry-over reminder, so it is a cross-check source rather than a separate planning input.
 - The previous handoff left admin diagnostics, final freshness policy, daily ops consistency, and public follow-up open. Today only the two lowest-risk, highest-value items are selected.
 
 ---
@@ -28,7 +29,7 @@ In parallel, tighten daily ops continuity so the next session can recover carry-
 
 - Daily ops consistency gate
   - previous status: blocked
-  - why it was not completed: there was no minimal rule yet to keep QA, strategy, and handoff in the same state chain
+  - why it was not completed: there was no minimal rule yet to keep QA, strategy, and handoff in the same state chain or to surface format/encoding drift early
   - still relevant: yes
   - decision today: continue now
 
@@ -90,6 +91,11 @@ In parallel, tighten daily ops continuity so the next session can recover carry-
   - where it appears: `docs/ops/2026-04-08/QA_INBOX.md`
   - why it matters: the structured QA file must remain the primary planning input
 
+- QA structured and QA inbox are consistent on the selected work, but the inbox is too thin to act as a standalone plan source.
+  - symptom: the inbox contains only a carry-over reminder
+  - where it appears: `docs/ops/2026-04-08/QA_INBOX.md`
+  - why it matters: planning should continue to treat QA structured as the primary input and inbox as a verification source
+
 ---
 
 ## 7. Code / System Findings
@@ -99,8 +105,8 @@ In parallel, tighten daily ops continuity so the next session can recover carry-
 - `NewsIngestionServiceImpl.java` owns final freshness filtering.
 - `NaverNewsSourceProvider.java`, `NewsApiServiceImpl.java`, and `GNewsSourceProvider.java` contain provider-specific failure sites.
 - The 2026-04-07 trace report confirmed that the zero-result path is split across scheduler, controller, provider, selector, and freshness gate.
+- The 2026-04-06 harness ops consistency report showed that daily ops files can exist while still drifting in carry-over state or encoding quality.
 - `QA_STRUCTURED.md` and `QA_INBOX.md` do not materially conflict. The inbox only repeats the carry-over reminder and does not change the selected work.
-- The 2026-04-06 harness ops consistency report showed that checking whether a daily file exists is not enough; carry-over state also needs continuity checks.
 
 ---
 
@@ -111,7 +117,7 @@ In parallel, tighten daily ops continuity so the next session can recover carry-
 
 - ops / harness
   - why it exists: QA, strategy, and handoff can lose carry-over state between sessions
-  - scope: daily ops consistency gate, encoding and format hygiene, carry-over continuity check
+  - scope: daily ops consistency gate, encoding and format hygiene, carry-over continuity check, thin-inbox cross-check behavior
 
 - product decision
   - why it exists: the final freshness gate is a policy choice, not a logging problem
@@ -148,7 +154,7 @@ In parallel, tighten daily ops continuity so the next session can recover carry-
   - why not deferred: leaving the logs unchanged keeps triage slow and ambiguous
 
 - ops / harness
-  - goal: keep QA, strategy, and handoff aligned on the same carry-over state
+  - goal: keep QA, strategy, and handoff aligned on the same carry-over state and surface encoding or format drift early
   - why selected: the next session should not need to rebuild today's context from scratch
   - why not deferred: continuity problems reduce the value of the code work that follows
 
@@ -188,7 +194,7 @@ In parallel, tighten daily ops continuity so the next session can recover carry-
 ### Step 2. Tighten daily ops continuity checks
 
 **Goal**
-- Keep QA, strategy, and handoff aligned on the same carry-over state with a minimal continuity check
+- Keep QA, strategy, and handoff aligned on the same carry-over state with a minimal continuity check and early drift detection
 
 **Target Area**
 - docs / harness
@@ -207,6 +213,7 @@ In parallel, tighten daily ops continuity so the next session can recover carry-
 **Validation**
 - Check that QA structured, strategy, and handoff keep the same carry-over items
 - Confirm no new encoding or format corruption is introduced
+- Confirm QA inbox remains a cross-check rather than a competing source of truth
 
 **Expected Output**
 - updated daily ops continuity record and a clearer next-session state

@@ -5,7 +5,7 @@
 
 ## Normalization Note
 - `QA_INBOX.md` contains one actionable directive: review the unresolved work from 2026-04-07.
-- This structured list carries forward the unresolved items and separates implementation-ready work from broader product decisions.
+- This structured list carries forward the unresolved items and separates implementation-ready work from deferred decisions.
 
 ## Implementation-Ready Items
 
@@ -29,7 +29,7 @@
 - selected today: yes
 - carry-over candidate: yes
 
-## Product Decisions
+## Deferred Decisions
 
 ### Item 3. Final freshness gate policy
 - category: product-decision

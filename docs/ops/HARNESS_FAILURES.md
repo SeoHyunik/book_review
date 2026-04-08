@@ -131,3 +131,25 @@ Before closing a day, verify that `QA_INBOX.md`, `QA_STRUCTURED.md`, `TODAY_STRA
 
 **Prevention**
 Add a pre-handoff gate that fails fast when the date-scoped ops set is missing, empty, corrupted, or internally inconsistent.
+
+---
+
+### [2026-04-08] Planning Chain Still Ends Without a Reusable Handoff
+
+**Type**
+harness failure
+
+**What Happened**
+Today's QA and strategy files stay aligned on the selected carry-over work, but `DAILY_HANDOFF.md` remains empty, so the session still ends without a reusable next-step artifact.
+
+**Root Cause**
+The harness validates planning consistency more reliably than it validates handoff completion.
+
+**Impact**
+The next session must reconstruct context from QA and strategy again, which repeats the same continuity friction even when the work selection is correct.
+
+**Rule / Fix**
+Do not treat a day as closed until the date-scoped handoff file contains the selected carry-over state and next-step record.
+
+**Prevention**
+Add a required final check that fails when QA, strategy, and handoff are aligned in intent but the handoff file is empty or missing.
