@@ -341,18 +341,19 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         int selectedCount = selected.size();
         int keptCount = freshOnly.size();
         int removedCount = selectedCount - keptCount;
+        String finalCause = selectedCount == 0
+                ? "selector-returned-empty"
+                : "freshness-gate-removed-all";
         if (selectedCount == 0 || keptCount == 0) {
-            String zeroResultReason = selectedCount == 0
-                    ? "selector-returned-empty"
-                    : "freshness-gate-removed-all";
             log.warn("[INGEST] zero-result summary reason={} selected={} kept={} removed={} selectedSourceSummary={}",
-                    zeroResultReason, selectedCount, keptCount, removedCount, summarizeSources(selected));
+                    finalCause, selectedCount, keptCount, removedCount, summarizeSources(selected));
         }
         if (selected.isEmpty()) {
-            log.warn("[INGEST] final freshness gate stage=pre-filter reason=selector-returned-empty selected=0 kept=0 removed=0");
+            log.warn("[INGEST] final freshness gate stage=pre-filter reason=selector-returned-empty finalCause={} selected=0 kept=0 removed=0",
+                    finalCause);
         } else if (freshOnly.isEmpty()) {
-            log.warn("[INGEST] final freshness gate stage=post-filter reason=removed-all selected={} kept=0 removed={}",
-                    selectedCount, removedCount);
+            log.warn("[INGEST] final freshness gate stage=post-filter reason=removed-all finalCause={} selected={} kept=0 removed={}",
+                    finalCause, selectedCount, removedCount);
         } else if (keptCount != selectedCount) {
             log.info("[INGEST] final freshness gate stage=post-filter reason=partial-filter selected={} kept={} removed={}",
                     selectedCount, keptCount, removedCount);

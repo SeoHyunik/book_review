@@ -300,6 +300,7 @@ public class AdminNewsController {
                     newsQueryService.getAutoIngestionBatchStatus(resolvedPageSize, ingested.size(),
                             ingested.stream().map(NewsEvent::id).toList());
             autoIngestionControlService.completeRun(autoBatchStatus);
+            AutoIngestionControlStatusDto controlStatus = autoIngestionControlService.getStatus();
             redirectAttributes.addFlashAttribute("successMessage", buildAutoIngestionFlashMessage(autoBatchStatus));
             if (pageSize <= 0) {
                 redirectAttributes.addFlashAttribute("warningMessage",
@@ -309,9 +310,9 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("autoBatchRequestedCount", resolvedPageSize);
             redirectAttributes.addFlashAttribute("autoBatchReturnedCount", ingested.size());
             redirectAttributes.addFlashAttribute("autoBatchItemIds", ingested.stream().map(NewsEvent::id).toList());
-            log.info("[ADMIN-AUTO] automatic ingestion completed requested={} returned={} analyzed={} pending={} failed={}",
+            log.info("[ADMIN-AUTO] automatic ingestion completed requested={} returned={} analyzed={} pending={} failed={} outcome={}",
                     resolvedPageSize, autoBatchStatus.returnedCount(), autoBatchStatus.analyzedCount(),
-                    autoBatchStatus.pendingCount(), autoBatchStatus.failedCount());
+                    autoBatchStatus.pendingCount(), autoBatchStatus.failedCount(), controlStatus.latestOutcome());
         } catch (RuntimeException ex) {
             autoIngestionControlService.failRun(resolvedPageSize);
             log.error("Admin external ingestion failed", ex);
