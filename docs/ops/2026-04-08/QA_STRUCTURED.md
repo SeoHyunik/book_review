@@ -4,8 +4,8 @@
 2026-04-08
 
 ## Normalization Note
-- `QA_INBOX.md` contains no new actionable user-reported issues for today.
-- This structured list carries forward unresolved items from 2026-04-07 and normalizes them into implementation-ready work vs. product decisions.
+- `QA_INBOX.md` contains one actionable directive: review the unresolved work from 2026-04-07.
+- This structured list carries forward the unresolved items and separates implementation-ready work from broader product decisions.
 
 ## Implementation-Ready Items
 
@@ -19,10 +19,10 @@
 - selected today: yes
 - carry-over candidate: yes
 
-### Item 2. Daily ops consistency gate and encoding hygiene
-- category: ops
+### Item 2. Daily ops consistency gate
+- category: process
 - surface: QA inbox, QA structured, TODAY_STRATEGY, DAILY_HANDOFF, harness review context
-- symptom: the handoff notes show unresolved work needs to be recovered from prior-day artifacts, and older ops files still carry mojibake/format corruption risk, which makes cross-session continuity brittle.
+- symptom: unresolved work must be recovered from prior-day artifacts, but the current handoff path still depends on manual recovery and older ops files show mojibake/format corruption risk.
 - requested change: strengthen the daily ops consistency check so QA, strategy, and handoff artifacts preserve the same unresolved work state across sessions and flag encoding or format corruption early.
 - impact: medium
 - priority: P1

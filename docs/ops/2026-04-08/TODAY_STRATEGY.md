@@ -14,7 +14,7 @@ In parallel, tighten daily ops continuity so the next session can recover carry-
 ## 3. Current Context Summary
 - Admin auto-ingestion still reaches a zero-result state without a single operator-facing explanation that ties together provider config, upstream failure, stale-only input, selector emptiness, and the final freshness gate.
 - The 2026-04-07 trace report already narrowed the execution path and the smallest safe edit surface.
-- Today's QA structured file contains two implementation-ready items; the QA inbox only repeats the carry-over reminder and does not add a new conflict.
+- Today's QA structured file contains two implementation-ready items; the QA inbox only repeats the carry-over reminder, so it is a cross-check source rather than a separate planning input.
 - The previous handoff left admin diagnostics, final freshness policy, daily ops consistency, and public follow-up open. Today only the two lowest-risk, highest-value items are selected.
 
 ---
@@ -136,7 +136,7 @@ In parallel, tighten daily ops continuity so the next session can recover carry-
 - Item 2 is selected because it improves session continuity without changing product behavior.
 - The final freshness gate decision is important, but it is a separate policy question and would widen scope if handled today.
 - Public follow-up and UI polish remain relevant, but they do not unblock the current stability problem.
-- The QA inbox does not introduce a new conflict, so it does not change the selection.
+- The QA inbox does not introduce a new conflict or new scope, so it does not change the selection.
 - Trade-off: keep today's work focused on traceability and continuity instead of behavior changes.
 
 ---

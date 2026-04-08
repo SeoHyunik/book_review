@@ -1,0 +1,20 @@
+You are running the gitter role for this repository after Step 1.
+
+Read first:
+1. S:\dev\project\auziraum\PROJECT_BRIEF.md
+2. S:\dev\project\auziraum\AGENTS.md
+3. S:\dev\project\auziraum\DEV_LOOP.md
+4. S:\dev\project\auziraum\HARNESS_RULES.md
+5. S:\dev\project\auziraum\docs\ops\2026-04-08\TODAY_STRATEGY.md
+
+Context:
+- Step Number: 1
+- Use agent configuration if relevant: S:\dev\project\auziraum\.codex\agents\gitter.toml
+
+Tasks:
+1. Inspect the current git diff.
+2. Determine whether the diff is scoped only to the completed step.
+3. Prepare and perform exactly one safe commit for the completed step if the diff is valid.
+4. Use a concise conventional commit message.
+5. Do not modify code or documentation content as part of this role.
+6. If the diff is empty or unsafe, report clearly and do not force a commit.

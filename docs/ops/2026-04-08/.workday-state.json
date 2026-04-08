@@ -2,11 +2,11 @@
     "completed_steps":  [
 
                         ],
-    "planner_done":  true,
+    "planner_done":  false,
     "handoff_done":  false,
     "qa_structurer_done":  false,
     "gitter_steps":  [
-
+                         1
                      ],
     "date":  "2026-04-08",
     "curator_done":  false
