@@ -21,9 +21,9 @@
 
 ### Item 2. Daily ops continuity gate for reusable handoff
 - category: process
-- surface: QA inbox, QA structured, TODAY_STRATEGY, DAILY_HANDOFF, workday-state enforcement
+- surface: QA inbox, QA structured, TODAY_STRATEGY, DAILY_HANDOFF, `.workday-state.json`
 - symptom: unresolved work still has to be reconstructed from prior-day artifacts, and the handoff path can end without a reusable state boundary; ops files also show encoding/format corruption risk.
-- requested change: add a hard continuity check so QA, strategy, and handoff artifacts preserve the same unresolved work state across sessions and flag encoding or format corruption early.
+- requested change: add a hard continuity check so QA, strategy, handoff, and workday-state artifacts preserve the same unresolved work state across sessions and flag encoding or format corruption early.
 - impact: high
 - priority: P1
 - selected today: yes

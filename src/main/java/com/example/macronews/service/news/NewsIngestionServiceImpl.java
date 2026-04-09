@@ -341,13 +341,15 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
         int selectedCount = selected.size();
         int keptCount = freshOnly.size();
         int removedCount = selectedCount - keptCount;
+        Map<String, Integer> selectedSourceSummary = summarizeSources(selected);
+        Map<String, Integer> keptSourceSummary = summarizeSources(freshOnly);
         String finalCause = selectedCount == 0
                 ? "selector-returned-empty"
                 : "freshness-gate-removed-all";
         if (selectedCount == 0 || keptCount == 0) {
             log.warn("[INGEST] zero-result summary stage={} reason={} selected={} kept={} removed={} selectedSourceSummary={}",
                     selectedCount == 0 ? "pre-filter" : "post-filter",
-                    finalCause, selectedCount, keptCount, removedCount, summarizeSources(selected));
+                    finalCause, selectedCount, keptCount, removedCount, selectedSourceSummary);
         }
         if (selected.isEmpty()) {
             log.warn("[INGEST] final freshness gate stage=pre-filter reason=selector-returned-empty finalCause={} selected=0 kept=0 removed=0",
@@ -359,8 +361,8 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
             log.info("[INGEST] final freshness gate stage=post-filter reason=partial-filter selected={} kept={} removed={}",
                     selectedCount, keptCount, removedCount);
         }
-        log.info("[INGEST] selected sourceSummary={} finalCause={} selected={} kept={} removed={}",
-                summarizeSources(freshOnly), finalCause, selectedCount, keptCount, removedCount);
+        log.info(buildSelectionSummaryLog(selectedSourceSummary, keptSourceSummary, finalCause,
+                selectedCount, keptCount, removedCount));
         return freshOnly;
     }
 
@@ -418,6 +420,16 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
             summary.merge(source, 1, Integer::sum);
         }
         return summary;
+    }
+
+    String buildSelectionSummaryLog(Map<String, Integer> selectedSourceSummary, Map<String, Integer> keptSourceSummary,
+            String finalCause, int selectedCount, int keptCount, int removedCount) {
+        return "[INGEST] selected sourceSummary=" + selectedSourceSummary
+                + " keptSourceSummary=" + keptSourceSummary
+                + " finalCause=" + finalCause
+                + " selected=" + selectedCount
+                + " kept=" + keptCount
+                + " removed=" + removedCount;
     }
 
     private boolean isFreshEnoughForBatch(ExternalNewsItem item) {

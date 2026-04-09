@@ -138,6 +138,34 @@ class NewsIngestionServiceImplTest {
     }
 
     @Test
+    @DisplayName("ingestTopHeadlines should keep the selected source summary when freshness removes everything")
+    void ingestTopHeadlines_logsSelectedSourcesWhenFreshnessRemovesEverything() {
+        ExternalNewsItem staleItem = new ExternalNewsItem(
+                "external-stale",
+                "NAVER",
+                "Old headline",
+                "Old headline summary",
+                "https://example.com/stale",
+                Instant.parse("2026-03-01T00:00:00Z"));
+        given(newsSourceProviderSelector.fetchTopHeadlines(3)).willReturn(List.of(staleItem));
+
+        List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(3);
+
+        assertThat(ingested).isEmpty();
+        assertThat(newsIngestionService.buildSelectionSummaryLog(
+                java.util.Map.of("NAVER", 1),
+                java.util.Map.of(),
+                "freshness-gate-removed-all",
+                1,
+                0,
+                1)).contains("selected sourceSummary={NAVER=1}")
+                .contains("keptSourceSummary={}")
+                .contains("finalCause=freshness-gate-removed-all");
+        verify(newsSourceProviderSelector).fetchTopHeadlines(3);
+        verifyNoInteractions(newsEventRepository, macroAiService, ingestionExecutor);
+    }
+
+    @Test
     @DisplayName("retryFailedAnalyses should reserve and submit only eligible failed items")
     void retryFailedAnalyses_reservesAndSubmitsEligibleItems() {
         Instant now = Instant.parse("2026-03-24T10:00:00Z");
