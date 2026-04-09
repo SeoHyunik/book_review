@@ -153,3 +153,25 @@ Do not treat a day as closed until the date-scoped handoff file contains the sel
 
 **Prevention**
 Add a required final check that fails when QA, strategy, and handoff are aligned in intent but the handoff file is empty or missing.
+
+---
+
+### [2026-04-09] Day Closed With Empty Handoff and Incomplete Workday-State
+
+**Type**
+harness failure
+
+**What Happened**
+The 2026-04-09 QA and strategy chain identified carry-over work correctly, but `DAILY_HANDOFF.md` was still empty at the day boundary and `.workday-state.json` showed `handoff_done=false` and `qa_structurer_done=false`.
+
+**Root Cause**
+The harness records planning progress more reliably than it records closure progress, so an unfinished handoff can survive into the end-of-day state.
+
+**Impact**
+The next session can still inherit a non-reusable context, even when the selected work was already clear.
+
+**Rule / Fix**
+Do not allow a day to close when the date-scoped handoff file is empty or the workday-state file says the session is incomplete.
+
+**Prevention**
+Add a closure gate that checks `QA_INBOX.md`, `QA_STRUCTURED.md`, `TODAY_STRATEGY.md`, `DAILY_HANDOFF.md`, and `.workday-state.json` together before marking the day complete.
