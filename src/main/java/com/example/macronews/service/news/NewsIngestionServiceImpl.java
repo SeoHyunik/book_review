@@ -345,7 +345,8 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
                 ? "selector-returned-empty"
                 : "freshness-gate-removed-all";
         if (selectedCount == 0 || keptCount == 0) {
-            log.warn("[INGEST] zero-result summary reason={} selected={} kept={} removed={} selectedSourceSummary={}",
+            log.warn("[INGEST] zero-result summary stage={} reason={} selected={} kept={} removed={} selectedSourceSummary={}",
+                    selectedCount == 0 ? "pre-filter" : "post-filter",
                     finalCause, selectedCount, keptCount, removedCount, summarizeSources(selected));
         }
         if (selected.isEmpty()) {
@@ -358,7 +359,8 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
             log.info("[INGEST] final freshness gate stage=post-filter reason=partial-filter selected={} kept={} removed={}",
                     selectedCount, keptCount, removedCount);
         }
-        log.info("[INGEST] selected sourceSummary={}", summarizeSources(freshOnly));
+        log.info("[INGEST] selected sourceSummary={} finalCause={} selected={} kept={} removed={}",
+                summarizeSources(freshOnly), finalCause, selectedCount, keptCount, removedCount);
         return freshOnly;
     }
 
