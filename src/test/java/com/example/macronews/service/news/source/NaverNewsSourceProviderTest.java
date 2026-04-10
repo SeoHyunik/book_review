@@ -514,8 +514,8 @@ class NaverNewsSourceProviderTest {
                 .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D\uAE08\uB9AC"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uBB3C\uAC00 \uBC1C\uD45C"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uACE0\uC6A9 \uBC1C\uD45C"))
-                .anySatisfy(url -> assertThat(url).contains("query=\uAD00\uC138"))
-                .anySatisfy(url -> assertThat(url).contains("query=\uC81C\uC7AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uC99D\uC2DC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uC8FC\uC2DD"))
                 .allSatisfy(url -> assertThat(url)
                         .doesNotContain("query=\uC7A5\uC911")
                         .doesNotContain("query=\uB9C8\uAC10"));
@@ -537,8 +537,8 @@ class NaverNewsSourceProviderTest {
                 .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uD53C"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uC5F0\uC900"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uACE0\uC6A9 \uBC1C\uD45C"))
-                .anySatisfy(url -> assertThat(url).contains("query=\uAD00\uC138"))
-                .anySatisfy(url -> assertThat(url).contains("query=\uC81C\uC7AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uC99D\uC2DC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uC8FC\uC2DD"))
                 .allSatisfy(url -> assertThat(url)
                         .doesNotContain("query=\uBBF8\uC911\uAC08\uB4F1")
                         .doesNotContain("query=\uC6B0\uD06C\uB77C\uC774\uB098"));

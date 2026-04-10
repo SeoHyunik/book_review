@@ -96,8 +96,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             "\uBB3C\uAC00 \uBC1C\uD45C",
             "\uACE0\uC6A9 \uBC1C\uD45C",
             "\uB2EC\uB7EC\uC778\uB371\uC2A4",
-            "\uAD00\uC138",
-            "\uC81C\uC7AC"
+            "\uC99D\uC2DC",
+            "\uC8FC\uC2DD"
     );
 
     private final ExternalApiUtils externalApiUtils;
