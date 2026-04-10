@@ -175,3 +175,25 @@ Do not allow a day to close when the date-scoped handoff file is empty or the wo
 
 **Prevention**
 Add a closure gate that checks `QA_INBOX.md`, `QA_STRUCTURED.md`, `TODAY_STRATEGY.md`, `DAILY_HANDOFF.md`, and `.workday-state.json` together before marking the day complete.
+
+---
+
+### [2026-04-10] Raw QA Nuance Can Be Lost During Normalization
+
+**Type**
+harness failure
+
+**What Happened**
+`QA_STRUCTURED.md` was used as the primary planning input, but the raw `QA_INBOX.md` text was noisy enough that the normalization step could drop useful implementation hints without leaving a clear provenance trail.
+
+**Root Cause**
+QA normalization records the selected issue set, but it does not always preserve which details were inferred from corrupted or ambiguous raw notes.
+
+**Impact**
+Important user intent can become harder to audit later, especially when the structured summary is reused without the raw inbox context.
+
+**Rule / Fix**
+When raw QA is noisy or partially unreadable, normalization must preserve a short provenance note for any materially inferred detail.
+
+**Prevention**
+Require reviewers to mark which structured items depend on ambiguous raw text and what part needs manual cross-checking.

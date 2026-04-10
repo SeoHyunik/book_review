@@ -1,0 +1,30 @@
+You are generating the daily handoff for this repository.
+
+Read first:
+1. S:\dev\project\auziraum\PROJECT_BRIEF.md
+2. S:\dev\project\auziraum\AGENTS.md
+3. S:\dev\project\auziraum\DEV_LOOP.md
+4. S:\dev\project\auziraum\HARNESS_RULES.md
+
+Today: 2026-04-10
+
+Ops rules:
+- MUST read the handoff format file first
+- MUST write only to: S:\dev\project\auziraum\docs\ops\2026-04-10\DAILY_HANDOFF.md
+- MUST NOT overwrite the format file
+- If the file already exists, update it carefully instead of creating a duplicate file
+
+Read if available:
+- format: S:\dev\project\auziraum\docs\ops\DAILY_HANDOFF_FORMAT.md
+- TODAY_STRATEGY: S:\dev\project\auziraum\docs\ops\2026-04-10\TODAY_STRATEGY.md
+- QA_INBOX: S:\dev\project\auziraum\docs\ops\2026-04-10\QA_INBOX.md
+- QA_STRUCTURED: S:\dev\project\auziraum\docs\ops\2026-04-10\QA_STRUCTURED.md
+- HARNESS_FAILURES: S:\dev\project\auziraum\docs\ops\HARNESS_FAILURES.md
+- reports: S:\dev\project\auziraum\docs\reports
+
+Tasks:
+1. Read DAILY_HANDOFF_FORMAT.md
+2. Create or update exactly: S:\dev\project\auziraum\docs\ops\2026-04-10\DAILY_HANDOFF.md
+3. Distinguish completed / partial / deferred / risks / next steps
+4. Do not invent finished work
+5. Do not modify any other file
