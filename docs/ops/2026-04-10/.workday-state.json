@@ -1,8 +1,8 @@
 {
     "completed_steps":  [
-
+                            1
                         ],
-    "planner_done":  true,
+    "planner_done":  false,
     "handoff_done":  false,
     "qa_structurer_done":  false,
     "gitter_steps":  [

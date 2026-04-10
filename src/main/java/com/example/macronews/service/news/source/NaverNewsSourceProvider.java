@@ -78,6 +78,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             "\uC720\uAC00",
             "\uB2EC\uB7EC",
             "\uACE0\uC6A9",
+            "kospi",
+            "kosdaq",
             "\uC99D\uC2DC",
             "\uCF54\uC2A4\uD53C",
             "\uCF54\uC2A4\uB2E5"
@@ -299,6 +301,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     }
                     continue;
                 }
+                if (!isRelevantForMacroNews(cleanedTitle, cleanedDescription)) {
+                    filteredByRelevanceCount++;
+                    continue;
+                }
                 if (!StringUtils.hasText(resolvedUrl)) {
                     missingUrlCount++;
                 }
@@ -325,6 +331,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                         ? "stale-only-input"
                         : (nullPublishedAtCount == rawItemCount || invalidPubDateCount == rawItemCount
                                 ? "unusable-input"
+                                : filteredByRelevanceCount == rawItemCount
+                                        ? "relevance-only-input"
                                 : "no-usable-items");
                 log.info("[NAVER] provider empty reason={} bucket={} query='{}' pageStart={} rawItems={} staleItems={} nullPublishedAt={} invalidPubDate={} filteredByRelevance={} missingUsableLink={} emptyTitle={}",
                         reason, bucket, query, pageStart, rawItemCount, staleItemCount, nullPublishedAtCount,

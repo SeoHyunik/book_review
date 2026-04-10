@@ -6,23 +6,22 @@
 ---
 
 ## 2. Strategy Objective
-- Restore daytime Naver news collection with the smallest safe filter adjustment so public freshness recovers without broadening the news set beyond the intended market topics.
-- Capture the external index-related API keys and manual source dependencies in a concise inventory so future market-data work is not blocked by unknown prerequisites.
+- Restore daytime Naver news collection with the smallest safe filter adjustment so public freshness recovers without broadening the feed beyond the intended market topics.
 
 ---
 
 ## 3. Current Context Summary
-- The current product pressure is freshness, not feature expansion: daytime news collection is empty, and that weakens downstream interpretation quality.
-- The requested ingestion fix is intentionally narrow: widen keyword filters first, then narrow the collected set back to KOSPI/KOSDAQ-related articles.
-- The broader market-data path is still prerequisite-heavy because the team does not yet have a clean inventory of required index-related API keys and external inputs.
-- Yesterday's harness continuity issue remains real, but today's QA points to product-facing work first; harness cleanup stays visible but off the critical path for today.
+- The immediate product issue is freshness: daytime collection is empty, which weakens downstream interpretation quality.
+- The requested fix is intentionally narrow: widen the collection filter first, then narrow the collected set back to KOSPI- and KOSDAQ-related articles.
+- The broader index-related API key inventory is still useful, but it is a prerequisite and not the highest-priority execution item for today.
+- The previous session also surfaced a harness continuity problem, but that remains off the critical path for this product-focused day.
 
 ---
 
 ## 4. Carry-over from Previous Session
 - Daily handoff completion gate
   - previous status: blocked
-  - why it was not completed: the previous session documented the gap, but the session ended before a reusable handoff was written
+  - why it was not completed: the previous session documented the gap, but the day ended before a reusable handoff was written
   - still relevant: yes
   - decision today: defer again
 - Workday-state consistency check
@@ -49,12 +48,12 @@
 - `docs/ops/2026-04-09/DAILY_HANDOFF.md`
 - `docs/reports/2026-04-08-step-2-daily-ops-continuity-check.md`
 - `docs/reports/2026-04-07-step-2-re-review-and-handoff-check.md`
-- explicit user instruction to use QA_STRUCTURED as the primary planning input and QA_INBOX only as a cross-check
+- explicit user instruction to use `QA_STRUCTURED.md` as the primary planning input and `QA_INBOX.md` only as a cross-check
 
 ---
 
 ## 6. User-Observed Issues
-- Symptom: Naver news is not being collected during the daytime.
+- Symptom: daytime Naver news is not being collected.
   - Where it appears: news collection pipeline / Naver crawler
   - Why it matters: public freshness drops and downstream interpretation quality degrades when the feed is empty
 - Symptom: the team does not yet have a clean list of index-related API keys and other manual inputs.
@@ -64,10 +63,11 @@
 ---
 
 ## 7. Code / System Findings
-- The structured QA and the raw inbox are aligned on the main issue: daytime Naver collection is missing and needs a careful filter adjustment, not a broad product rewrite.
-- The raw inbox adds implementation nuance, namely that the filter should be widened first and then narrowed to KOSPI/KOSDAQ-related articles; that is an inference from the QA text, not a code trace.
-- The 2026-04-08 continuity report shows the daily QA and strategy chain was internally consistent, and the actual operational gap was the empty handoff file.
-- No code trace was performed in this planning step, so the next execution pass still needs to confirm the exact crawler and filter path before changing behavior.
+- `QA_STRUCTURED.md` and `QA_INBOX.md` agree on the core issue: daytime Naver collection is missing and needs a narrow filter adjustment, not a broad rewrite.
+- The raw inbox adds an implementation hint that the filter should be widened first and then narrowed to KOSPI/KOSDAQ-related articles; that is an inference from the raw text, not a code trace.
+- The raw inbox also mentions the API-key inventory, but the structured QA separates it as a broader product decision rather than an immediate implementation item.
+- The 2026-04-09 handoff confirms the operational continuity gap remains real, but it is not the selected product work for today.
+- No code trace was performed in this planning step, so the exact crawler and filter path still needs to be confirmed during execution.
 
 ---
 
@@ -92,10 +92,10 @@
 ---
 
 ## 10. Selection Logic
-- The carry-over harness items remain relevant, but they are not selected today because they do not unblock the immediate public-facing freshness issue.
-- The new QA shifts priority toward the ingestion problem because it has the most direct user impact and the smallest safe execution path.
-- The dependency inventory is selected second because it reduces the chance that later market-data work stalls on unknown external prerequisites.
-- The trade-off is deliberate: keep the harness follow-up explicit, but avoid mixing it into the product fix so the step stays small and safe.
+- The structured QA marks the ingestion issue as the only implementation-ready item selected today, so it becomes the primary work item.
+- The dependency inventory is useful but deferred because it is a broader product decision and not required to restore today’s freshness problem.
+- The harness carry-over items remain relevant, but they are intentionally deferred so the step stays small and safe.
+- The raw inbox did not materially change the selection: it reinforced the same freshness issue and added only noisy phrasing around the prerequisite inventory.
 
 ---
 
@@ -104,10 +104,6 @@
   - goal: restore daytime Naver collection with a minimal filter adjustment
   - why selected: it directly addresses the degraded public feed
   - why not deferred: the freshness problem is current and user-visible
-- Docs alignment / dependency inventory
-  - goal: produce a concise inventory of index-related API keys and manual source inputs
-  - why selected: it prevents blocked or ambiguous follow-up work
-  - why not deferred: this is a bounded prerequisite task and can be completed without changing product behavior
 
 ---
 
@@ -144,43 +140,16 @@
 - code
 - tests
 
-### Step 2. Inventory Required Index API Keys and Manual Inputs
-
-**Goal**
-- Document the external index-related API keys and source dependencies the team must obtain manually before market-data work can proceed.
-
-**Target Area**
-- docs
-- report
-
-**Likely Files**
-- `docs/reports/2026-04-10-index-api-key-inventory.md`
-- any existing market-data notes that need a minimal cross-reference update
-
-**Forbidden Scope**
-- no code changes
-- no new architecture
-- no speculative market-data implementation
-
-**Validation**
-- check the inventory is complete enough for a developer to start the next market-data step without guessing prerequisites
-- cross-check the list against the current product brief and QA notes
-
-**Expected Output**
-- report
-- optional documentation note if the repository already has a natural place for it
-
 ---
 
 ## 13. Recommended Agent Flow
-- Default flow applies:
+- Default flow applies for the selected ingestion step:
   1. navi
   2. reviewer
   3. worker
   4. reviewer
   5. dockeeper
   6. gitter
-- Keep Step 1 and Step 2 separate so the ingestion fix can be validated before any documentation follow-up is finalized.
 
 ---
 
@@ -199,28 +168,30 @@
 
 ## 15. Risks and Constraints
 - The Naver filter change could broaden the feed too far if the keyword narrowing is not preserved.
-- The index API inventory may require external source lookup, so the step can stall if the prerequisite list is not discoverable from the repo and reports alone.
 - The raw inbox is noisy at the text level, so the structured QA remains the source of truth for scope selection.
+- The index API inventory remains a useful follow-up, but it should not pull focus away from the freshness fix.
 - Harness cleanup remains necessary, but mixing it into today's product work would increase scope without helping the freshness issue.
 
 ---
 
 ## 16. Deferrals
-- Harness completion gate
+- Index-related API key and source inventory
+  - reason: important prerequisite work, but not required to restore today's daytime feed
+  - when to revisit: after the ingestion fix is stable
+- Daily handoff completion gate
   - reason: not needed to unblock today's user-visible freshness problem
-  - revisit: after the ingestion fix is stable
+  - when to revisit: after the ingestion fix is stable
 - Workday-state consistency validation
-  - reason: important, but separate from the product-facing QA items selected today
-  - revisit: during the next harness-focused pass
+  - reason: important, but separate from the product-facing QA item selected today
+  - when to revisit: during the next harness-focused pass
 - Daily ops corruption detection
   - reason: still relevant, but no new enforcement change is required to start today's work
-  - revisit: when the harness work is reopened
+  - when to revisit: when the harness work is reopened
 
 ---
 
 ## 17. Definition of Done for Today
 - Daytime Naver collection resumes with the intended topic constraints preserved.
-- The index-related API prerequisite list is written down clearly enough to support follow-on work.
 - No unrelated files are changed.
 - The carry-over harness items remain visible but are not accidentally expanded into today's scope.
 - The next session can continue from a clear handoff.
@@ -230,4 +201,3 @@
 ## 18. Handoff Requirement
 
 `docs/ops/2026-04-10/DAILY_HANDOFF.md`
-

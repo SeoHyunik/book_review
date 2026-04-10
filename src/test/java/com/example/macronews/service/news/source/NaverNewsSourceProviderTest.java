@@ -92,7 +92,7 @@ class NaverNewsSourceProviderTest {
                 {
                   "items": [
                     {
-                      "title": "Market tone firms",
+                      "title": "KOSPI tone firms",
                       "description": "Alternate date format",
                       "originallink": "https://news.example.com/alternate-date",
                       "link": "https://search.naver.com/alternate-date",
@@ -116,7 +116,7 @@ class NaverNewsSourceProviderTest {
                 {
                   "items": [
                     {
-                      "title": "USD pulls back",
+                      "title": "Dollar pulls back",
                       "description": "Fallback link should be used",
                       "originallink": "",
                       "link": "https://search.naver.com/usd-pullback",
@@ -165,7 +165,7 @@ class NaverNewsSourceProviderTest {
                 {
                   "items": [
                     {
-                      "title": "Kosdaq recovers",
+                      "title": "KOSDAQ recovers",
                       "description": "기관 수급이 개선되고 있습니다.",
                       "originallink": "https://news.example.com/kosdaq",
                       "link": "https://search.naver.com/kosdaq",
@@ -182,6 +182,37 @@ class NaverNewsSourceProviderTest {
     }
 
     @Test
+    @DisplayName("NAVER provider should filter out fresh but irrelevant items")
+    void fetchTopHeadlines_filtersFreshIrrelevantItems() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "\uCF54\uC2A4\uD53C");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "KOSPI opens higher",
+                      "description": "Fed signals patience on rates",
+                      "originallink": "https://news.example.com/relevant",
+                      "link": "https://search.naver.com/relevant",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                    },
+                    {
+                      "title": "Celebrity profile",
+                      "description": "Entertainment roundup",
+                      "originallink": "https://news.example.com/irrelevant",
+                      "link": "https://search.naver.com/irrelevant",
+                      "pubDate": "Fri, 13 Mar 2026 09:10:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).url()).isEqualTo("https://news.example.com/relevant");
+    }
+
+    @Test
     @DisplayName("NAVER provider should not use links as summary text")
     void fetchTopHeadlines_doesNotUseLinkAsSummary() {
         ReflectionTestUtils.setField(provider, "rawQueries", "semiconductor");
@@ -189,7 +220,7 @@ class NaverNewsSourceProviderTest {
                 {
                   "items": [
                     {
-                      "title": "Chip cycle improves",
+                      "title": "KOSPI cycle improves",
                       "description": "https://news.example.com/chip-cycle",
                       "originallink": "https://news.example.com/chip-cycle",
                       "link": "https://search.naver.com/chip-cycle",
@@ -259,7 +290,7 @@ class NaverNewsSourceProviderTest {
                 {
                   "items": [
                     {
-                      "title": "FX earlier wrap",
+                      "title": "KOSPI earlier wrap",
                       "description": "Inside fallback window",
                       "originallink": "https://news.example.com/fx-semi",
                       "link": "https://search.naver.com/fx-semi",
@@ -298,7 +329,7 @@ class NaverNewsSourceProviderTest {
                         {
                           "items": [
                             {
-                              "title": "Fresh intraday move",
+                      "title": "Fresh KOSPI intraday move",
                               "description": "Fresh page two item",
                               "originallink": "https://news.example.com/fresh-2",
                               "link": "https://search.naver.com/fresh-2",
@@ -326,14 +357,14 @@ class NaverNewsSourceProviderTest {
                 {
                   "items": [
                     {
-                      "title": "Fresh item one",
+                      "title": "Fresh KOSPI item one",
                       "description": "Fresh result",
                       "originallink": "https://news.example.com/fresh-1",
                       "link": "https://search.naver.com/fresh-1",
                       "pubDate": "Fri, 13 Mar 2026 11:50:00 +0900"
                     },
                     {
-                      "title": "Fresh item two",
+                      "title": "Fresh KOSPI item two",
                       "description": "Fresh result",
                       "originallink": "https://news.example.com/fresh-2",
                       "link": "https://search.naver.com/fresh-2",
