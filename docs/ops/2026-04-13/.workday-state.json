@@ -1,10 +1,10 @@
 {
     "completed_steps":  [
-
+                            1
                         ],
     "planner_done":  false,
     "handoff_done":  false,
-    "qa_structurer_done":  true,
+    "qa_structurer_done":  false,
     "gitter_steps":  [
 
                      ],
