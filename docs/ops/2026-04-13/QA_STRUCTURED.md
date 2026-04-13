@@ -4,7 +4,7 @@
 2026-04-13
 
 ## Normalization Note
-- The raw QA inbox contains one clear implementation issue and one related but broader operational decision.
+- The raw QA inbox contains one implementation-ready ingestion issue and one broader operational decision about log access.
 - The log-access request is kept separate from the collection failure so the implementation scope stays minimal and safe.
 - The 2026-04-10 carry-over is reflected by marking the ingestion issue as a carry-over candidate.
 
