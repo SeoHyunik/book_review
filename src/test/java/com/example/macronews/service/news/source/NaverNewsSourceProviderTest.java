@@ -351,6 +351,63 @@ class NaverNewsSourceProviderTest {
     }
 
     @Test
+    @DisplayName("NAVER provider should use the third page when the first two pages are stale only")
+    void fetchTopHeadlines_usesThirdPageWhenFirstTwoPagesAreStaleOnly() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "KOSPI");
+        ReflectionTestUtils.setField(provider, "display", 5);
+        ReflectionTestUtils.setField(provider, "maxPages", 0);
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "Old KOSPI wrap",
+                              "description": "Too old",
+                              "originallink": "https://news.example.com/old-1",
+                              "link": "https://search.naver.com/old-1",
+                              "pubDate": "Thu, 12 Mar 2026 00:00:00 +0900"
+                            }
+                          ]
+                        }
+                        """))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "Still old KOSPI wrap",
+                              "description": "Still too old",
+                              "originallink": "https://news.example.com/old-2",
+                              "link": "https://search.naver.com/old-2",
+                              "pubDate": "Thu, 12 Mar 2026 03:00:00 +0900"
+                            }
+                          ]
+                        }
+                        """))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "Fresh KOSPI move",
+                              "description": "Third page recovery item",
+                              "originallink": "https://news.example.com/fresh-3",
+                              "link": "https://search.naver.com/fresh-3",
+                              "pubDate": "Fri, 13 Mar 2026 10:30:00 +0900"
+                            }
+                          ]
+                        }
+                        """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).url()).isEqualTo("https://news.example.com/fresh-3");
+        List<String> urls = capturedRequestUrls();
+        assertThat(urls).anySatisfy(url -> assertThat(url).contains("start=1"));
+        assertThat(urls).anySatisfy(url -> assertThat(url).contains("start=6"));
+        assertThat(urls).anySatisfy(url -> assertThat(url).contains("start=11"));
+    }
+
+    @Test
     @DisplayName("NAVER provider should stop paging once enough fresh items are found")
     void fetchTopHeadlines_stopsPagingWhenEnoughFreshItemsAreFound() {
         ReflectionTestUtils.setField(provider, "rawQueries", "코스피");

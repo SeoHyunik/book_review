@@ -132,7 +132,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     @Value("${app.news.naver.fallback-max-age-hours:24}")
     private long fallbackMaxAgeHours;
 
-    @Value("${app.news.naver.max-pages:2}")
+    @Value("${app.news.naver.max-pages:3}")
     private int maxPages;
 
     private Clock clock = DEFAULT_CLOCK;
@@ -436,7 +436,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     }
 
     private int resolveMaxPages() {
-        return maxPages > 0 ? maxPages : 2;
+        return maxPages > 0 ? maxPages : 3;
     }
 
     private String normalizeTitle(String title) {
