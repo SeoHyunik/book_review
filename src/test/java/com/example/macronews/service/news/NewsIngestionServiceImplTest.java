@@ -14,8 +14,10 @@ import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.repository.NewsEventRepository;
 import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -163,6 +165,32 @@ class NewsIngestionServiceImplTest {
                 .contains("finalCause=freshness-gate-removed-all");
         verify(newsSourceProviderSelector).fetchTopHeadlines(3);
         verifyNoInteractions(newsEventRepository, macroAiService, ingestionExecutor);
+    }
+
+    @Test
+    @DisplayName("ingestTopHeadlines should keep Naver items inside the extended recovery window")
+    void ingestTopHeadlines_keepsNaverItemsInsideExtendedRecoveryWindow() {
+        ReflectionTestUtils.setField(newsIngestionService, "naverFallbackMaxAgeHours", 336L);
+        Instant publishedAt = Instant.now().minus(Duration.ofDays(10));
+
+        ExternalNewsItem recoveredItem = new ExternalNewsItem(
+                "external-recovered",
+                "NAVER",
+                "Recovered Naver headline",
+                "Recovered summary",
+                "https://example.com/recovered",
+                publishedAt);
+        given(newsSourceProviderSelector.fetchTopHeadlines(3)).willReturn(List.of(recoveredItem));
+        given(newsEventRepository.findByExternalId("external-recovered")).willReturn(Optional.empty());
+        given(newsEventRepository.findByUrl("https://example.com/recovered")).willReturn(Optional.empty());
+        given(newsEventRepository.save(any(NewsEvent.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(3);
+
+        assertThat(ingested).hasSize(1);
+        assertThat(ingested.get(0).source()).isEqualTo("NAVER");
+        verify(newsSourceProviderSelector).fetchTopHeadlines(3);
+        verify(newsEventRepository).save(any(NewsEvent.class));
     }
 
     @Test

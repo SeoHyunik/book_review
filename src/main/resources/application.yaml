@@ -178,8 +178,10 @@ app:
       display: 5
       start: 1
       max-pages: 2
-      max-age-hours: 12
-      fallback-max-age-hours: 24
+      # Recovery window: keep recent-but-not-immediate Naver market articles usable
+      # when the upstream feed is running behind the current market cycle.
+      max-age-hours: 168
+      fallback-max-age-hours: 336
     gnews:
       enabled: true
       base-url: https://gnews.io/api/v4/search

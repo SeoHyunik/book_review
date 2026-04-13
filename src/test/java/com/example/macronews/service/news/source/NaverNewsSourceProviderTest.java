@@ -283,9 +283,11 @@ class NaverNewsSourceProviderTest {
     }
 
     @Test
-    @DisplayName("NAVER semi-fresh bucket should allow controlled fallback items")
-    void fetchTopHeadlines_allowsSemiFreshItemsInsideFallbackWindow() {
+    @DisplayName("NAVER semi-fresh bucket should allow controlled fallback items inside the extended recovery window")
+    void fetchTopHeadlines_allowsSemiFreshItemsInsideExtendedFallbackWindow() {
         ReflectionTestUtils.setField(provider, "rawQueries", "fx");
+        ReflectionTestUtils.setField(provider, "maxAgeHours", 168L);
+        ReflectionTestUtils.setField(provider, "fallbackMaxAgeHours", 336L);
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
                 {
                   "items": [
@@ -294,7 +296,7 @@ class NaverNewsSourceProviderTest {
                       "description": "Inside fallback window",
                       "originallink": "https://news.example.com/fx-semi",
                       "link": "https://search.naver.com/fx-semi",
-                      "pubDate": "Thu, 12 Mar 2026 18:00:00 +0900"
+                      "pubDate": "Mon, 02 Mar 2026 12:00:00 +0900"
                     }
                   ]
                 }
