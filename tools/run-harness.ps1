@@ -1580,7 +1580,7 @@ try {
             Initialize-NextDayCarryOverDraft
         }
         'workday' {
-            & (Join-Path $RootDir 'tools/verify-run-harness-regression.ps1') -RootDir $RootDir
+            & (Join-Path $RootDir 'tools/verify-run-harness-regression.ps1') -RootDir $RootDir -DateString $DateString
             Invoke-WorkdayMode
         }
 }

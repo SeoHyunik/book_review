@@ -1,11 +1,14 @@
 param(
-    [string]$RootDir = (Split-Path $PSScriptRoot -Parent)
+    [string]$RootDir = (Split-Path $PSScriptRoot -Parent),
+    [string]$DateString = (Get-Date -Format 'yyyy-MM-dd')
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $script:Failures = New-Object System.Collections.Generic.List[string]
+$script:GuardStatus = 'passed'
+$script:GuardMessage = 'workday regression verification passed'
 
 function Assert-True {
     param(
@@ -48,7 +51,7 @@ function Invoke-Test {
 
 $env:HARNESS_LIBRARY_MODE = '1'
 try {
-    . (Join-Path $RootDir 'tools/run-harness.ps1') -RootDir $RootDir -DateString '2026-04-16' -StepNumber 1 -DryRun
+    . (Join-Path $RootDir 'tools/run-harness.ps1') -RootDir $RootDir -DateString $DateString -StepNumber 1
 
     Invoke-Test -Name 'interruption classification' -Block {
         $cases = @(
@@ -100,9 +103,16 @@ try {
     }
 
     if ($script:Failures.Count -gt 0) {
+        $script:GuardStatus = 'failed'
+        $script:GuardMessage = 'workday execution blocked by harness regression guard'
+    }
+
+    if ($script:GuardStatus -eq 'failed') {
+        Write-Host ("[GUARD] regression verification {0}" -f $script:GuardStatus) -ForegroundColor Red
         throw ("Run harness regression verification failed:`n- {0}" -f ($script:Failures -join "`n- "))
     }
 
+    Write-Host ("[GUARD] regression verification {0}" -f $script:GuardStatus) -ForegroundColor Green
     Write-Host '[PASS] run-harness regression verification completed' -ForegroundColor Green
 }
 finally {
