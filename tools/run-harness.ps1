@@ -270,6 +270,31 @@ function Get-ResumeStepFloor {
     return $resumeFrom
 }
 
+function Get-RunStatusFromErrorMessage {
+    param(
+        [string]$ErrorMessage
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ErrorMessage)) {
+        return @{
+            runStatus = 'COMPLETED'
+            exitCode = 0
+        }
+    }
+
+    if ($ErrorMessage.StartsWith('[RESUMABLE_INTERRUPTION]')) {
+        return @{
+            runStatus = 'INTERRUPTED'
+            exitCode = 2
+        }
+    }
+
+    return @{
+        runStatus = 'FAILED'
+        exitCode = 1
+    }
+}
+
 function Get-LatestPreviousHandoffFile {
     param(
         [string]$OpsRoot,
@@ -1468,6 +1493,11 @@ function Invoke-WorkdayMode {
 # 4. Validation# ==========================================
 # 4. Validation
 # ==========================================
+$libraryMode = $env:HARNESS_LIBRARY_MODE
+if ($libraryMode -eq '1') {
+    return
+}
+
 $requiredFiles = @(
     $AgentsFile,
     $ProjectBrief,
@@ -1552,18 +1582,13 @@ try {
         'workday' {
             Invoke-WorkdayMode
         }
-    }
+}
 }
 catch {
     $errorMessage = $_.Exception.Message
-    if ($errorMessage -like '[RESUMABLE_INTERRUPTION]*') {
-        $runStatus = 'INTERRUPTED'
-        $exitCode = 2
-    }
-    else {
-        $runStatus = 'FAILED'
-        $exitCode = 1
-    }
+    $runOutcome = Get-RunStatusFromErrorMessage -ErrorMessage $errorMessage
+    $runStatus = $runOutcome.runStatus
+    $exitCode = $runOutcome.exitCode
 }
 finally {
     Write-FinalRunSummary -ModeName $Mode -Status $runStatus -ErrorMessage $errorMessage
