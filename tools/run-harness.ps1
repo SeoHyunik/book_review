@@ -23,6 +23,7 @@ $ErrorActionPreference = "Stop"
 
 $RunStartedAt = Get-Date
 $ExecutedStages = New-Object System.Collections.Generic.List[string]
+$script:LastInterruption = $null
 
 # ==========================================
 # 1. Core paths
@@ -109,6 +110,10 @@ function Get-WorkdayState {
             gitter_steps = @()
             curator_done = $false
             handoff_done = $false
+            current_stage = $null
+            stage_status = 'idle'
+            next_step = $null
+            interruption = $null
         }
     }
 
@@ -122,6 +127,10 @@ function Get-WorkdayState {
         if (-not $state.ContainsKey('gitter_steps')) { $state.gitter_steps = @() }
         if (-not $state.ContainsKey('curator_done')) { $state.curator_done = $false }
         if (-not $state.ContainsKey('handoff_done')) { $state.handoff_done = $false }
+        if (-not $state.ContainsKey('current_stage')) { $state.current_stage = $null }
+        if (-not $state.ContainsKey('stage_status')) { $state.stage_status = 'idle' }
+        if (-not $state.ContainsKey('next_step')) { $state.next_step = $null }
+        if (-not $state.ContainsKey('interruption')) { $state.interruption = $null }
 
         $state.completed_steps = @($state.completed_steps | ForEach-Object { [int]$_ } | Sort-Object -Unique)
         $state.gitter_steps = @($state.gitter_steps | ForEach-Object { [int]$_ } | Sort-Object -Unique)
@@ -137,6 +146,10 @@ function Get-WorkdayState {
             gitter_steps = @()
             curator_done = $false
             handoff_done = $false
+            current_stage = $null
+            stage_status = 'idle'
+            next_step = $null
+            interruption = $null
         }
     }
 }
@@ -154,6 +167,107 @@ function Save-WorkdayState {
 
     $json = $State | ConvertTo-Json -Depth 5
     [System.IO.File]::WriteAllText($WorkdayStateFile, $json, [System.Text.UTF8Encoding]::new($false))
+}
+
+function Get-InterruptionInfo {
+    param(
+        [string]$Text,
+        [string]$StageName
+    )
+
+    $raw = if ($Text) { $Text } else { '' }
+    $normalized = $raw.ToLowerInvariant()
+    $patterns = @(
+        'token',
+        'usage limit',
+        'quota',
+        'rate limit',
+        'context length',
+        'max token',
+        'too many requests',
+        '429',
+        'insufficient_quota'
+    )
+
+    foreach ($pattern in $patterns) {
+        if ($normalized -match [regex]::Escape($pattern)) {
+            return @{
+                is_resumable = $true
+                type = 'resumable_interruption'
+                reason = 'token_or_usage_limit'
+                stage = $StageName
+                detected_pattern = $pattern
+                detected_at = (Get-Date).ToString('o')
+            }
+        }
+    }
+
+    return $null
+}
+
+function Set-StageState {
+    param(
+        [string]$StageName,
+        [string]$Status,
+        [hashtable]$Interruption = $null
+    )
+
+    if ($DryRun) {
+        return
+    }
+
+    $state = Get-WorkdayState
+    $state.current_stage = $StageName
+    $state.stage_status = $Status
+    $state.interruption = $Interruption
+
+    if ($StageName -match '^step-(\d+)$' -or $StageName -match '^gitter-step-(\d+)$') {
+        $state.next_step = [int]$Matches[1]
+    }
+
+    if ($Status -eq 'completed') {
+        $state.current_stage = $null
+        $state.stage_status = 'idle'
+        $state.interruption = $null
+    }
+
+    Save-WorkdayState -State $state
+}
+
+function Get-ResumeStepFloor {
+    param(
+        [hashtable]$State,
+        [int]$RequestedStepNumber
+    )
+
+    $resumeFrom = $RequestedStepNumber
+
+    if ($null -eq $State) {
+        return $resumeFrom
+    }
+
+    if ($State.stage_status -ne 'interrupted') {
+        return $resumeFrom
+    }
+
+    if ($null -eq $State.interruption) {
+        return $resumeFrom
+    }
+
+    if ($State.interruption.reason -ne 'token_or_usage_limit') {
+        return $resumeFrom
+    }
+
+    if ($null -eq $State.next_step) {
+        return $resumeFrom
+    }
+
+    $nextStep = [int]$State.next_step
+    if ($nextStep -gt $resumeFrom) {
+        $resumeFrom = $nextStep
+    }
+
+    return $resumeFrom
 }
 
 function Get-LatestPreviousHandoffFile {
@@ -656,7 +770,7 @@ function Write-FinalRunSummary {
     $elapsed = (Get-Date) - $RunStartedAt
     $elapsedText = $elapsed.ToString("hh\:mm\:ss")
     $executed = if ($ExecutedStages.Count -gt 0) { $ExecutedStages -join ' -> ' } else { '(none)' }
-    $summaryColor = if ($Status -eq 'SUCCESS') { 'Green' } else { 'Red' }
+    $summaryColor = if ($Status -eq 'COMPLETED') { 'Green' } elseif ($Status -eq 'INTERRUPTED') { 'Yellow' } else { 'Red' }
 
     Write-Host ""
     Write-Host "==========================================" -ForegroundColor $summaryColor
@@ -698,10 +812,53 @@ function Invoke-CodexFromPrompt {
         return
     }
 
+    $script:LastInterruption = $null
+    Set-StageState -StageName $StageName -Status 'in_progress'
+
     $stageStartedAt = Get-Date
-    Invoke-Expression $cmd
-    Add-ExecutedStage -StageName $StageName
-    Write-StageCompletion -StageName $StageName -StartedAt $stageStartedAt
+    $codexOutput = @()
+    try {
+        $codexOutput = @(Get-Content $PromptFile -Raw | codex $codexArgs 2>&1)
+        $codexExitCode = $LASTEXITCODE
+
+        if ($codexOutput.Count -gt 0) {
+            $codexOutput | ForEach-Object { Write-Host $_ }
+        }
+
+        if ($codexExitCode -ne 0) {
+            $joined = ($codexOutput -join [Environment]::NewLine)
+            if ([string]::IsNullOrWhiteSpace($joined)) {
+                $joined = "codex exited with code $codexExitCode"
+            }
+
+            $interruption = Get-InterruptionInfo -Text $joined -StageName $StageName
+            if ($null -ne $interruption) {
+                Set-StageState -StageName $StageName -Status 'interrupted' -Interruption $interruption
+                $script:LastInterruption = $interruption
+                throw ("[RESUMABLE_INTERRUPTION] Stage {0} interrupted due to token/usage limit signal." -f $StageName)
+            }
+
+            Set-StageState -StageName $StageName -Status 'failed'
+            throw $joined
+        }
+
+        Set-StageState -StageName $StageName -Status 'completed'
+        Add-ExecutedStage -StageName $StageName
+        Write-StageCompletion -StageName $StageName -StartedAt $stageStartedAt
+    }
+    catch {
+        if ($script:LastInterruption -eq $null) {
+            $combinedText = $_.Exception.Message
+            $interruption = Get-InterruptionInfo -Text $combinedText -StageName $StageName
+            if ($null -ne $interruption) {
+                Set-StageState -StageName $StageName -Status 'interrupted' -Interruption $interruption
+                $script:LastInterruption = $interruption
+                throw ("[RESUMABLE_INTERRUPTION] Stage {0} interrupted due to token/usage limit signal." -f $StageName)
+            }
+        }
+
+        throw
+    }
 }
 
 function New-QaStructurerPromptContent {
@@ -1223,6 +1380,10 @@ $tomorrow
 function Invoke-WorkdayMode {
     $state = Get-WorkdayState
 
+    if ($state.stage_status -eq 'failed' -and -not [string]::IsNullOrWhiteSpace($state.current_stage)) {
+        throw ("Workday resume blocked. Last run failed at stage '{0}'. Resolve the failure before rerunning." -f $state.current_stage)
+    }
+
     if ($state.qa_structurer_done) {
         Write-Host "[SKIP] qa-structurer already done" -ForegroundColor Yellow
         Add-ExecutedStage -StageName 'qa-structurer (skipped)'
@@ -1245,10 +1406,15 @@ function Invoke-WorkdayMode {
         throw "TODAY_STRATEGY.md not found after planner run: $TodayStrategy"
     }
 
-    $plannedSteps = @(Get-PlannedStepNumbers -TodayStrategyPath $TodayStrategy | Where-Object { $_ -ge $StepNumber })
+    $resumeStepFloor = Get-ResumeStepFloor -State $state -RequestedStepNumber $StepNumber
+    if ($resumeStepFloor -gt $StepNumber) {
+        Write-Host ("[RESUME] Using interrupted resume point: step-{0}" -f $resumeStepFloor) -ForegroundColor Yellow
+    }
+
+    $plannedSteps = @(Get-PlannedStepNumbers -TodayStrategyPath $TodayStrategy | Where-Object { $_ -ge $resumeStepFloor })
 
     if ($plannedSteps.Count -eq 0) {
-        throw "No planned steps were found in TODAY_STRATEGY.md starting from Step $StepNumber"
+        throw "No planned steps were found in TODAY_STRATEGY.md starting from Step $resumeStepFloor"
     }
 
     foreach ($plannedStep in $plannedSteps) {
@@ -1353,8 +1519,9 @@ $PreviousHandoff = Get-LatestPreviousHandoffFile -OpsRoot $OpsDir -CurrentDate $
 # ==========================================
 # 6. Execute by mode
 # ==========================================
-$runStatus = 'SUCCESS'
+$runStatus = 'COMPLETED'
 $errorMessage = $null
+$exitCode = 0
 
 try {
     switch ($Mode) {
@@ -1388,10 +1555,19 @@ try {
     }
 }
 catch {
-    $runStatus = 'FAILED'
     $errorMessage = $_.Exception.Message
-    throw
+    if ($errorMessage -like '[RESUMABLE_INTERRUPTION]*') {
+        $runStatus = 'INTERRUPTED'
+        $exitCode = 2
+    }
+    else {
+        $runStatus = 'FAILED'
+        $exitCode = 1
+    }
 }
 finally {
     Write-FinalRunSummary -ModeName $Mode -Status $runStatus -ErrorMessage $errorMessage
+    if ($exitCode -ne 0) {
+        exit $exitCode
+    }
 }
