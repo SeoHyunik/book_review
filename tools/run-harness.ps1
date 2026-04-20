@@ -63,7 +63,11 @@ $ReadableDocsToCheckBeforeHandoff = @(
 # ==========================================
 # 2. Codex CLI args
 # ==========================================
-$CodexBaseArgs = 'exec --dangerously-bypass-approvals-and-sandbox -C "{WORKDIR}"'
+$CodexBaseArgs = @(
+    'exec',
+    '--dangerously-bypass-approvals-and-sandbox',
+    '-C'
+)
 
 # ==========================================
 # 3. Helpers
@@ -824,8 +828,8 @@ function Invoke-CodexFromPrompt {
         [string]$StageName = "codex"
     )
 
-    $codexArgs = $CodexBaseArgs.Replace('{WORKDIR}', $WorkDir)
-    $cmd = "Get-Content `"$PromptFile`" -Raw | codex $codexArgs"
+    $codexArgs = @($CodexBaseArgs + @($WorkDir, '-'))
+    $cmd = "Get-Content `"$PromptFile`" -Raw | codex exec --dangerously-bypass-approvals-and-sandbox -C `"$WorkDir`" -"
 
     Write-StageBanner -Title ("Running {0}" -f $StageName) -Color "Cyan"
     Write-Host $cmd
@@ -843,7 +847,7 @@ function Invoke-CodexFromPrompt {
     $stageStartedAt = Get-Date
     $codexOutput = @()
     try {
-        $codexOutput = @(Get-Content $PromptFile -Raw | codex $codexArgs 2>&1)
+        $codexOutput = @(Get-Content $PromptFile -Raw | & codex @codexArgs 2>&1)
         $codexExitCode = $LASTEXITCODE
 
         if ($codexOutput.Count -gt 0) {

@@ -1,0 +1,17 @@
+{
+    "completed_steps":  [
+
+                        ],
+    "planner_done":  false,
+    "gitter_steps":  [
+
+                     ],
+    "qa_structurer_done":  false,
+    "date":  "2026-04-20",
+    "next_step":  null,
+    "current_stage":  "qa-structurer",
+    "handoff_done":  false,
+    "curator_done":  false,
+    "stage_status":  "in_progress",
+    "interruption":  null
+}

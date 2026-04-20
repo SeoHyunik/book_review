@@ -39,13 +39,13 @@ public class NewsQueryService {
     private final NewsScoringPolicy scoringPolicy;
     private final NewsDtoMapper newsDtoMapper;
 
-    @Value("${app.news.naver.max-age-hours:12}")
+    @Value("${app.news.naver.max-age-hours:168}")
     private long naverMaxAgeHours;
 
     @Value("${app.news.global.max-age-hours:24}")
     private long globalMaxAgeHours;
 
-    @Value("${app.news.naver.fallback-max-age-hours:24}")
+    @Value("${app.news.naver.fallback-max-age-hours:336}")
     private long naverFallbackMaxAgeHours;
 
     @Value("${app.news.global.fallback-max-age-hours:36}")

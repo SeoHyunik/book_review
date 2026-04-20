@@ -47,10 +47,10 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
     @Qualifier("ingestionExecutor")
     private final Executor ingestionExecutor;
 
-    @Value("${app.news.naver.max-age-hours:12}")
+    @Value("${app.news.naver.max-age-hours:168}")
     private long naverMaxAgeHours;
 
-    @Value("${app.news.naver.fallback-max-age-hours:24}")
+    @Value("${app.news.naver.fallback-max-age-hours:336}")
     private long naverFallbackMaxAgeHours;
 
     @Value("${app.news.global.max-age-hours:24}")
