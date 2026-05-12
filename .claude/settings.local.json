@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff *)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(git add .)",
+      "Bash(curl *)",
+      "Bash(scp *)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(secrets/**)",
+      "Read(certs/**)",
+      "Read(keys/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File D:\harness-kit/claude/hooks/pre_tool_guard.ps1"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File D:\harness-kit/claude/hooks/post_tool_guard.ps1"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File D:\harness-kit/claude/hooks/encoding_guard.ps1"
+          }
+        ]
+      }
+    ]
+  }
+}
