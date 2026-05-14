@@ -29,6 +29,8 @@ server:
   port: ${PORT:8080}
 
 spring:
+  config:
+    import: optional:application-secrets.yaml
   application:
     name: macro_news
 

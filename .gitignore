@@ -38,3 +38,7 @@ out/
 ### VS Code ###
 .vscode/
 
+### Secrets ###
+application-secrets.yaml
+!application-secrets.enc.yaml
+
