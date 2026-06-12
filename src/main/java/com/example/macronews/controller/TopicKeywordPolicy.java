@@ -1,8 +1,8 @@
 package com.example.macronews.controller;
 
 import com.example.macronews.dto.NewsListItemDto;
+import com.example.macronews.util.KeywordMatcher;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -78,9 +78,8 @@ final class TopicKeywordPolicy {
         if (!StringUtils.hasText(value)) {
             return false;
         }
-        String normalized = value.toLowerCase(Locale.ROOT);
         for (String keyword : keywords) {
-            if (normalized.contains(keyword)) {
+            if (KeywordMatcher.matches(value, keyword)) {
                 return true;
             }
         }

@@ -6,6 +6,7 @@ import com.example.macronews.domain.MacroVariable;
 import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.MarketSignalItemDto;
+import com.example.macronews.util.KeywordMatcher;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -290,7 +291,7 @@ class NewsScoringPolicy {
     }
 
     private boolean containsKeyword(String text, String keyword) {
-        return StringUtils.hasText(text) && text.contains(keyword);
+        return KeywordMatcher.matches(text, keyword);
     }
 
     private String normalize(String value) {
