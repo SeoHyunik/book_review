@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -84,6 +85,26 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             "\uCF54\uC2A4\uD53C",
             "\uCF54\uC2A4\uB2E5"
     );
+    // Short ASCII tokens (rate, oil, fed, ppi, ...) cause false positives when matched as raw
+    // substrings inside unrelated words, so they require an ASCII word-boundary match. Korean
+    // keywords keep substring matching because Java \b boundaries do not behave for Hangul.
+    private static final List<Pattern> ASCII_RELEVANCE_PATTERNS;
+    private static final List<String> NON_ASCII_RELEVANCE_KEYWORDS;
+
+    static {
+        List<Pattern> asciiPatterns = new ArrayList<>();
+        List<String> nonAsciiKeywords = new ArrayList<>();
+        for (String keyword : RELEVANCE_KEYWORDS) {
+            if (isAsciiKeyword(keyword)) {
+                asciiPatterns.add(Pattern.compile("\\b" + Pattern.quote(keyword) + "\\b", Pattern.CASE_INSENSITIVE));
+            } else {
+                nonAsciiKeywords.add(keyword.toLowerCase(Locale.ROOT));
+            }
+        }
+        ASCII_RELEVANCE_PATTERNS = List.copyOf(asciiPatterns);
+        NON_ASCII_RELEVANCE_KEYWORDS = List.copyOf(nonAsciiKeywords);
+    }
+
     private static final List<String> DEFAULT_QUERIES = List.of(
             "\uCF54\uC2A4\uD53C \uC7A5\uC911",
             "\uCF54\uC2A4\uD53C \uB9C8\uAC10",
@@ -481,12 +502,26 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             return false;
         }
         String normalized = value.toLowerCase(Locale.ROOT);
-        for (String keyword : RELEVANCE_KEYWORDS) {
+        for (String keyword : NON_ASCII_RELEVANCE_KEYWORDS) {
             if (normalized.contains(keyword)) {
                 return true;
             }
         }
+        for (Pattern pattern : ASCII_RELEVANCE_PATTERNS) {
+            if (pattern.matcher(value).find()) {
+                return true;
+            }
+        }
         return false;
+    }
+
+    private static boolean isAsciiKeyword(String keyword) {
+        for (int i = 0; i < keyword.length(); i++) {
+            if (keyword.charAt(i) > 0x7F) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String formatAgeHours(Instant publishedAt, Instant now) {

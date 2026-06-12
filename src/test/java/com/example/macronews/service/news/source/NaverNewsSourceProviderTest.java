@@ -213,6 +213,37 @@ class NaverNewsSourceProviderTest {
     }
 
     @Test
+    @DisplayName("NAVER provider should exclude ASCII keyword substring matches while keeping word-boundary matches")
+    void fetchTopHeadlines_excludesAsciiKeywordSubstringMatchesButKeepsWordBoundaryMatches() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "kospi");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "Bank of Korea rate decision",
+                      "description": "Officials weigh the policy rate",
+                      "originallink": "https://news.example.com/relevant-rate",
+                      "link": "https://search.naver.com/relevant-rate",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                    },
+                    {
+                      "title": "Corporate restructuring plan",
+                      "description": "Leadership operates separately",
+                      "originallink": "https://news.example.com/substring-only",
+                      "link": "https://search.naver.com/substring-only",
+                      "pubDate": "Fri, 13 Mar 2026 09:10:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).url()).isEqualTo("https://news.example.com/relevant-rate");
+    }
+
+    @Test
     @DisplayName("NAVER provider should not use links as summary text")
     void fetchTopHeadlines_doesNotUseLinkAsSummary() {
         ReflectionTestUtils.setField(provider, "rawQueries", "semiconductor");
