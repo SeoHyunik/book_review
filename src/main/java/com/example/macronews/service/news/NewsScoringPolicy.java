@@ -7,6 +7,7 @@ import com.example.macronews.domain.NewsEvent;
 import com.example.macronews.domain.SignalSentiment;
 import com.example.macronews.dto.MarketSignalItemDto;
 import com.example.macronews.util.KeywordMatcher;
+import com.example.macronews.util.KeywordSource;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -53,6 +54,11 @@ class NewsScoringPolicy {
             "reuters.com", "bloomberg.com", "yonhapnews.co.kr", "ft.com", "wsj.com", "apnews.com",
             "nikkei.com", "cnbc.com"
     );
+    // KW-DYN-03: keyword lists are read through the KeywordSource seam so the source can later
+    // evolve (e.g. dynamic refresh) without changing scoring logic. The default is a fixed
+    // snapshot of the curated lists above, so behavior is identical to the prior build.
+    private static final KeywordSource TRUSTED_SOURCE_KEYWORDS = KeywordSource.fixed(TRUSTED_SOURCE_MARKERS);
+    private static final KeywordSource TRUSTED_DOMAIN_KEYWORDS = KeywordSource.fixed(TRUSTED_DOMAIN_MARKERS);
 
     Comparator<NewsEvent> buildComparator(NewsListSort sort) {
         NewsListSort resolvedSort = sort == null ? NewsListSort.PUBLISHED_DESC : sort;
@@ -235,10 +241,10 @@ class NewsScoringPolicy {
 
     private int calculateSourceReliabilityWeight(String source, String domain) {
         int weight = 0;
-        if (containsAnyKeyword(source, TRUSTED_SOURCE_MARKERS.toArray(String[]::new))) {
+        if (containsAnyKeyword(source, TRUSTED_SOURCE_KEYWORDS.keywords().toArray(String[]::new))) {
             weight += 3;
         }
-        if (containsAnyKeyword(domain, TRUSTED_DOMAIN_MARKERS.toArray(String[]::new))) {
+        if (containsAnyKeyword(domain, TRUSTED_DOMAIN_KEYWORDS.keywords().toArray(String[]::new))) {
             weight += 2;
         }
         return Math.min(weight, 4);
