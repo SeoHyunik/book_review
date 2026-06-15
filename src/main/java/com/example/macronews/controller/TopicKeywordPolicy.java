@@ -2,6 +2,7 @@ package com.example.macronews.controller;
 
 import com.example.macronews.dto.NewsListItemDto;
 import com.example.macronews.util.KeywordMatcher;
+import com.example.macronews.util.KeywordSource;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -9,7 +10,7 @@ import org.springframework.util.StringUtils;
 @Component
 final class TopicKeywordPolicy {
 
-    private static final List<String> DOLLAR_KEYWORDS = List.of(
+    private static final KeywordSource DOLLAR_KEYWORDS = KeywordSource.fixed(List.of(
             "usd",
             "dollar",
             "dxy",
@@ -20,9 +21,9 @@ final class TopicKeywordPolicy {
             "fed",
             "fomc",
             "rate"
-    );
+    ));
 
-    private static final List<String> RATES_KEYWORDS = List.of(
+    private static final KeywordSource RATES_KEYWORDS = KeywordSource.fixed(List.of(
             "rates",
             "yield",
             "yields",
@@ -38,9 +39,9 @@ final class TopicKeywordPolicy {
             "rate decision",
             "rate hike",
             "rate cut"
-    );
+    ));
 
-    private static final List<String> OIL_KEYWORDS = List.of(
+    private static final KeywordSource OIL_KEYWORDS = KeywordSource.fixed(List.of(
             "oil",
             "wti",
             "brent",
@@ -49,18 +50,18 @@ final class TopicKeywordPolicy {
             "opec",
             "production",
             "supply"
-    );
+    ));
 
     boolean matchesDollar(NewsListItemDto item) {
-        return matchesKeywords(item, DOLLAR_KEYWORDS);
+        return matchesKeywords(item, DOLLAR_KEYWORDS.keywords());
     }
 
     boolean matchesRates(NewsListItemDto item) {
-        return matchesKeywords(item, RATES_KEYWORDS);
+        return matchesKeywords(item, RATES_KEYWORDS.keywords());
     }
 
     boolean matchesOil(NewsListItemDto item) {
-        return matchesKeywords(item, OIL_KEYWORDS);
+        return matchesKeywords(item, OIL_KEYWORDS.keywords());
     }
 
     private boolean matchesKeywords(NewsListItemDto item, List<String> keywords) {
