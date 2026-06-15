@@ -96,7 +96,7 @@ public class NewsController {
     private List<NewsListItemDto> safeGetRecentNewsForToday(NewsStatus selectedStatus, NewsListSort selectedSort) {
         try {
             List<NewsListItemDto> todayNewsItems = newsQueryService.getRecentNewsForToday(selectedStatus, selectedSort);
-            if (todayNewsItems != null) {
+            if (todayNewsItems != null && !todayNewsItems.isEmpty()) {
                 return todayNewsItems;
             }
             return newsQueryService.getRecentNews(selectedStatus, selectedSort);

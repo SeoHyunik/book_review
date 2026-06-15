@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.example.macronews.domain.AnalysisResult;
 import com.example.macronews.domain.ImpactDirection;
@@ -208,6 +210,82 @@ class NewsControllerTest {
 
         assertThat(viewName).isEqualTo("redirect:/news");
         assertThat(redirectAttributes.getFlashAttributes()).containsKey("errorMessage");
+    }
+
+    @Test
+    @DisplayName("list should fall back to recent news when today's list is empty")
+    void list_fallsBackToRecentNewsWhenTodayListIsEmpty() {
+        NewsListItemDto recentNews = new NewsListItemDto(
+                "news-older",
+                "Older market headline",
+                "Older market headline",
+                "Reuters",
+                Instant.parse("2026-03-16T02:30:00Z"),
+                Instant.parse("2026-03-16T02:35:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.POSITIVE,
+                "Headline",
+                "Interpretation",
+                10
+        );
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of());
+        given(newsQueryService.getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(recentNews));
+        given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(new MarketSignalOverviewDto(List.of()));
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+        given(marketSummarySnapshotService.getLatestValidSummary()).willReturn(Optional.empty());
+        given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.list(null, null, null, model);
+
+        assertThat(viewName).isEqualTo("news/list");
+        assertThat(model.getAttribute("newsItems")).isEqualTo(List.of(recentNews));
+        assertThat(model.getAttribute("featuredNews")).isEqualTo(recentNews);
+        verify(newsQueryService).getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC);
+    }
+
+    @Test
+    @DisplayName("list should prefer today's news and not call recent fallback when today's list has items")
+    void list_prefersTodayNewsAndDoesNotCallRecentFallbackWhenTodayListHasItems() {
+        NewsListItemDto todayNews = new NewsListItemDto(
+                "news-today",
+                "Today market headline",
+                "Today market headline",
+                "Reuters",
+                Instant.parse("2026-03-17T02:30:00Z"),
+                Instant.parse("2026-03-17T02:35:00Z"),
+                NewsStatus.ANALYZED,
+                true,
+                true,
+                ImpactDirection.UP,
+                SignalSentiment.POSITIVE,
+                "Headline",
+                "Interpretation",
+                10
+        );
+        given(newsQueryService.getRecentNewsForToday(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(List.of(todayNews));
+        given(newsQueryService.getMarketSignalOverview(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC))
+                .willReturn(new MarketSignalOverviewDto(List.of()));
+        given(marketForecastQueryService.getCurrentSnapshot()).willReturn(Optional.empty());
+        given(marketSummarySnapshotService.getLatestValidSummary()).willReturn(Optional.empty());
+        given(aiMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+        given(recentMarketSummaryService.getCurrentSummary()).willReturn(Optional.empty());
+
+        ConcurrentModel model = new ConcurrentModel();
+        String viewName = newsController.list(null, null, null, model);
+
+        assertThat(viewName).isEqualTo("news/list");
+        assertThat(model.getAttribute("newsItems")).isEqualTo(List.of(todayNews));
+        assertThat(model.getAttribute("featuredNews")).isEqualTo(todayNews);
+        verify(newsQueryService, never()).getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC);
     }
 
     @Test
@@ -462,6 +540,7 @@ class NewsControllerTest {
         assertThat(model.getAttribute("featuredNews")).isNull();
         assertThat(model.getAttribute("featuredPrimaryMode")).isEqualTo("article");
         assertThat(model.getAttribute("featuredSummaryMode")).isEqualTo(false);
+        verify(newsQueryService, never()).getRecentNews(null, com.example.macronews.service.news.NewsListSort.PUBLISHED_DESC);
     }
 
     @Test
