@@ -106,20 +106,20 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     }
 
     private static final List<String> DEFAULT_QUERIES = List.of(
-            "\uCF54\uC2A4\uD53C \uC7A5\uC911",
+            "\uCF54\uC2A4\uD53C \uC9C0\uC218",
             "\uCF54\uC2A4\uD53C \uB9C8\uAC10",
-            "\uCF54\uC2A4\uB2E5 \uC7A5\uC911",
+            "\uCF54\uC2A4\uB2E5 \uC9C0\uC218",
             "\uCF54\uC2A4\uB2E5 \uB9C8\uAC10",
             "\uC6D0\uB2EC\uB7EC \uD658\uC728",
             "\uD55C\uAD6D\uC740\uD589 \uAE30\uC900\uAE08\uB9AC",
-            "\uBBF8\uAD6D\uCC44 \uAE08\uB9AC",
-            "\uC5F0\uC900 \uAE08\uB9AC",
-            "\uBBF8\uAD6D CPI \uBC1C\uD45C",
-            "\uBBF8\uAD6D \uACE0\uC6A9\uC9C0\uD45C",
+            "\uBBF8\uAD6D \uC5F0\uC900 \uAE08\uB9AC",
+            "\uBBF8\uAD6D CPI \uBB3C\uAC00",
+            "\uBBF8\uAD6D \uACE0\uC6A9\uC9C0\uD45C \uBC1C\uD45C",
             "\uAD6D\uC81C\uC720\uAC00 WTI",
             "\uBC18\uB3C4\uCCB4 \uC8FC\uAC00",
             "\uB274\uC695\uC99D\uC2DC \uB9C8\uAC10",
-            "\uB2EC\uB7EC\uC778\uB371\uC2A4 \uD658\uC728"
+            "\uB2EC\uB7EC\uC778\uB371\uC2A4 \uD658\uC728",
+            "\uC778\uD50C\uB808\uC774\uC158 \uAE08\uB9AC"
     );
 
     private final ExternalApiUtils externalApiUtils;
