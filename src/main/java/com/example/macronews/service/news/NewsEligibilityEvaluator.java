@@ -95,6 +95,12 @@ class NewsEligibilityEvaluator {
         long primaryHours = naver ? naverMaxAgeHours : globalMaxAgeHours;
         long fallbackHours = naver ? naverFallbackMaxAgeHours : globalFallbackMaxAgeHours;
         long defaultHours = naver ? 12L : 24L;
+        if (naver) {
+            // NAVER honors the wider recovery (fallback) window so persisted NAVER items
+            // stay display-eligible even once the primary window has lapsed.
+            long effectiveHours = Math.max(Math.max(primaryHours, 0L), Math.max(fallbackHours, 0L));
+            return effectiveHours > 0 ? effectiveHours : defaultHours;
+        }
         if (primaryHours > 0) {
             return primaryHours;
         }

@@ -1105,6 +1105,35 @@ class NewsQueryServiceTest {
     }
 
     @Test
+    @DisplayName("Recent news list should keep persisted NAVER items inside the wider recovery window after the primary window lapses")
+    void getRecentNews_keepsNaverItemWithinFallbackWindowAfterPrimaryLapses() {
+        ReflectionTestUtils.setField(newsQueryService, "naverMaxAgeHours", 168L);
+        ReflectionTestUtils.setField(newsQueryService, "naverFallbackMaxAgeHours", 336L);
+
+        NewsEvent agedNaverItem = new NewsEvent(
+                "aged-naver-recovery-window",
+                null,
+                "Persisted NAVER article past the primary window but inside recovery",
+                "Summary",
+                "NAVER",
+                "https://example.com/aged-naver-recovery-window",
+                FIXED_NOW.minus(Duration.ofHours(200)),
+                FIXED_NOW.minus(Duration.ofHours(200)),
+                NewsStatus.INGESTED,
+                null,
+                null,
+                null
+        );
+
+        given(newsEventRepository.findTop20ByOrderByIngestedAtDesc())
+                .willReturn(List.of(agedNaverItem));
+
+        List<NewsListItemDto> items = newsQueryService.getRecentNews();
+
+        assertThat(items).extracting(NewsListItemDto::id).containsExactly("aged-naver-recovery-window");
+    }
+
+    @Test
     @DisplayName("Market signal overview should use analysis completion timing instead of old publishedAt")
     void getMarketSignalOverview_usesAnalysisCreatedAtForSignalWindow() {
         Instant now = FIXED_NOW;
