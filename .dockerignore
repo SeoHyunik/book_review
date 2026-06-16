@@ -5,3 +5,8 @@ node_modules
 .gradle
 .idea
 *.log
+
+# Exclude plaintext application secrets, but keep the encrypted variant used at runtime.
+**/application-secrets.yaml
+**/application-secrets.*.yaml
+!src/main/resources/application-secrets.enc.yaml
