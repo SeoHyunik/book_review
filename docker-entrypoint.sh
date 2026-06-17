@@ -26,6 +26,15 @@ fail() {
     exit 1
 }
 
+log() {
+    # Emit a non-secret positive diagnostic to stderr. Callers must pass only
+    # safe booleans, key names, or paths -- never secret values or decrypted
+    # content.
+    echo "docker-entrypoint: $1" >&2
+}
+
+log "bootstrap started=true"
+
 # --- Preconditions (fail fast, no secret output) ---------------------------
 
 command -v sops >/dev/null 2>&1 || fail "sops binary not found on PATH"
@@ -35,8 +44,10 @@ if [ -z "${SOPS_AGE_KEY:-}" ]; then
     fail "SOPS_AGE_KEY is not set; cannot decrypt application secrets"
 fi
 export SOPS_AGE_KEY
+log "SOPS_AGE_KEY present=true"
 
 [ -f "$SECRETS_ENC_FILE" ] || fail "encrypted secrets file not found: $SECRETS_ENC_FILE"
+log "encrypted config file present=true path=$SECRETS_ENC_FILE"
 
 # --- Decrypt to a runtime-only path ----------------------------------------
 
@@ -50,8 +61,10 @@ if ! sops --decrypt --output "$SECRETS_OUT_FILE" "$SECRETS_ENC_FILE" >/dev/null 
     rm -f "$SECRETS_OUT_FILE"
     fail "failed to decrypt $SECRETS_ENC_FILE (check SOPS_AGE_KEY)"
 fi
+log "sops decrypt success=true"
 
 [ -s "$SECRETS_OUT_FILE" ] || fail "decrypted secrets file is empty: $SECRETS_OUT_FILE"
+log "decrypted runtime config file created=true path=$SECRETS_OUT_FILE"
 
 # --- Launch the application ------------------------------------------------
 
@@ -59,6 +72,7 @@ fi
 
 # Point Spring at the decrypted file via an additional config import.
 # `exec` so the JVM becomes PID 1 and receives container signals directly.
+log "Spring config import attempted=true path=$SECRETS_OUT_FILE"
 exec java \
     "-Dspring.config.import=optional:file:${SECRETS_OUT_FILE}" \
     -jar "$APP_JAR" "$@"
