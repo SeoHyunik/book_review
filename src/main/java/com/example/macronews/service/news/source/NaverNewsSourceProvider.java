@@ -105,6 +105,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         NON_ASCII_RELEVANCE_KEYWORDS = List.copyOf(nonAsciiKeywords);
     }
 
+    // Default queries are intentionally aligned with RELEVANCE_KEYWORDS so the safe-default path
+    // still produces macro-relevant items when app.news.naver.queries is unset or blank.
     private static final List<String> DEFAULT_QUERIES = List.of(
             "\uCF54\uC2A4\uD53C \uC9C0\uC218",
             "\uCF54\uC2A4\uD53C \uB9C8\uAC10",
@@ -113,14 +115,24 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             "\uC6D0\uB2EC\uB7EC \uD658\uC728",
             "\uD55C\uAD6D\uC740\uD589 \uAE30\uC900\uAE08\uB9AC",
             "\uBBF8\uAD6D \uC5F0\uC900 \uAE08\uB9AC",
+            "FOMC \uD68C\uC758 \uACB0\uACFC",
+            "\uD30C\uC6D4 \uC758\uC7A5 \uBC1C\uC5B8",
             "\uBBF8\uAD6D CPI \uBB3C\uAC00",
+            "\uBBF8\uAD6D PPI \uBB3C\uAC00",
             "\uBBF8\uAD6D \uACE0\uC6A9\uC9C0\uD45C \uBC1C\uD45C",
             "\uAD6D\uC81C\uC720\uAC00 WTI",
+            "\uBE0C\uB80C\uD2B8\uC720 \uAC00\uACA9",
             "\uBC18\uB3C4\uCCB4 \uC8FC\uAC00",
             "\uB274\uC695\uC99D\uC2DC \uB9C8\uAC10",
             "\uB2EC\uB7EC\uC778\uB371\uC2A4 \uD658\uC728",
             "\uC778\uD50C\uB808\uC774\uC158 \uAE08\uB9AC"
     );
+
+    // app.news.naver.queries may arrive comma, semicolon, or newline separated (env vs. yaml list
+    // flattening), so accept all three delimiters. Caps guard against runaway/abusive bindings.
+    private static final Pattern QUERY_DELIMITER = Pattern.compile("[,;\\r\\n]+");
+    private static final int MAX_CONFIGURED_QUERIES = 50;
+    private static final int MAX_QUERY_LENGTH = 100;
 
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
@@ -233,11 +245,31 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         if (!StringUtils.hasText(rawQueries)) {
             return List.of();
         }
-        return Arrays.stream(rawQueries.split(","))
-                .map(String::trim)
+        return Arrays.stream(QUERY_DELIMITER.split(rawQueries))
+                .map(this::normalizeConfiguredQuery)
                 .filter(StringUtils::hasText)
                 .distinct()
+                .limit(MAX_CONFIGURED_QUERIES)
                 .toList();
+    }
+
+    private String normalizeConfiguredQuery(String value) {
+        if (value == null) {
+            return "";
+        }
+        String trimmed = value.trim();
+        // Env/YAML binding frequently leaves a single layer of wrapping quotes on each entry.
+        if (trimmed.length() >= 2) {
+            char first = trimmed.charAt(0);
+            char last = trimmed.charAt(trimmed.length() - 1);
+            if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+                trimmed = trimmed.substring(1, trimmed.length() - 1).trim();
+            }
+        }
+        if (trimmed.length() > MAX_QUERY_LENGTH) {
+            trimmed = trimmed.substring(0, MAX_QUERY_LENGTH).trim();
+        }
+        return trimmed;
     }
 
     private List<NaverCandidate> fetchQuery(String query, int limit, NewsFreshnessBucket bucket) {
@@ -301,8 +333,13 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             int filteredByRelevanceCount = 0;
             int missingUrlCount = 0;
             int emptyTitleCount = 0;
+            int fallbackRetainedCount = 0;
             Instant now = Instant.now(clock);
             Instant cutoff = now.minus(Duration.ofHours(maxAgeHours));
+            // FRESH-window cutoff used only to observe (never to filter) how many retained items
+            // survive purely because the SEMI_FRESH fallback window is wider than FRESH. This makes
+            // it visible that useful semi-fresh items within fallbackMaxAgeHours are kept, not hidden.
+            Instant freshCutoff = now.minus(Duration.ofHours(resolveMaxAgeHours(NewsFreshnessBucket.FRESH)));
             List<NaverCandidate> mapped = new ArrayList<>();
             for (JsonNode item : items) {
                 String cleanedTitle = cleanHtml(item.path("title").asText(""));
@@ -345,6 +382,9 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 if (!StringUtils.hasText(cleanedTitle)) {
                     emptyTitleCount++;
                 }
+                if (!isFreshEnough(publishedAt, freshCutoff)) {
+                    fallbackRetainedCount++;
+                }
 
                 ExternalNewsItem mappedItem = new ExternalNewsItem(
                         resolveExternalId(resolvedUrl, dedupTitle, rawPubDate),
@@ -357,9 +397,9 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 mapped.add(new NaverCandidate(mappedItem, originalLink, fallbackLink, dedupTitle));
             }
             log.info("[NAVER] bucket={} query='{}' pageStart={} rawItems={}", bucket, query, pageStart, rawItemCount);
-            log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} filteredByRelevance={} missingUsableLink={} emptyTitle={}",
+            log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} filteredByRelevance={} missingUsableLink={} emptyTitle={} fallbackRetained={}",
                     bucket, query, pageStart, mapped.size(), nullPublishedAtCount, invalidPubDateCount, staleItemCount,
-                    filteredByRelevanceCount, missingUrlCount, emptyTitleCount);
+                    filteredByRelevanceCount, missingUrlCount, emptyTitleCount, fallbackRetainedCount);
             if (mapped.isEmpty() && rawItemCount > 0) {
                 String reason = staleItemCount == rawItemCount
                         ? "stale-only-input"
@@ -540,10 +580,15 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     }
 
     private long resolveMaxAgeHours(NewsFreshnessBucket bucket) {
+        long freshMaxAge = maxAgeHours > 0 ? maxAgeHours : 12L;
         if (bucket == NewsFreshnessBucket.SEMI_FRESH) {
-            return fallbackMaxAgeHours > 0 ? fallbackMaxAgeHours : 24L;
+            long fallbackMaxAge = fallbackMaxAgeHours > 0 ? fallbackMaxAgeHours : 24L;
+            // SEMI_FRESH is the lenient fallback bucket, so its window must never be tighter than
+            // FRESH. A misconfigured fallback-max-age-hours < max-age-hours would otherwise make the
+            // fallback stricter than the primary pass and silently drop items FRESH would accept.
+            return Math.max(fallbackMaxAge, freshMaxAge);
         }
-        return maxAgeHours > 0 ? maxAgeHours : 12L;
+        return freshMaxAge;
     }
 
     private String resolveExternalId(String resolvedUrl, String normalizedTitle, String rawPubDate) {

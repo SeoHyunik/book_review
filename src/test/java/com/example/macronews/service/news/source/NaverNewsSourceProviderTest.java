@@ -622,7 +622,7 @@ class NaverNewsSourceProviderTest {
 
         provider.fetchTopHeadlines(5);
 
-        assertThat(decodedRequestUrls()).hasSize(14)
+        assertThat(decodedRequestUrls()).hasSize(18)
                 .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uD53C \uC9C0\uC218"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uD53C \uB9C8\uAC10"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uB2E5 \uC9C0\uC218"))
@@ -630,9 +630,13 @@ class NaverNewsSourceProviderTest {
                 .anySatisfy(url -> assertThat(url).contains("query=\uC6D0\uB2EC\uB7EC \uD658\uC728"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uD55C\uAD6D\uC740\uD589 \uAE30\uC900\uAE08\uB9AC"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D \uC5F0\uC900 \uAE08\uB9AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=FOMC \uD68C\uC758 \uACB0\uACFC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uD30C\uC6D4 \uC758\uC7A5 \uBC1C\uC5B8"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D CPI \uBB3C\uAC00"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D PPI \uBB3C\uAC00"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D \uACE0\uC6A9\uC9C0\uD45C \uBC1C\uD45C"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uAD6D\uC81C\uC720\uAC00 WTI"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uBE0C\uB80C\uD2B8\uC720 \uAC00\uACA9"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uBC18\uB3C4\uCCB4 \uC8FC\uAC00"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uB274\uC695\uC99D\uC2DC \uB9C8\uAC10"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uB2EC\uB7EC\uC778\uB371\uC2A4 \uD658\uC728"))
@@ -656,10 +660,14 @@ class NaverNewsSourceProviderTest {
 
         provider.fetchTopHeadlines(5);
 
-        assertThat(decodedRequestUrls()).hasSize(14)
+        assertThat(decodedRequestUrls()).hasSize(18)
                 .anySatisfy(url -> assertThat(url).contains("query=\uCF54\uC2A4\uD53C \uC9C0\uC218"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D \uC5F0\uC900 \uAE08\uB9AC"))
+                .anySatisfy(url -> assertThat(url).contains("query=FOMC \uD68C\uC758 \uACB0\uACFC"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uD30C\uC6D4 \uC758\uC7A5 \uBC1C\uC5B8"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D PPI \uBB3C\uAC00"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uBBF8\uAD6D \uACE0\uC6A9\uC9C0\uD45C \uBC1C\uD45C"))
+                .anySatisfy(url -> assertThat(url).contains("query=\uBE0C\uB80C\uD2B8\uC720 \uAC00\uACA9"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uB274\uC695\uC99D\uC2DC \uB9C8\uAC10"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uB2EC\uB7EC\uC778\uB371\uC2A4 \uD658\uC728"))
                 .anySatisfy(url -> assertThat(url).contains("query=\uC778\uD50C\uB808\uC774\uC158 \uAE08\uB9AC"))
