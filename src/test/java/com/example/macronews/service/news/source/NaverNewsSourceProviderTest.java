@@ -9,6 +9,8 @@ import static org.mockito.Mockito.verify;
 
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.service.news.query.DeterministicQueryGenerator;
+import com.example.macronews.service.news.query.GdeltHotIssueSeedProvider;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,11 +35,18 @@ class NaverNewsSourceProviderTest {
     @Mock
     private ExternalApiUtils externalApiUtils;
 
+    @Mock
+    private GdeltHotIssueSeedProvider gdeltHotIssueSeedProvider;
+
+    @Mock
+    private DeterministicQueryGenerator deterministicQueryGenerator;
+
     private NaverNewsSourceProvider provider;
 
     @BeforeEach
     void setUp() {
-        provider = new NaverNewsSourceProvider(externalApiUtils, new ObjectMapper());
+        provider = new NaverNewsSourceProvider(
+                externalApiUtils, new ObjectMapper(), gdeltHotIssueSeedProvider, deterministicQueryGenerator);
         ReflectionTestUtils.setField(provider, "enabled", true);
         ReflectionTestUtils.setField(provider, "baseUrl", "https://openapi.naver.com");
         ReflectionTestUtils.setField(provider, "clientId", "client-id");

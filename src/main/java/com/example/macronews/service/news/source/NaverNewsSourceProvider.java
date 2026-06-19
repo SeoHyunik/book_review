@@ -2,6 +2,8 @@ package com.example.macronews.service.news.source;
 
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.service.news.query.DeterministicQueryGenerator;
+import com.example.macronews.service.news.query.GdeltHotIssueSeedProvider;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.example.macronews.util.external.ExternalResponseTextNormalizer;
@@ -136,6 +138,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
+    private final GdeltHotIssueSeedProvider gdeltHotIssueSeedProvider;
+    private final DeterministicQueryGenerator deterministicQueryGenerator;
 
     @Value("${app.news.naver.enabled:false}")
     private boolean enabled;

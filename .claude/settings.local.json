@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(git status)",
-      "Bash(git diff *)"
+      "Bash(git diff *)",
+      "Bash(.\\gradlew.bat test)",
+      "Bash(.\\gradlew.bat test *)",
+      "Bash(.\\gradlew.bat testClasses)",
+      "PowerShell(.\\gradlew.bat test)",
+      "PowerShell(.\\gradlew.bat test *)",
+      "PowerShell(.\\gradlew.bat testClasses)"
     ],
     "deny": [
       "Bash(git push *)",
