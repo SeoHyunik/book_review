@@ -47,6 +47,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     private static final int NAVER_MAX_START = 1000;
     private static final int STALE_LOG_SAMPLE_LIMIT = 3;
     private static final int STALE_LOG_TITLE_MAX_LENGTH = 80;
+    // When the FRESH pass returns nothing because every candidate was stale, run a bounded recovery
+    // pass that re-queries the leading (highest-intent) queries within the SAME freshness bucket as
+    // the caller. It refines query intent without widening the freshness window, so the FRESH path
+    // never returns SEMI_FRESH-only or stale items, and it stays cheap by never fanning out across the
+    // full configured query list.
+    private static final int SECOND_PASS_MAX_QUERIES = 3;
     private static final DateTimeFormatter NAVER_PUB_DATE_FORMATTER = DateTimeFormatter.RFC_1123_DATE_TIME;
     private static final List<DateTimeFormatter> NAVER_PUB_DATE_FALLBACK_FORMATTERS = List.of(
             new DateTimeFormatterBuilder()
@@ -210,22 +216,68 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         }
 
         int resolvedLimit = limit > 0 ? limit : Math.max(display, 1);
-        List<NaverCandidate> candidates = new ArrayList<>();
         List<String> queries = resolveQueries();
-        for (String query : queries) {
-            candidates.addAll(fetchQuery(query, resolvedLimit, bucket));
-            if (deduplicateAndLimit(candidates, resolvedLimit).size() >= resolvedLimit) {
-                break;
-            }
-        }
-        List<ExternalNewsItem> merged = deduplicateAndLimit(candidates, resolvedLimit);
+        NaverPassResult firstPass = runQueryPass(queries, resolvedLimit, bucket);
+        List<ExternalNewsItem> merged = deduplicateAndLimit(firstPass.candidates(), resolvedLimit);
         log.info("[NAVER] bucket={} merged usableItems={} requestedLimit={} queries={}",
                 bucket, merged.size(), resolvedLimit, queries.size());
+
+        if (merged.isEmpty() && shouldRunStaleRecoveryPass(bucket, firstPass)) {
+            // The recovery pass refines query intent within the caller's freshness bucket; it must
+            // never widen the window (FRESH stays FRESH), so a stale-only first pass is never
+            // "recovered" by retaining stale items. SEMI_FRESH already uses its wider window in its
+            // own first pass and so does not need a separate recovery pass.
+            NewsFreshnessBucket recoveryBucket = bucket;
+            List<String> recoveryQueries = resolveSecondPassQueries(queries);
+            log.info("[NAVER] second-pass start reason=stale-only-first-pass primaryBucket={} recoveryBucket={} "
+                            + "firstPassStaleItems={} firstPassRawItems={} recoveryQueries={}",
+                    bucket, recoveryBucket, firstPass.staleItemCount(), firstPass.rawItemCount(),
+                    recoveryQueries.size());
+            NaverPassResult secondPass = runQueryPass(recoveryQueries, resolvedLimit, recoveryBucket);
+            merged = deduplicateAndLimit(secondPass.candidates(), resolvedLimit);
+            log.info("[NAVER] second-pass complete recoveryBucket={} recoveredItems={} recoveryStaleItems={} recoveryRawItems={}",
+                    recoveryBucket, merged.size(), secondPass.staleItemCount(), secondPass.rawItemCount());
+        }
+
         if (merged.isEmpty()) {
             log.info("[NAVER] provider empty reason=no-usable-items bucket={} requestedLimit={} queries={} configured={}",
                     bucket, resolvedLimit, queries.size(), isConfigured());
         }
         return merged;
+    }
+
+    private NaverPassResult runQueryPass(List<String> queries, int resolvedLimit, NewsFreshnessBucket bucket) {
+        List<NaverCandidate> candidates = new ArrayList<>();
+        int staleItems = 0;
+        int rawItems = 0;
+        for (String query : queries) {
+            NaverQueryOutcome outcome = fetchQuery(query, resolvedLimit, bucket);
+            candidates.addAll(outcome.candidates());
+            staleItems += outcome.staleItemCount();
+            rawItems += outcome.rawItemCount();
+            if (deduplicateAndLimit(candidates, resolvedLimit).size() >= resolvedLimit) {
+                break;
+            }
+        }
+        return new NaverPassResult(candidates, rawItems, staleItems);
+    }
+
+    // The recovery pass only runs for the FRESH primary path, and only when the first pass actually
+    // dropped items for being stale. It re-queries the leading queries within the FRESH window (it
+    // never widens freshness), so any other empty result (no raw items, relevance filtering, unusable
+    // pubDate) is not helped and we skip the extra upstream calls. SEMI_FRESH callers already use the
+    // wider window in their first pass, so they get no separate recovery pass.
+    private boolean shouldRunStaleRecoveryPass(NewsFreshnessBucket bucket, NaverPassResult firstPass) {
+        if (bucket != NewsFreshnessBucket.FRESH) {
+            return false;
+        }
+        return firstPass.staleItemCount() > 0;
+    }
+
+    private List<String> resolveSecondPassQueries(List<String> queries) {
+        return queries.stream()
+                .limit(SECOND_PASS_MAX_QUERIES)
+                .toList();
     }
 
     @Override
@@ -235,13 +287,21 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private List<String> resolveQueries() {
         List<String> configuredQueries = parseConfiguredQueries();
+        // rawQueriesPresent distinguishes a truly unset APP_NEWS_NAVER_QUERIES from one that was
+        // bound but normalized away to nothing (blank/quotes-only), since both fall through to the
+        // default path. defaultOnly tells whether the request is running purely on safe defaults.
+        boolean rawQueriesPresent = StringUtils.hasText(rawQueries);
         if (!configuredQueries.isEmpty()) {
+            log.info("[NAVER] query-source resolved source=configured rawQueriesPresent={} defaultOnly=false resolvedQueryCount={}",
+                    rawQueriesPresent, configuredQueries.size());
             return configuredQueries;
         }
 
         log.warn("[NAVER] Naver news queries are empty; using safe defaults. "
                         + "Configure APP_NEWS_NAVER_QUERIES explicitly for production tuning. defaults={}",
                 String.join(", ", DEFAULT_QUERIES));
+        log.info("[NAVER] query-source resolved source=default rawQueriesPresent={} defaultOnly=true resolvedQueryCount={}",
+                rawQueriesPresent, DEFAULT_QUERIES.size());
         return DEFAULT_QUERIES;
     }
 
@@ -276,10 +336,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         return trimmed;
     }
 
-    private List<NaverCandidate> fetchQuery(String query, int limit, NewsFreshnessBucket bucket) {
+    private NaverQueryOutcome fetchQuery(String query, int limit, NewsFreshnessBucket bucket) {
         log.info("[NAVER] query start bucket={} query='{}' requestedLimit={}", bucket, query, limit);
         int pageSize = resolveDisplay(limit);
         List<NaverCandidate> collected = new ArrayList<>();
+        int staleItems = 0;
+        int rawItems = 0;
         for (int pageIndex = 0; pageIndex < resolveMaxPages(); pageIndex++) {
             int pageStart = resolvePageStart(pageIndex, pageSize);
             if (pageStart < 0) {
@@ -303,6 +365,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
             NaverParseResult parsed = parseItems(query, pageStart, result.body(), resolveMaxAgeHours(bucket), bucket);
             collected.addAll(parsed.items());
+            staleItems += parsed.staleItemCount();
+            rawItems += parsed.rawItemCount();
             if (collected.size() >= limit) {
                 break;
             }
@@ -310,14 +374,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 break;
             }
         }
-        return collected;
+        return new NaverQueryOutcome(collected, rawItems, staleItems);
     }
 
     private NaverParseResult parseItems(String query, int pageStart, String body, long maxAgeHours, NewsFreshnessBucket bucket) {
         if (!StringUtils.hasText(body)) {
             log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 bodyEmpty=true",
                     bucket, query, pageStart);
-            return new NaverParseResult(List.of(), 0);
+            return new NaverParseResult(List.of(), 0, 0);
         }
 
         try {
@@ -326,7 +390,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             if (!items.isArray()) {
                 log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 itemsArray=false",
                         bucket, query, pageStart);
-                return new NaverParseResult(List.of(), 0);
+                return new NaverParseResult(List.of(), 0, 0);
             }
 
             int rawItemCount = items.size();
@@ -416,10 +480,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                         reason, bucket, query, pageStart, rawItemCount, staleItemCount, nullPublishedAtCount,
                         invalidPubDateCount, filteredByRelevanceCount, missingUrlCount, emptyTitleCount);
             }
-            return new NaverParseResult(mapped, rawItemCount);
+            return new NaverParseResult(mapped, rawItemCount, staleItemCount);
         } catch (Exception ex) {
             log.warn("[NAVER] failed to parse response bucket={} query='{}' pageStart={}", bucket, query, pageStart, ex);
-            return new NaverParseResult(List.of(), 0);
+            return new NaverParseResult(List.of(), 0, 0);
         }
     }
 
@@ -675,7 +739,22 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     private record NaverParseResult(
             List<NaverCandidate> items,
-            int rawItemCount
+            int rawItemCount,
+            int staleItemCount
+    ) {
+    }
+
+    private record NaverQueryOutcome(
+            List<NaverCandidate> candidates,
+            int rawItemCount,
+            int staleItemCount
+    ) {
+    }
+
+    private record NaverPassResult(
+            List<NaverCandidate> candidates,
+            int rawItemCount,
+            int staleItemCount
     ) {
     }
 }

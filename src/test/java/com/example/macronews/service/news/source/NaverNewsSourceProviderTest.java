@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.example.macronews.dto.external.ExternalNewsItem;
@@ -346,6 +347,94 @@ class NaverNewsSourceProviderTest {
         assertThat(provider.fetchTopHeadlines(5, NewsFreshnessBucket.SEMI_FRESH))
                 .extracting(ExternalNewsItem::url)
                 .containsExactly("https://news.example.com/fx-semi");
+    }
+
+    @Test
+    @DisplayName("NAVER FRESH second-pass recovery should surface a fresh item from the leading queries")
+    void fetchTopHeadlines_freshSecondPassRecoversFreshItem() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "코스피");
+        // maxPages=1 removes page-level paging, so any recovery here must come from the pass-level
+        // FRESH second pass rather than fetching a later page within the same query.
+        ReflectionTestUtils.setField(provider, "maxPages", 1);
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "Old KOSPI wrap",
+                              "description": "Too old for the fresh window",
+                              "originallink": "https://news.example.com/stale-first-pass",
+                              "link": "https://search.naver.com/stale-first-pass",
+                              "pubDate": "Thu, 12 Mar 2026 00:00:00 +0900"
+                            }
+                          ]
+                        }
+                        """))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "Fresh KOSPI recovery move",
+                              "description": "Within the fresh window",
+                              "originallink": "https://news.example.com/fresh-recovery",
+                              "link": "https://search.naver.com/fresh-recovery",
+                              "pubDate": "Fri, 13 Mar 2026 11:00:00 +0900"
+                            }
+                          ]
+                        }
+                        """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results)
+                .extracting(ExternalNewsItem::url)
+                .containsExactly("https://news.example.com/fresh-recovery");
+        verify(externalApiUtils, times(2)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("NAVER FRESH second-pass recovery should not widen the window to semi-fresh items")
+    void fetchTopHeadlines_freshSecondPassDoesNotRecoverSemiFreshItems() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "코스피");
+        // maxPages=1 isolates the pass-level recovery; maxAgeHours/fallbackMaxAgeHours keep a real gap
+        // between the FRESH and SEMI_FRESH windows so the recovery item sits inside SEMI_FRESH only.
+        ReflectionTestUtils.setField(provider, "maxPages", 1);
+        ReflectionTestUtils.setField(provider, "maxAgeHours", 12L);
+        ReflectionTestUtils.setField(provider, "fallbackMaxAgeHours", 24L);
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "Old KOSPI wrap",
+                              "description": "Too old for the fresh window",
+                              "originallink": "https://news.example.com/stale-first-pass",
+                              "link": "https://search.naver.com/stale-first-pass",
+                              "pubDate": "Thu, 12 Mar 2026 00:00:00 +0900"
+                            }
+                          ]
+                        }
+                        """))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "KOSPI afternoon recap",
+                              "description": "코스피 흐름 정리",
+                              "originallink": "https://news.example.com/semi-fresh-recovery",
+                              "link": "https://search.naver.com/semi-fresh-recovery",
+                              "pubDate": "Thu, 12 Mar 2026 19:00:00 +0900"
+                            }
+                          ]
+                        }
+                        """));
+
+        // The recovery item is relevant and inside the SEMI_FRESH window, so an empty result proves the
+        // FRESH second pass kept the FRESH window instead of falling back to the wider SEMI_FRESH window.
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).isEmpty();
+        verify(externalApiUtils, times(2)).callAPI(any());
     }
 
     @Test
