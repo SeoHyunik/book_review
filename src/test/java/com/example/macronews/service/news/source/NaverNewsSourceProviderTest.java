@@ -2,11 +2,13 @@ package com.example.macronews.service.news.source;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
@@ -866,6 +868,131 @@ class NaverNewsSourceProviderTest {
 
         assertThat(results).isEmpty();
         verify(externalApiUtils, never()).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("NAVER provider should resolve configured queries and merge their results without consulting the GDELT seed or deterministic generator")
+    void fetchTopHeadlines_resolvesConfiguredQueriesWithoutGeneratedQuerySource() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "코스피,환율");
+        // maxPages=1 keeps one request per configured query so the captured URLs map 1:1 to the
+        // resolved query list rather than fanning out into later pages of the sequential stub.
+        ReflectionTestUtils.setField(provider, "maxPages", 1);
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "코스피 강세",
+                              "description": "기관 매수",
+                              "originallink": "https://news.example.com/configured-kospi",
+                              "link": "https://search.naver.com/configured-kospi",
+                              "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                            }
+                          ]
+                        }
+                        """))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "환율 급등",
+                              "description": "달러 강세",
+                              "originallink": "https://news.example.com/configured-fx",
+                              "link": "https://search.naver.com/configured-fx",
+                              "pubDate": "Fri, 13 Mar 2026 10:00:00 +0900"
+                            }
+                          ]
+                        }
+                        """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        // Characterization: the configured query source is the only one resolved here. Exactly the two
+        // configured queries reach the upstream call and their candidates flow into the shared merge,
+        // newest first, while the GDELT seed and deterministic generator collaborators stay untouched.
+        assertThat(decodedRequestUrls())
+                .hasSize(2)
+                .anySatisfy(url -> assertThat(url).contains("query=코스피"))
+                .anySatisfy(url -> assertThat(url).contains("query=환율"));
+        assertThat(results).extracting(ExternalNewsItem::url)
+                .containsExactly(
+                        "https://news.example.com/configured-fx",
+                        "https://news.example.com/configured-kospi");
+        verifyNoInteractions(gdeltHotIssueSeedProvider, deterministicQueryGenerator);
+    }
+
+    @Test
+    @DisplayName("NAVER provider should fall back to built-in default queries without consulting the GDELT seed or deterministic generator")
+    void fetchTopHeadlines_resolvesDefaultQueriesWithoutGeneratedQuerySource() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": []
+                }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        // Characterization: when configured queries are blank the provider resolves its own built-in
+        // default query list rather than seeding from GDELT or generating queries, so the default path
+        // remains separated from the generated query source and neither collaborator is consulted.
+        assertThat(decodedRequestUrls()).hasSize(18)
+                .anySatisfy(url -> assertThat(url).contains("query=코스피 지수"))
+                .anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
+        verifyNoInteractions(gdeltHotIssueSeedProvider, deterministicQueryGenerator);
+    }
+
+    @Test
+    @DisplayName("NAVER provider should merge generated queries before default queries when dynamic query source is enabled")
+    void fetchTopHeadlines_dynamicQueriesEnabledMergesGeneratedQueriesBeforeDefaults() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+        ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
+        ReflectionTestUtils.setField(provider, "maxPages", 1);
+        given(gdeltHotIssueSeedProvider.resolveHotIssueSeeds(10))
+                .willReturn(List.of("federal reserve rate decision"));
+        given(deterministicQueryGenerator.generateQueries(eq(List.of("federal reserve rate decision")), eq(10)))
+                .willReturn(List.of("연준 금리", "코스피 지수", "연준 금리"));
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": []
+                }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        List<String> urls = decodedRequestUrls();
+        assertThat(urls).hasSize(19);
+        assertThat(urls.get(0)).contains("query=연준 금리");
+        assertThat(urls.get(1)).contains("query=코스피 지수");
+        assertThat(urls).filteredOn(url -> url.contains("query=연준 금리")).hasSize(1);
+        assertThat(urls).filteredOn(url -> url.contains("query=코스피 지수")).hasSize(1);
+        assertThat(urls).anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
+        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeeds(10);
+        verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
+    }
+
+    @Test
+    @DisplayName("NAVER provider should keep safe default fallback when dynamic query generation fails")
+    void fetchTopHeadlines_dynamicQueriesEnabledFallsBackToDefaultsWhenGeneratorFails() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+        ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
+        given(gdeltHotIssueSeedProvider.resolveHotIssueSeeds(10))
+                .willReturn(List.of("federal reserve rate decision"));
+        given(deterministicQueryGenerator.generateQueries(any(), eq(10)))
+                .willThrow(new IllegalStateException("generator unavailable"));
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": []
+                }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        assertThat(decodedRequestUrls()).hasSize(18)
+                .anySatisfy(url -> assertThat(url).contains("query=코스피 지수"))
+                .anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
+        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeeds(10);
+        verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
     }
 
     private List<String> capturedRequestUrls() {

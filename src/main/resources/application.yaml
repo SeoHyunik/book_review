@@ -171,6 +171,9 @@ app:
       fallback-max-age-hours: 36
     naver:
       enabled: ${APP_NEWS_NAVER_ENABLED:true}
+      # Merged dynamic query path (GDELT-seed -> deterministic generator) is on by default
+      # so deployments pick it up without a new environment setting; override to disable.
+      dynamic-queries-enabled: ${APP_NEWS_NAVER_DYNAMIC_QUERIES_ENABLED:true}
       base-url: https://openapi.naver.com
       client-id: ${NAVER_CLIENT_ID:}
       client-secret: ${NAVER_CLIENT_SECRET:}

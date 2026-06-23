@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -141,6 +142,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     private static final Pattern QUERY_DELIMITER = Pattern.compile("[,;\\r\\n]+");
     private static final int MAX_CONFIGURED_QUERIES = 50;
     private static final int MAX_QUERY_LENGTH = 100;
+    // Bounds for the optional dynamic (GDELT-seed -> deterministic-generator) query source. They cap
+    // how many hot-issue seeds are requested and how many generated queries are merged ahead of the
+    // static safe defaults, so the dynamic path can never fan out unbounded upstream calls.
+    private static final int DYNAMIC_SEED_LIMIT = 10;
+    private static final int DYNAMIC_QUERY_LIMIT = 10;
 
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
@@ -161,6 +167,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
 
     @Value("${app.news.naver.queries:}")
     private String rawQueries;
+
+    // Off by default so the safe-default behavior is preserved unless operators explicitly opt in.
+    // When enabled, and only when no explicit queries are configured, the GDELT-seed + deterministic
+    // generator source is merged ahead of the built-in defaults.
+    @Value("${app.news.naver.dynamic-queries-enabled:false}")
+    private boolean dynamicQueriesEnabled;
 
     @Value("${app.news.naver.display:10}")
     private int display;
@@ -185,9 +197,9 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         String queryMode = configuredQueries.isEmpty() ? "default" : "configured";
         int queryCount = configuredQueries.isEmpty() ? DEFAULT_QUERIES.size() : configuredQueries.size();
         log.info("[NAVER] configuration enabled={} clientIdPresent={} clientSecretPresent={} configured={} "
-                        + "queryMode={} queryCount={} display={} start={} maxPages={} maxAgeHours={} "
+                        + "dynamicQueriesEnabled={} queryMode={} queryCount={} display={} start={} maxPages={} maxAgeHours={} "
                         + "fallbackMaxAgeHours={} baseUrl={}",
-                enabled, hasClientId(), hasClientSecret(), isConfigured(), queryMode, queryCount,
+                enabled, hasClientId(), hasClientSecret(), isConfigured(), dynamicQueriesEnabled, queryMode, queryCount,
                 resolveDisplay(display), resolveStart(), resolveMaxPages(), resolveMaxAgeHours(NewsFreshnessBucket.FRESH),
                 resolveMaxAgeHours(NewsFreshnessBucket.SEMI_FRESH), baseUrl);
     }
@@ -219,6 +231,9 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         List<String> queries = resolveQueries();
         NaverPassResult firstPass = runQueryPass(queries, resolvedLimit, bucket);
         List<ExternalNewsItem> merged = deduplicateAndLimit(firstPass.candidates(), resolvedLimit);
+        // The pass that produced the final (possibly empty) merged result; used to build the
+        // provider-wide empty summary so the recovery pass, when it runs, drives the reported cause.
+        NaverPassResult effectivePass = firstPass;
         log.info("[NAVER] bucket={} merged usableItems={} requestedLimit={} queries={}",
                 bucket, merged.size(), resolvedLimit, queries.size());
 
@@ -235,13 +250,21 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     recoveryQueries.size());
             NaverPassResult secondPass = runQueryPass(recoveryQueries, resolvedLimit, recoveryBucket);
             merged = deduplicateAndLimit(secondPass.candidates(), resolvedLimit);
+            effectivePass = secondPass;
             log.info("[NAVER] second-pass complete recoveryBucket={} recoveredItems={} recoveryStaleItems={} recoveryRawItems={}",
                     recoveryBucket, merged.size(), secondPass.staleItemCount(), secondPass.rawItemCount());
         }
 
         if (merged.isEmpty()) {
-            log.info("[NAVER] provider empty reason=no-usable-items bucket={} requestedLimit={} queries={} configured={}",
-                    bucket, resolvedLimit, queries.size(), isConfigured());
+            // Provider-wide empty summary: aggregate the per-query dispositions of the pass that
+            // produced the empty result into a single cause, instead of a fixed no-usable-items
+            // label. Since merged is empty no candidate was accepted, so stale + relevance-filtered +
+            // unusable partition the raw items, letting the dominant cause be reported honestly.
+            String reason = resolveProviderEmptyReason(effectivePass);
+            log.info("[NAVER] provider empty reason={} bucket={} requestedLimit={} queries={} configured={} rawItems={} staleItems={} filteredByRelevance={} unusableItems={}",
+                    reason, bucket, resolvedLimit, queries.size(), isConfigured(),
+                    effectivePass.rawItemCount(), effectivePass.staleItemCount(),
+                    effectivePass.filteredByRelevanceCount(), effectivePass.unusableItemCount());
         }
         return merged;
     }
@@ -250,16 +273,20 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         List<NaverCandidate> candidates = new ArrayList<>();
         int staleItems = 0;
         int rawItems = 0;
+        int filteredByRelevance = 0;
+        int unusableItems = 0;
         for (String query : queries) {
             NaverQueryOutcome outcome = fetchQuery(query, resolvedLimit, bucket);
             candidates.addAll(outcome.candidates());
             staleItems += outcome.staleItemCount();
             rawItems += outcome.rawItemCount();
+            filteredByRelevance += outcome.filteredByRelevanceCount();
+            unusableItems += outcome.unusableItemCount();
             if (deduplicateAndLimit(candidates, resolvedLimit).size() >= resolvedLimit) {
                 break;
             }
         }
-        return new NaverPassResult(candidates, rawItems, staleItems);
+        return new NaverPassResult(candidates, rawItems, staleItems, filteredByRelevance, unusableItems);
     }
 
     // The recovery pass only runs for the FRESH primary path, and only when the first pass actually
@@ -280,6 +307,27 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 .toList();
     }
 
+    // Classifies a provider-wide empty result by its dominant cause. merged being empty means no
+    // candidate survived, so stale + relevance-filtered + unusable partition the raw items exactly;
+    // when one cause accounts for every raw item it is reported specifically, otherwise the result is
+    // a genuine mix and reported as such so callers can tell a recoverable cause from a structural one.
+    private String resolveProviderEmptyReason(NaverPassResult pass) {
+        int rawItems = pass.rawItemCount();
+        if (rawItems <= 0) {
+            return "no-raw-items";
+        }
+        if (pass.staleItemCount() == rawItems) {
+            return "stale-only";
+        }
+        if (pass.filteredByRelevanceCount() == rawItems) {
+            return "relevance-only";
+        }
+        if (pass.unusableItemCount() == rawItems) {
+            return "unusable-input";
+        }
+        return "mixed-no-usable-items";
+    }
+
     @Override
     public boolean isConfigured() {
         return enabled && hasClientId() && hasClientSecret();
@@ -292,9 +340,21 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         // default path. defaultOnly tells whether the request is running purely on safe defaults.
         boolean rawQueriesPresent = StringUtils.hasText(rawQueries);
         if (!configuredQueries.isEmpty()) {
+            // Explicit operator-configured queries are honored as-is; the dynamic GDELT-seed +
+            // generator source never dilutes an explicit configuration.
             log.info("[NAVER] query-source resolved source=configured rawQueriesPresent={} defaultOnly=false resolvedQueryCount={}",
                     rawQueriesPresent, configuredQueries.size());
             return configuredQueries;
+        }
+
+        // No explicit configuration. When the dynamic source is enabled, merge GDELT-seeded generated
+        // queries ahead of the static defaults so hot-issue intent leads while the safe defaults stay
+        // as the fallback tail. When disabled, behavior is unchanged (safe-default fallback preserved).
+        if (dynamicQueriesEnabled) {
+            List<String> mergedQueries = resolveMergedDynamicQueries(rawQueriesPresent);
+            if (!mergedQueries.isEmpty()) {
+                return mergedQueries;
+            }
         }
 
         log.warn("[NAVER] Naver news queries are empty; using safe defaults. "
@@ -303,6 +363,39 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         log.info("[NAVER] query-source resolved source=default rawQueriesPresent={} defaultOnly=true resolvedQueryCount={}",
                 rawQueriesPresent, DEFAULT_QUERIES.size());
         return DEFAULT_QUERIES;
+    }
+
+    // Resolves the dynamic query source (GDELT hot-issue seeds -> deterministic Korean generator) and
+    // merges the generated queries ahead of the built-in defaults. Generated and default counts are
+    // logged separately from the merged total so the active query provenance stays observable. Any
+    // dynamic-source failure falls back to the built-in defaults, preserving the safe production path.
+    private List<String> resolveMergedDynamicQueries(boolean rawQueriesPresent) {
+        try {
+            List<String> seeds = gdeltHotIssueSeedProvider.resolveHotIssueSeeds(DYNAMIC_SEED_LIMIT);
+            List<String> generatedQueries = deterministicQueryGenerator.generateQueries(seeds, DYNAMIC_QUERY_LIMIT).stream()
+                    .map(this::normalizeConfiguredQuery)
+                    .filter(StringUtils::hasText)
+                    .distinct()
+                    .limit(DYNAMIC_QUERY_LIMIT)
+                    .toList();
+
+            // LinkedHashSet keeps generated queries first (insertion order) and drops any default that a
+            // generated query already covers, so the merge stays deduplicated without reordering intent.
+            LinkedHashSet<String> merged = new LinkedHashSet<>(generatedQueries);
+            merged.addAll(DEFAULT_QUERIES);
+            List<String> mergedQueries = merged.stream()
+                    .limit(MAX_CONFIGURED_QUERIES)
+                    .toList();
+
+            log.info("[NAVER] query-source resolved source=merged rawQueriesPresent={} defaultOnly=false seedCount={} "
+                            + "generatedQueryCount={} defaultQueryCount={} resolvedQueryCount={}",
+                    rawQueriesPresent, seeds.size(), generatedQueries.size(), DEFAULT_QUERIES.size(), mergedQueries.size());
+            return mergedQueries;
+        } catch (Exception ex) {
+            log.warn("[NAVER] dynamic query source failed; using safe defaults. rawQueriesPresent={} defaultOnly=true resolvedQueryCount={}",
+                    rawQueriesPresent, DEFAULT_QUERIES.size(), ex);
+            return DEFAULT_QUERIES;
+        }
     }
 
     private List<String> parseConfiguredQueries() {
@@ -342,6 +435,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         List<NaverCandidate> collected = new ArrayList<>();
         int staleItems = 0;
         int rawItems = 0;
+        int filteredByRelevance = 0;
+        int unusableItems = 0;
         for (int pageIndex = 0; pageIndex < resolveMaxPages(); pageIndex++) {
             int pageStart = resolvePageStart(pageIndex, pageSize);
             if (pageStart < 0) {
@@ -367,6 +462,8 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             collected.addAll(parsed.items());
             staleItems += parsed.staleItemCount();
             rawItems += parsed.rawItemCount();
+            filteredByRelevance += parsed.filteredByRelevanceCount();
+            unusableItems += parsed.unusableItemCount();
             if (collected.size() >= limit) {
                 break;
             }
@@ -374,14 +471,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 break;
             }
         }
-        return new NaverQueryOutcome(collected, rawItems, staleItems);
+        return new NaverQueryOutcome(collected, rawItems, staleItems, filteredByRelevance, unusableItems);
     }
 
     private NaverParseResult parseItems(String query, int pageStart, String body, long maxAgeHours, NewsFreshnessBucket bucket) {
         if (!StringUtils.hasText(body)) {
             log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 bodyEmpty=true",
                     bucket, query, pageStart);
-            return new NaverParseResult(List.of(), 0, 0);
+            return new NaverParseResult(List.of(), 0, 0, 0, 0);
         }
 
         try {
@@ -390,7 +487,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             if (!items.isArray()) {
                 log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 itemsArray=false",
                         bucket, query, pageStart);
-                return new NaverParseResult(List.of(), 0, 0);
+                return new NaverParseResult(List.of(), 0, 0, 0, 0);
             }
 
             int rawItemCount = items.size();
@@ -480,10 +577,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                         reason, bucket, query, pageStart, rawItemCount, staleItemCount, nullPublishedAtCount,
                         invalidPubDateCount, filteredByRelevanceCount, missingUrlCount, emptyTitleCount);
             }
-            return new NaverParseResult(mapped, rawItemCount, staleItemCount);
+            return new NaverParseResult(mapped, rawItemCount, staleItemCount, filteredByRelevanceCount, nullPublishedAtCount);
         } catch (Exception ex) {
             log.warn("[NAVER] failed to parse response bucket={} query='{}' pageStart={}", bucket, query, pageStart, ex);
-            return new NaverParseResult(List.of(), 0, 0);
+            return new NaverParseResult(List.of(), 0, 0, 0, 0);
         }
     }
 
@@ -740,21 +837,27 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     private record NaverParseResult(
             List<NaverCandidate> items,
             int rawItemCount,
-            int staleItemCount
+            int staleItemCount,
+            int filteredByRelevanceCount,
+            int unusableItemCount
     ) {
     }
 
     private record NaverQueryOutcome(
             List<NaverCandidate> candidates,
             int rawItemCount,
-            int staleItemCount
+            int staleItemCount,
+            int filteredByRelevanceCount,
+            int unusableItemCount
     ) {
     }
 
     private record NaverPassResult(
             List<NaverCandidate> candidates,
             int rawItemCount,
-            int staleItemCount
+            int staleItemCount,
+            int filteredByRelevanceCount,
+            int unusableItemCount
     ) {
     }
 }
