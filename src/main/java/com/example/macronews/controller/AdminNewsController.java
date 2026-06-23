@@ -12,6 +12,7 @@ import com.example.macronews.service.notification.AutoIngestionEmailNotification
 import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
+import com.example.macronews.service.news.NewsIngestionSummary;
 import com.example.macronews.service.news.NewsListSort;
 import com.example.macronews.service.news.NewsQueryService;
 import com.example.macronews.service.ops.OpsFeatureToggleService;
@@ -295,13 +296,19 @@ public class AdminNewsController {
                 return "redirect:" + AUTO_PAGE;
             }
 
-            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(resolvedPageSize).events();
+            NewsIngestionSummary summary = newsIngestionService.ingestTopHeadlines(resolvedPageSize);
+            List<NewsEvent> ingested = summary.events();
             AutoIngestionBatchStatusDto autoBatchStatus =
                     newsQueryService.getAutoIngestionBatchStatus(resolvedPageSize, ingested.size(),
                             ingested.stream().map(NewsEvent::id).toList());
             autoIngestionControlService.completeRun(autoBatchStatus);
             AutoIngestionControlStatusDto controlStatus = autoIngestionControlService.getStatus();
-            redirectAttributes.addFlashAttribute("successMessage", buildAutoIngestionFlashMessage(autoBatchStatus));
+            // Outcome is derived from the duplicate-aware summary first, so a cycle that only re-observed
+            // existing items (newlyPersisted=0, duplicates>0) is reported as DUPLICATE_ONLY instead of the
+            // control-state COMPLETED, which otherwise hides that nothing new was stored.
+            String autoOutcome = resolveAdminAutoOutcome(summary, controlStatus);
+            redirectAttributes.addFlashAttribute("successMessage",
+                    buildAutoIngestionFlashMessage(summary, autoBatchStatus));
             if (pageSize <= 0) {
                 redirectAttributes.addFlashAttribute("warningMessage",
                         msg("admin.news.auto.pageSize.invalid", DEFAULT_LIMIT));
@@ -309,10 +316,15 @@ public class AdminNewsController {
             redirectAttributes.addFlashAttribute("autoBatchStatus", autoBatchStatus);
             redirectAttributes.addFlashAttribute("autoBatchRequestedCount", resolvedPageSize);
             redirectAttributes.addFlashAttribute("autoBatchReturnedCount", ingested.size());
+            redirectAttributes.addFlashAttribute("autoBatchNewlyPersistedCount", summary.newlyPersisted());
+            redirectAttributes.addFlashAttribute("autoBatchDuplicateCount", summary.duplicates());
+            redirectAttributes.addFlashAttribute("autoBatchSubmittedForAnalysisCount", summary.submittedForAnalysis());
+            redirectAttributes.addFlashAttribute("autoBatchOutcome", autoOutcome);
             redirectAttributes.addFlashAttribute("autoBatchItemIds", ingested.stream().map(NewsEvent::id).toList());
-            log.info("[ADMIN-AUTO] automatic ingestion completed requested={} returned={} analyzed={} pending={} failed={} outcome={}",
-                    resolvedPageSize, autoBatchStatus.returnedCount(), autoBatchStatus.analyzedCount(),
-                    autoBatchStatus.pendingCount(), autoBatchStatus.failedCount(), controlStatus.latestOutcome());
+            log.info("[ADMIN-AUTO] automatic ingestion completed requested={} returned={} newlyPersisted={} duplicates={} submittedForAnalysis={} analyzed={} pending={} failed={} outcome={}",
+                    resolvedPageSize, ingested.size(), summary.newlyPersisted(), summary.duplicates(),
+                    summary.submittedForAnalysis(), autoBatchStatus.analyzedCount(), autoBatchStatus.pendingCount(),
+                    autoBatchStatus.failedCount(), autoOutcome);
         } catch (RuntimeException ex) {
             autoIngestionControlService.failRun(resolvedPageSize);
             log.error("Admin external ingestion failed", ex);
@@ -468,6 +480,32 @@ public class AdminNewsController {
 
     private int resolveAutoPageSize(int pageSize) {
         return pageSize > 0 ? pageSize : DEFAULT_LIMIT;
+    }
+
+    // Admin-facing outcome label derived from the duplicate-aware summary. It intentionally does NOT
+    // mutate the shared AutoIngestionRunOutcome control state (used by the scheduler/email paths); it
+    // only refines how this manual run is presented so duplicate-only cycles are not shown as COMPLETED.
+    private String resolveAdminAutoOutcome(NewsIngestionSummary summary, AutoIngestionControlStatusDto controlStatus) {
+        if (summary.selected() == 0) {
+            return "NO_ARTICLES";
+        }
+        if (summary.newlyPersisted() == 0 && summary.duplicates() > 0) {
+            return "DUPLICATE_ONLY";
+        }
+        return controlStatus == null || controlStatus.latestOutcome() == null
+                ? "COMPLETED"
+                : controlStatus.latestOutcome().name();
+    }
+
+    private String buildAutoIngestionFlashMessage(NewsIngestionSummary summary,
+            AutoIngestionBatchStatusDto autoBatchStatus) {
+        // Duplicate-only cycle: returned items exist but none were newly stored. Surface that explicitly
+        // instead of the generic success message so the operator is not misled.
+        if (summary.selected() > 0 && summary.newlyPersisted() == 0 && summary.duplicates() > 0) {
+            return msg("admin.news.auto.run.completed.duplicateOnly",
+                    autoBatchStatus.returnedCount(), summary.duplicates());
+        }
+        return buildAutoIngestionFlashMessage(autoBatchStatus);
     }
 
     private String buildAutoIngestionFlashMessage(AutoIngestionBatchStatusDto autoBatchStatus) {

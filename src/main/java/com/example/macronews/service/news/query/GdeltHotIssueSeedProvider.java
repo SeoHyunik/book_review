@@ -82,7 +82,7 @@ public class GdeltHotIssueSeedProvider {
         int resolvedLimit = limit > 0 ? limit : DEFAULT_LIMIT;
 
         if (!enabled || !StringUtils.hasText(baseUrl)) {
-            return fallback(resolvedLimit, false, false, 0, "not-configured");
+            return fallback(resolvedLimit, false, false, 0, -1, "not-configured");
         }
 
         ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
@@ -91,30 +91,39 @@ public class GdeltHotIssueSeedProvider {
                 buildRequestUrl(resolvedLimit),
                 null
         ));
-        boolean httpOk = result != null && result.statusCode() >= 200 && result.statusCode() < 300;
+        int statusCode = result == null ? -1 : result.statusCode();
+        boolean httpOk = result != null && statusCode >= 200 && statusCode < 300;
         if (!httpOk) {
-            return fallback(resolvedLimit, false, false, 0, "upstream-unavailable");
+            // Keep the status code so the next log distinguishes 429 (rate-limit), 504 (timeout),
+            // 503 (connect failure) and 4xx (rejected query) without dumping the response body.
+            return fallback(resolvedLimit, false, false, 0, statusCode, "upstream-unavailable");
         }
 
-        List<String> remoteSeeds = parseSeeds(result.body(), resolvedLimit);
-        if (remoteSeeds.isEmpty()) {
-            return fallback(resolvedLimit, true, true, 0, "no-usable-seeds");
+        SeedParseResult parsed = parseSeeds(result.body(), resolvedLimit);
+        if (parsed.seeds().isEmpty()) {
+            // Distinguish a GDELT 200 plain-text/HTML error body (malformed-body) from a valid but
+            // empty result (no-articles) and from articles whose titles are unusable (no-usable-title),
+            // so the post-deploy log pinpoints exactly why remote seeds were not extracted.
+            boolean parsedJson = parsed.status() != SeedParseStatus.MALFORMED_BODY;
+            return fallback(resolvedLimit, true, parsedJson, 0, statusCode, parsed.status().reason());
         }
 
-        log.info("[GDELT] hot-issue seeds mode={} remoteEnabled={} httpOk={} parsedSeeds={} usedFallback={} limit={}",
-                MODE_REMOTE, true, true, remoteSeeds.size(), false, resolvedLimit);
-        return remoteSeeds;
+        log.info("[GDELT] hot-issue seeds mode={} remoteEnabled={} httpOk={} status={} parsed=true parsedSeeds={} usedFallback={} limit={}",
+                MODE_REMOTE, true, true, statusCode, parsed.seeds().size(), false, resolvedLimit);
+        return parsed.seeds();
     }
 
-    private List<String> parseSeeds(String body, int limit) {
-        if (!StringUtils.hasText(body)) {
-            return List.of();
+    private SeedParseResult parseSeeds(String body, int limit) {
+        if (!StringUtils.hasText(body) || !looksLikeJsonObject(body)) {
+            // GDELT frequently answers a rejected or too-broad query with HTTP 200 and a plain-text or
+            // HTML error body instead of JSON; classify a non-JSON body as malformed without logging it.
+            return new SeedParseResult(List.of(), SeedParseStatus.MALFORMED_BODY);
         }
         try {
             JsonNode root = objectMapper.readTree(body);
             JsonNode articles = root.path("articles");
-            if (!articles.isArray()) {
-                return List.of();
+            if (!articles.isArray() || articles.isEmpty()) {
+                return new SeedParseResult(List.of(), SeedParseStatus.NO_ARTICLES);
             }
             LinkedHashSet<String> seeds = new LinkedHashSet<>();
             for (JsonNode article : articles) {
@@ -126,12 +135,21 @@ public class GdeltHotIssueSeedProvider {
                     break;
                 }
             }
-            return List.copyOf(seeds);
+            if (seeds.isEmpty()) {
+                // Valid JSON with articles, but no article carried a usable title.
+                return new SeedParseResult(List.of(), SeedParseStatus.NO_USABLE_TITLE);
+            }
+            return new SeedParseResult(List.copyOf(seeds), SeedParseStatus.OK);
         } catch (Exception ex) {
-            // Treat any malformed payload as a soft failure; the caller still gets fallback seeds.
+            // JSON-looking prefix but malformed payload; degrade to fallback without dumping the body.
             log.warn("[GDELT] failed to parse hot-issue response; falling back");
-            return List.of();
+            return new SeedParseResult(List.of(), SeedParseStatus.MALFORMED_BODY);
         }
+    }
+
+    private boolean looksLikeJsonObject(String body) {
+        String trimmed = body.stripLeading();
+        return !trimmed.isEmpty() && trimmed.charAt(0) == '{';
     }
 
     private String normalizeSeed(String rawTitle) {
@@ -148,11 +166,32 @@ public class GdeltHotIssueSeedProvider {
         return trimmed;
     }
 
-    private List<String> fallback(int limit, boolean httpOk, boolean parsed, int parsedSeeds, String reason) {
+    private List<String> fallback(int limit, boolean httpOk, boolean parsed, int parsedSeeds, int statusCode,
+            String reason) {
         List<String> seeds = FALLBACK_SEEDS.stream().limit(limit).toList();
-        log.info("[GDELT] hot-issue seeds mode={} remoteEnabled={} httpOk={} parsed={} parsedSeeds={} returnedSeeds={} usedFallback={} limit={} reason={}",
-                MODE_FALLBACK, enabled, httpOk, parsed, parsedSeeds, seeds.size(), true, limit, reason);
+        log.info("[GDELT] hot-issue seeds mode={} remoteEnabled={} httpOk={} status={} parsed={} parsedSeeds={} returnedSeeds={} usedFallback={} limit={} reason={}",
+                MODE_FALLBACK, enabled, httpOk, statusCode, parsed, parsedSeeds, seeds.size(), true, limit, reason);
         return seeds;
+    }
+
+    private enum SeedParseStatus {
+        OK("ok"),
+        MALFORMED_BODY("malformed-body"),
+        NO_ARTICLES("no-articles"),
+        NO_USABLE_TITLE("no-usable-title");
+
+        private final String reason;
+
+        SeedParseStatus(String reason) {
+            this.reason = reason;
+        }
+
+        String reason() {
+            return reason;
+        }
+    }
+
+    private record SeedParseResult(List<String> seeds, SeedParseStatus status) {
     }
 
     private String buildRequestUrl(int limit) {

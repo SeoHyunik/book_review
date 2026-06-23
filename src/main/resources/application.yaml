@@ -204,7 +204,12 @@ app:
       # deterministic local fallback seeds, so the safe-default path is preserved.
       enabled: ${APP_NEWS_GDELT_ENABLED:true}
       base-url: https://api.gdeltproject.org/api/v2/doc/doc
-      query: '(market OR inflation OR "interest rate" OR "central bank" OR oil OR semiconductor)'
+      # GDELT DOC 2.0 rejects overly broad queries (very common single words such as "market"/"oil")
+      # by returning an HTTP error or an HTTP 200 plain-text error body, which surfaces here as
+      # upstream-unavailable / malformed-body. A smaller set of specific macro phrases stays within
+      # GDELT's query limits while still mapping to the deterministic Korean query generator.
+      # Override APP_NEWS_GDELT_QUERY to retune without a redeploy.
+      query: ${APP_NEWS_GDELT_QUERY:inflation OR "interest rate" OR "central bank" OR "federal reserve" OR "oil price"}
       timespan: 24h
       max-records: 25
   market:

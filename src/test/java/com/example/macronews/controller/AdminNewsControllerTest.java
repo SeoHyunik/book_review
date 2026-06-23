@@ -23,6 +23,7 @@ import com.example.macronews.service.ops.RenderKeepAliveService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.ResourceBundle;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -89,6 +90,88 @@ class AdminNewsControllerTest {
 
         assertThat(redirect).isEqualTo("redirect:/admin/news/auto");
         verify(autoIngestionControlService).beginManualRun(3);
+        verify(newsIngestionService).ingestTopHeadlines(3);
+    }
+
+    @Test
+    @DisplayName("user triggered auto ingestion should report DUPLICATE_ONLY when nothing new is stored")
+    void ingestFromApi_reportsDuplicateOnlyOutcomeWhenNoNewArticlesPersisted() {
+        NewsIngestionService newsIngestionService = mock(NewsIngestionService.class);
+        NewsQueryService newsQueryService = mock(NewsQueryService.class);
+        AutoIngestionControlService autoIngestionControlService = mock(AutoIngestionControlService.class);
+        NewsSourceProviderSelector newsSourceProviderSelector = mock(NewsSourceProviderSelector.class);
+        AdminNewsController controller = new AdminNewsController(
+                newsIngestionService,
+                newsSourceProviderSelector,
+                mock(MacroAiService.class),
+                newsQueryService,
+                autoIngestionControlService,
+                new OpsFeatureToggleService(false, false),
+                mock(RenderKeepAliveService.class),
+                mock(AutoIngestionEmailNotificationService.class),
+                messageSource());
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        List<NewsEvent> ingested = List.of(sampleNewsEvent("event-1"));
+        // Duplicate-only cycle: one item returned but it already existed (newlyPersisted=0, duplicates=1).
+        NewsIngestionSummary summary = new NewsIngestionSummary(3, 1, 0, 1, 0, ingested);
+        AutoIngestionBatchStatusDto batchStatus = new AutoIngestionBatchStatusDto(3, 1, 0, 1, 0, 0, true, List.of());
+
+        when(newsSourceProviderSelector.isConfigured()).thenReturn(true);
+        when(autoIngestionControlService.beginManualRun(3)).thenReturn(AutoIngestionRunCommandResult.STARTED);
+        when(newsIngestionService.ingestTopHeadlines(3)).thenReturn(summary);
+        when(newsQueryService.getAutoIngestionBatchStatus(3, 1, List.of("event-1"))).thenReturn(batchStatus);
+        when(autoIngestionControlService.getStatus()).thenReturn(new AutoIngestionControlStatusDto(
+                true, false, AutoIngestionRunOutcome.COMPLETED, null, null, 3, 0, 1, 0, 0));
+
+        String redirect = controller.ingestFromApi(3, redirectAttributes);
+
+        assertThat(redirect).isEqualTo("redirect:/admin/news/auto");
+        Map<String, ?> flash = redirectAttributes.getFlashAttributes();
+        assertThat(flash.get("autoBatchOutcome")).isEqualTo("DUPLICATE_ONLY");
+        assertThat(flash.get("autoBatchNewlyPersistedCount")).isEqualTo(0);
+        assertThat(flash.get("autoBatchDuplicateCount")).isEqualTo(1);
+        assertThat(flash.get("autoBatchSubmittedForAnalysisCount")).isEqualTo(0);
+        verify(newsIngestionService).ingestTopHeadlines(3);
+    }
+
+    @Test
+    @DisplayName("user triggered auto ingestion should keep the control outcome when new articles are stored")
+    void ingestFromApi_keepsControlOutcomeWhenNewArticlesPersisted() {
+        NewsIngestionService newsIngestionService = mock(NewsIngestionService.class);
+        NewsQueryService newsQueryService = mock(NewsQueryService.class);
+        AutoIngestionControlService autoIngestionControlService = mock(AutoIngestionControlService.class);
+        NewsSourceProviderSelector newsSourceProviderSelector = mock(NewsSourceProviderSelector.class);
+        AdminNewsController controller = new AdminNewsController(
+                newsIngestionService,
+                newsSourceProviderSelector,
+                mock(MacroAiService.class),
+                newsQueryService,
+                autoIngestionControlService,
+                new OpsFeatureToggleService(false, false),
+                mock(RenderKeepAliveService.class),
+                mock(AutoIngestionEmailNotificationService.class),
+                messageSource());
+        RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
+        List<NewsEvent> ingested = List.of(sampleNewsEvent("event-1"));
+        // Productive cycle: one new article stored and submitted for analysis.
+        NewsIngestionSummary summary = new NewsIngestionSummary(3, 1, 1, 0, 1, ingested);
+        AutoIngestionBatchStatusDto batchStatus = new AutoIngestionBatchStatusDto(3, 1, 1, 0, 0, 1, false, List.of());
+
+        when(newsSourceProviderSelector.isConfigured()).thenReturn(true);
+        when(autoIngestionControlService.beginManualRun(3)).thenReturn(AutoIngestionRunCommandResult.STARTED);
+        when(newsIngestionService.ingestTopHeadlines(3)).thenReturn(summary);
+        when(newsQueryService.getAutoIngestionBatchStatus(3, 1, List.of("event-1"))).thenReturn(batchStatus);
+        when(autoIngestionControlService.getStatus()).thenReturn(new AutoIngestionControlStatusDto(
+                true, false, AutoIngestionRunOutcome.COMPLETED, null, null, 3, 1, 0, 1, 0));
+
+        String redirect = controller.ingestFromApi(3, redirectAttributes);
+
+        assertThat(redirect).isEqualTo("redirect:/admin/news/auto");
+        Map<String, ?> flash = redirectAttributes.getFlashAttributes();
+        assertThat(flash.get("autoBatchOutcome")).isEqualTo("COMPLETED");
+        assertThat(flash.get("autoBatchNewlyPersistedCount")).isEqualTo(1);
+        assertThat(flash.get("autoBatchDuplicateCount")).isEqualTo(0);
+        assertThat(flash.get("autoBatchSubmittedForAnalysisCount")).isEqualTo(1);
         verify(newsIngestionService).ingestTopHeadlines(3);
     }
 

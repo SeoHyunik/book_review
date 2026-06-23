@@ -152,4 +152,76 @@ class GdeltHotIssueSeedProviderTest {
         assertThat(seeds).startsWith(FIRST_FALLBACK_SEED);
         verify(externalApiUtils, never()).callAPI(any());
     }
+
+    @Test
+    @DisplayName("Extracts article titles as remote seeds from a realistic GDELT DOC 2.0 artlist response")
+    void resolveHotIssueSeeds_extractsTitlesFromRealisticGdeltResponse() {
+        // Realistic GDELT DOC 2.0 mode=artlist&format=json payload, including the full field set
+        // (url, url_mobile, seendate, socialimage, domain, language, sourcecountry) so this test would
+        // catch any drift in the expected `articles`/`title` extraction keys.
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "articles": [
+                    {
+                      "url": "https://www.example.com/fed-holds-rates",
+                      "url_mobile": "",
+                      "title": "Fed holds interest rates steady amid inflation concerns",
+                      "seendate": "20260623T101500Z",
+                      "socialimage": "https://www.example.com/a.jpg",
+                      "domain": "example.com",
+                      "language": "English",
+                      "sourcecountry": "United States"
+                    },
+                    {
+                      "url": "https://www.example.org/oil-prices-climb",
+                      "url_mobile": "",
+                      "title": "Oil prices climb as central bank signals caution",
+                      "seendate": "20260623T100000Z",
+                      "socialimage": "https://www.example.org/b.jpg",
+                      "domain": "example.org",
+                      "language": "English",
+                      "sourcecountry": "United Kingdom"
+                    }
+                  ]
+                }
+                """));
+
+        List<String> seeds = provider.resolveHotIssueSeeds(5);
+
+        assertThat(seeds).containsExactly(
+                "Fed holds interest rates steady amid inflation concerns",
+                "Oil prices climb as central bank signals caution");
+    }
+
+    @Test
+    @DisplayName("Falls back when articles are present but every title is blank")
+    void resolveHotIssueSeeds_fallsBackWhenArticlesHaveBlankTitles() {
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "articles": [
+                    { "url": "https://www.example.com/a", "title": "" },
+                    { "url": "https://www.example.com/b", "title": "   " }
+                  ]
+                }
+                """));
+
+        List<String> seeds = provider.resolveHotIssueSeeds(4);
+
+        assertThat(seeds).hasSize(4);
+        assertThat(seeds).startsWith(FIRST_FALLBACK_SEED, SECOND_FALLBACK_SEED);
+    }
+
+    @Test
+    @DisplayName("Falls back when GDELT returns HTTP 200 with a non-JSON plain-text error body")
+    void resolveHotIssueSeeds_fallsBackWhenBodyIsNonJsonTextError() {
+        // GDELT commonly answers a rejected/too-broad query with HTTP 200 and a plain-text error
+        // instead of JSON; this must degrade to fallback seeds rather than surface zero seeds.
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200,
+                "Your query was too short or too broad. Please refine and try again."));
+
+        List<String> seeds = provider.resolveHotIssueSeeds(6);
+
+        assertThat(seeds).hasSize(6);
+        assertThat(seeds).startsWith(FIRST_FALLBACK_SEED, SECOND_FALLBACK_SEED);
+    }
 }
