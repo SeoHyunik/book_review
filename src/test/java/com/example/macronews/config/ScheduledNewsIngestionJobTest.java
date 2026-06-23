@@ -13,6 +13,7 @@ import com.example.macronews.dto.AutoIngestionRunOutcome;
 import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
+import com.example.macronews.service.news.NewsIngestionSummary;
 import com.example.macronews.service.news.NewsQueryService;
 import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
@@ -83,7 +84,7 @@ class ScheduledNewsIngestionJobTest {
         given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
         given(newsSourceProviderSelector.isConfigured()).willReturn(true);
         given(autoIngestionControlService.beginScheduledRun(5)).willReturn(AutoIngestionRunCommandResult.STARTED);
-        given(newsIngestionService.ingestTopHeadlines(5)).willReturn(List.of());
+        given(newsIngestionService.ingestTopHeadlines(5)).willReturn(summaryOf(5, List.of()));
         given(newsQueryService.getAutoIngestionBatchStatus(5, 0, List.of()))
                 .willReturn(new AutoIngestionBatchStatusDto(5, 0, 0, 0, 0, 0, true, List.of()));
 
@@ -101,7 +102,7 @@ class ScheduledNewsIngestionJobTest {
         given(newsSourceProviderSelector.isConfigured()).willReturn(true);
         given(autoIngestionControlService.beginScheduledRun(12)).willReturn(AutoIngestionRunCommandResult.STARTED);
         List<NewsEvent> ingested = List.of(sampleNewsEvent("event-1"));
-        given(newsIngestionService.ingestTopHeadlines(12)).willReturn(ingested);
+        given(newsIngestionService.ingestTopHeadlines(12)).willReturn(summaryOf(12, ingested));
         AutoIngestionBatchStatusDto batchStatus = new AutoIngestionBatchStatusDto(12, 1, 1, 0, 0, 1, false, List.of());
         given(newsQueryService.getAutoIngestionBatchStatus(12, 1, List.of("event-1")))
                 .willReturn(batchStatus);
@@ -154,7 +155,7 @@ class ScheduledNewsIngestionJobTest {
         given(autoIngestionControlService.isSchedulerEnabled()).willReturn(true);
         given(newsSourceProviderSelector.isConfigured()).willReturn(true);
         given(autoIngestionControlService.beginScheduledRun(10)).willReturn(AutoIngestionRunCommandResult.STARTED);
-        given(newsIngestionService.ingestTopHeadlines(10)).willReturn(List.of());
+        given(newsIngestionService.ingestTopHeadlines(10)).willReturn(summaryOf(10, List.of()));
         given(newsQueryService.getAutoIngestionBatchStatus(10, 0, List.of()))
                 .willReturn(new AutoIngestionBatchStatusDto(10, 0, 0, 0, 0, 0, true, List.of()));
 
@@ -199,7 +200,7 @@ class ScheduledNewsIngestionJobTest {
         given(newsSourceProviderSelector.isConfigured()).willReturn(true);
         given(autoIngestionControlService.beginScheduledRun(12)).willReturn(AutoIngestionRunCommandResult.STARTED);
         List<NewsEvent> ingested = List.of(sampleNewsEvent("event-1"));
-        given(newsIngestionService.ingestTopHeadlines(12)).willReturn(ingested);
+        given(newsIngestionService.ingestTopHeadlines(12)).willReturn(summaryOf(12, ingested));
         doThrow(new IllegalStateException("retry-failed")).when(newsIngestionService).retryFailedAnalyses();
         AutoIngestionBatchStatusDto batchStatus = new AutoIngestionBatchStatusDto(12, 1, 1, 0, 0, 1, false, List.of());
         given(newsQueryService.getAutoIngestionBatchStatus(12, 1, List.of("event-1")))
@@ -213,6 +214,10 @@ class ScheduledNewsIngestionJobTest {
 
         verify(newsIngestionService).retryFailedAnalyses();
         verify(autoIngestionControlService).completeRun(batchStatus);
+    }
+
+    private NewsIngestionSummary summaryOf(int requested, List<NewsEvent> events) {
+        return new NewsIngestionSummary(requested, events.size(), events.size(), 0, events.size(), events);
     }
 
     private NewsEvent sampleNewsEvent(String id) {

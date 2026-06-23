@@ -14,6 +14,7 @@ import com.example.macronews.service.macro.MacroAiService;
 import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
+import com.example.macronews.service.news.NewsIngestionSummary;
 import com.example.macronews.service.news.NewsQueryService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
 import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
@@ -48,7 +49,8 @@ class AdminNewsControllerTest {
         RedirectAttributesModelMap redirectAttributes = new RedirectAttributesModelMap();
         AdminIngestionRequest request = new AdminIngestionRequest(null, null, null, null, null, null, 3);
 
-        when(newsIngestionService.ingestTopHeadlines(3)).thenReturn(List.of());
+        when(newsIngestionService.ingestTopHeadlines(3))
+                .thenReturn(new NewsIngestionSummary(3, 0, 0, 0, 0, List.of()));
 
         String redirect = controller.ingest(request, redirectAttributes);
 
@@ -79,7 +81,8 @@ class AdminNewsControllerTest {
 
         when(newsSourceProviderSelector.isConfigured()).thenReturn(true);
         when(autoIngestionControlService.beginManualRun(3)).thenReturn(AutoIngestionRunCommandResult.STARTED);
-        when(newsIngestionService.ingestTopHeadlines(3)).thenReturn(ingested);
+        when(newsIngestionService.ingestTopHeadlines(3))
+                .thenReturn(new NewsIngestionSummary(3, 1, 1, 0, 1, ingested));
         when(newsQueryService.getAutoIngestionBatchStatus(3, 1, List.of("event-1"))).thenReturn(batchStatus);
 
         String redirect = controller.ingestFromApi(3, redirectAttributes);

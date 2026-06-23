@@ -196,6 +196,17 @@ app:
       country: us
       max-age-hours: 24
       fallback-max-age-hours: 36
+    gdelt:
+      # GDELT DOC 2.0 is a key-free public endpoint, so no secret is required.
+      # Enabled by default so deployments pick up the real-time hot-issue seed path
+      # without a new environment setting; flip APP_NEWS_GDELT_ENABLED=false to disable.
+      # On any remote failure/timeout/malformed payload the provider keeps its
+      # deterministic local fallback seeds, so the safe-default path is preserved.
+      enabled: ${APP_NEWS_GDELT_ENABLED:true}
+      base-url: https://api.gdeltproject.org/api/v2/doc/doc
+      query: '(market OR inflation OR "interest rate" OR "central bank" OR oil OR semiconductor)'
+      timespan: 24h
+      max-records: 25
   market:
     fx:
       enabled: false

@@ -6,6 +6,7 @@ import com.example.macronews.dto.AutoIngestionBatchStatusDto;
 import com.example.macronews.service.news.AutoIngestionControlService;
 import com.example.macronews.service.news.AutoIngestionRunCommandResult;
 import com.example.macronews.service.news.NewsIngestionService;
+import com.example.macronews.service.news.NewsIngestionSummary;
 import com.example.macronews.service.news.NewsQueryService;
 import com.example.macronews.service.notification.AutoIngestionEmailNotificationService;
 import com.example.macronews.service.news.source.NewsSourceProviderSelector;
@@ -68,7 +69,8 @@ public class ScheduledNewsIngestionJob {
             }
 
             log.info("[SCHEDULER] runId={} started pageSize={}", runId, resolvedPageSize);
-            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(resolvedPageSize);
+            NewsIngestionSummary ingestionSummary = newsIngestionService.ingestTopHeadlines(resolvedPageSize);
+            List<NewsEvent> ingested = ingestionSummary.events();
             int retriedFailedAnalyses = 0;
             try {
                 retriedFailedAnalyses = newsIngestionService.retryFailedAnalyses();
@@ -81,13 +83,14 @@ public class ScheduledNewsIngestionJob {
                     ingested.stream().map(NewsEvent::id).toList());
             autoIngestionControlService.completeRun(batchStatus);
             autoIngestionEmailNotificationService.sendRunResult(autoIngestionControlService.getStatus(), batchStatus);
-            log.info("[SCHEDULER] runId={} completed returned={} analyzed={} pending={} failed={} duplicates={}",
+            log.info("[SCHEDULER] runId={} completed requested={} returned={} analyzed={} pending={} failed={} duplicates={} retried={}",
                     runId,
+                    resolvedPageSize,
                     ingested.size(),
                     countByStatus(ingested, NewsStatus.ANALYZED),
                     countByStatus(ingested, NewsStatus.INGESTED),
                     countByStatus(ingested, NewsStatus.FAILED),
-                    countByStatus(ingested, NewsStatus.DUPLICATE),
+                    ingestionSummary.duplicates(),
                     retriedFailedAnalyses);
         } catch (RuntimeException ex) {
             autoIngestionControlService.failRun(resolvedPageSize);

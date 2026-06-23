@@ -995,6 +995,107 @@ class NaverNewsSourceProviderTest {
         verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
     }
 
+    @Test
+    @DisplayName("parseItems should record a freshness x relevance breakdown without changing drops")
+    void parseItems_recordsStaleRelevanceDiagnosticsWithoutChangingDrops() {
+        // Four items spanning every freshness x relevance combination. Fixed clock = 2026-03-13T03:30Z,
+        // maxAgeHours = 12 -> cutoff = 2026-03-12T15:30Z. Items dated 2026-03-13 are fresh; 2026-03-01 stale.
+        String body = """
+                {
+                  "items": [
+                    {
+                      "title": "코스피 지수 상승",
+                      "description": "기관 매수세 확대",
+                      "originallink": "https://news.example.com/fresh-relevant",
+                      "link": "https://search.naver.com/fresh-relevant",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                    },
+                    {
+                      "title": "연예인 화보 공개",
+                      "description": "패션 트렌드 정리",
+                      "originallink": "https://news.example.com/fresh-irrelevant",
+                      "link": "https://search.naver.com/fresh-irrelevant",
+                      "pubDate": "Fri, 13 Mar 2026 11:00:00 +0900"
+                    },
+                    {
+                      "title": "한국은행 기준금리 동결",
+                      "description": "통화정책 방향 점검",
+                      "originallink": "https://news.example.com/stale-relevant",
+                      "link": "https://search.naver.com/stale-relevant",
+                      "pubDate": "Sun, 01 Mar 2026 09:00:00 +0900"
+                    },
+                    {
+                      "title": "봄 여행 명소 추천",
+                      "description": "라이프스타일 가이드",
+                      "originallink": "https://news.example.com/stale-irrelevant",
+                      "link": "https://search.naver.com/stale-irrelevant",
+                      "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900"
+                    }
+                  ]
+                }
+                """;
+
+        NaverNewsSourceProvider.NaverParseResult result =
+                provider.parseItems("진단", 1, body, 12L, NewsFreshnessBucket.FRESH);
+
+        // Drop behavior unchanged: only the fresh+relevant item survives.
+        assertThat(result.rawItemCount()).isEqualTo(4);
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.staleItemCount()).isEqualTo(2);
+        assertThat(result.filteredByRelevanceCount()).isEqualTo(1);
+
+        // New simultaneous diagnostics surface the previously hidden stale-AND-irrelevant item.
+        assertThat(result.staleAndIrrelevantCount()).isEqualTo(1);
+        assertThat(result.staleButRelevantCount()).isEqualTo(1);
+        assertThat(result.freshButIrrelevantCount()).isEqualTo(1);
+        assertThat(result.freshAndRelevantCount()).isEqualTo(1);
+
+        // Invariants tying the new counters back to the existing ones.
+        assertThat(result.staleAndIrrelevantCount() + result.staleButRelevantCount())
+                .isEqualTo(result.staleItemCount());
+        assertThat(result.freshButIrrelevantCount()).isEqualTo(result.filteredByRelevanceCount());
+        assertThat(result.freshAndRelevantCount()).isEqualTo(result.items().size());
+    }
+
+    @Test
+    @DisplayName("Adding stale/relevance diagnostics does not change the returned item set")
+    void fetchTopHeadlines_diagnosticsDoNotChangeReturnedItems() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "코스피");
+        ReflectionTestUtils.setField(provider, "maxPages", 1);
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "items": [
+                    {
+                      "title": "코스피 지수 상승",
+                      "description": "기관 매수세 확대",
+                      "originallink": "https://news.example.com/fresh-relevant",
+                      "link": "https://search.naver.com/fresh-relevant",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                    },
+                    {
+                      "title": "연예인 화보 공개",
+                      "description": "패션 트렌드 정리",
+                      "originallink": "https://news.example.com/fresh-irrelevant",
+                      "link": "https://search.naver.com/fresh-irrelevant",
+                      "pubDate": "Fri, 13 Mar 2026 11:00:00 +0900"
+                    },
+                    {
+                      "title": "봄 여행 명소 추천",
+                      "description": "라이프스타일 가이드",
+                      "originallink": "https://news.example.com/stale-irrelevant",
+                      "link": "https://search.naver.com/stale-irrelevant",
+                      "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900"
+                    }
+                  ]
+                }
+                """));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).url()).isEqualTo("https://news.example.com/fresh-relevant");
+    }
+
     private List<String> capturedRequestUrls() {
         ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
         verify(externalApiUtils, atLeastOnce()).callAPI(requestCaptor.capture());

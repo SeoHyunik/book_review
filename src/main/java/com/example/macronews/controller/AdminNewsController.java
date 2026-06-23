@@ -209,7 +209,7 @@ public class AdminNewsController {
             int limit = request.limit() != null && request.limit() > 0
                     ? request.limit()
                     : DEFAULT_LIMIT;
-            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(limit);
+            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(limit).events();
             redirectAttributes.addFlashAttribute("successMessage",
                     "External ingestion completed. total=" + ingested.size());
             return "redirect:" + MANUAL_PAGE;
@@ -295,7 +295,7 @@ public class AdminNewsController {
                 return "redirect:" + AUTO_PAGE;
             }
 
-            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(resolvedPageSize);
+            List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(resolvedPageSize).events();
             AutoIngestionBatchStatusDto autoBatchStatus =
                     newsQueryService.getAutoIngestionBatchStatus(resolvedPageSize, ingested.size(),
                             ingested.stream().map(NewsEvent::id).toList());

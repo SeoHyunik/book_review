@@ -3,6 +3,8 @@ package com.example.macronews.service.news.query;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
@@ -119,5 +121,35 @@ class GdeltHotIssueSeedProviderTest {
         List<String> failureSeeds = provider.resolveHotIssueSeeds(6);
 
         assertThat(timeoutSeeds).isEqualTo(failureSeeds);
+    }
+
+    @Test
+    @DisplayName("Returns deterministic fallback seeds without any remote call when disabled")
+    void resolveHotIssueSeeds_whenDisabled_returnsFallbackWithoutRemoteCall() {
+        // Mirrors the production not-configured state (app.news.gdelt.enabled=false): the provider
+        // must short-circuit to deterministic fallback seeds and never touch the remote endpoint.
+        ReflectionTestUtils.setField(provider, "enabled", false);
+
+        List<String> seeds = provider.resolveHotIssueSeeds(5);
+
+        assertThat(seeds).isNotEmpty();
+        assertThat(seeds).hasSize(5);
+        assertThat(seeds).startsWith(FIRST_FALLBACK_SEED, SECOND_FALLBACK_SEED);
+        verify(externalApiUtils, never()).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("Returns not-configured fallback seeds without any remote call when base URL is blank")
+    void resolveHotIssueSeeds_whenBaseUrlBlank_returnsNotConfiguredFallback() {
+        // A blank base-url is treated as not-configured even when enabled=true, so the provider
+        // degrades to fallback seeds without issuing any remote request.
+        ReflectionTestUtils.setField(provider, "baseUrl", "");
+
+        List<String> seeds = provider.resolveHotIssueSeeds(3);
+
+        assertThat(seeds).isNotEmpty();
+        assertThat(seeds).hasSize(3);
+        assertThat(seeds).startsWith(FIRST_FALLBACK_SEED);
+        verify(externalApiUtils, never()).callAPI(any());
     }
 }

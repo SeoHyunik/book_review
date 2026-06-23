@@ -109,26 +109,42 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
 
     @Override
     @Transactional
-    public List<NewsEvent> ingestTopHeadlines(int limit) {
+    public NewsIngestionSummary ingestTopHeadlines(int limit) {
         log.info("[INGEST] batch start limit={}", limit);
         List<ExternalNewsItem> externalItems = loadScheduledHeadlineFeed(limit);
         List<NewsEvent> results = new ArrayList<>();
         List<String> interpretationTargets = new ArrayList<>();
+        int newlyPersisted = 0;
+        int duplicates = 0;
 
         for (ExternalNewsItem item : externalItems) {
             boolean duplicateBeforeIngest = findDuplicate(item, resolveExternalId(item)).isPresent();
             NewsEvent ingested = ingestExternalItem(item);
             results.add(ingested);
 
-            if (!duplicateBeforeIngest && isAsyncInterpretationTarget(ingested)) {
-                interpretationTargets.add(ingested.id());
+            // Count newly persisted vs duplicate using the same pre-ingest duplicate check that the
+            // async-interpretation gate already relied on, so no extra repository queries are added.
+            if (duplicateBeforeIngest) {
+                duplicates++;
+            } else {
+                newlyPersisted++;
+                if (isAsyncInterpretationTarget(ingested)) {
+                    interpretationTargets.add(ingested.id());
+                }
             }
         }
 
         submitAsyncInterpretations(interpretationTargets);
-        log.info("[INGEST] batch completed requested={} processed={} asyncSubmitted={}",
-                limit, results.size(), interpretationTargets.size());
-        return results;
+        int selected = externalItems.size();
+        int submittedForAnalysis = interpretationTargets.size();
+        log.info(buildBatchSummaryLog(limit, selected, results.size(), newlyPersisted, duplicates, submittedForAnalysis));
+        // Surface the "looks completed but stored nothing new" case explicitly: a run that selected
+        // items yet persisted zero new articles (everything was a duplicate) is otherwise invisible.
+        if (newlyPersisted == 0 && selected > 0) {
+            log.warn("[INGEST] no new articles persisted requested={} selected={} returned={} duplicates={}",
+                    limit, selected, results.size(), duplicates);
+        }
+        return new NewsIngestionSummary(limit, selected, newlyPersisted, duplicates, submittedForAnalysis, results);
     }
 
     @Override
@@ -420,6 +436,16 @@ public class NewsIngestionServiceImpl implements NewsIngestionService {
             summary.merge(source, 1, Integer::sum);
         }
         return summary;
+    }
+
+    String buildBatchSummaryLog(int requested, int selected, int returned, int newlyPersisted, int duplicates,
+            int submittedForAnalysis) {
+        return "[INGEST] batch completed requested=" + requested
+                + " selected=" + selected
+                + " returned=" + returned
+                + " newlyPersisted=" + newlyPersisted
+                + " duplicates=" + duplicates
+                + " submittedForAnalysis=" + submittedForAnalysis;
     }
 
     String buildSelectionSummaryLog(Map<String, Integer> selectedSourceSummary, Map<String, Integer> keptSourceSummary,

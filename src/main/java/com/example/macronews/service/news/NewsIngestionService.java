@@ -10,7 +10,7 @@ public interface NewsIngestionService {
 
     NewsEvent ingestExternalItem(ExternalNewsItem item);
 
-    List<NewsEvent> ingestTopHeadlines(int limit);
+    NewsIngestionSummary ingestTopHeadlines(int limit);
 
     int retryFailedAnalyses();
 

@@ -474,11 +474,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         return new NaverQueryOutcome(collected, rawItems, staleItems, filteredByRelevance, unusableItems);
     }
 
-    private NaverParseResult parseItems(String query, int pageStart, String body, long maxAgeHours, NewsFreshnessBucket bucket) {
+    // Package-private for direct diagnostic assertions in unit tests (see NaverParseResult).
+    NaverParseResult parseItems(String query, int pageStart, String body, long maxAgeHours, NewsFreshnessBucket bucket) {
         if (!StringUtils.hasText(body)) {
             log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 bodyEmpty=true",
                     bucket, query, pageStart);
-            return new NaverParseResult(List.of(), 0, 0, 0, 0);
+            return new NaverParseResult(List.of(), 0, 0, 0, 0, 0, 0, 0, 0);
         }
 
         try {
@@ -487,7 +488,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             if (!items.isArray()) {
                 log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 itemsArray=false",
                         bucket, query, pageStart);
-                return new NaverParseResult(List.of(), 0, 0, 0, 0);
+                return new NaverParseResult(List.of(), 0, 0, 0, 0, 0, 0, 0, 0);
             }
 
             int rawItemCount = items.size();
@@ -499,6 +500,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             int missingUrlCount = 0;
             int emptyTitleCount = 0;
             int fallbackRetainedCount = 0;
+            // Diagnostic-only freshness x relevance breakdown for every dated item. These counters
+            // never affect the drop decisions below; they exist so a stale-only empty result can be
+            // told apart from a stale-AND-irrelevant one (the stale-first drop order otherwise hides
+            // irrelevant-but-old items inside staleItems with filteredByRelevance=0).
+            int staleAndIrrelevantCount = 0;
+            int staleButRelevantCount = 0;
+            int freshButIrrelevantCount = 0;
+            int freshAndRelevantCount = 0;
             Instant now = Instant.now(clock);
             Instant cutoff = now.minus(Duration.ofHours(maxAgeHours));
             // FRESH-window cutoff used only to observe (never to filter) how many retained items
@@ -527,7 +536,25 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     nullPublishedAtCount++;
                     continue;
                 }
-                if (!isFreshEnough(publishedAt, cutoff)) {
+                // Evaluate freshness and relevance once, up front, for both the diagnostic breakdown
+                // and the drop decisions. The drop order (stale first, then relevance) is unchanged;
+                // we only also record relevance for stale items, which the old order never measured.
+                boolean fresh = isFreshEnough(publishedAt, cutoff);
+                boolean relevant = isRelevantForMacroNews(cleanedTitle, cleanedDescription);
+                if (fresh) {
+                    if (relevant) {
+                        freshAndRelevantCount++;
+                    } else {
+                        freshButIrrelevantCount++;
+                    }
+                } else {
+                    if (relevant) {
+                        staleButRelevantCount++;
+                    } else {
+                        staleAndIrrelevantCount++;
+                    }
+                }
+                if (!fresh) {
                     staleItemCount++;
                     if (staleLoggedCount < STALE_LOG_SAMPLE_LIMIT) {
                         log.info("[NAVER] stale item sample bucket={} query='{}' pageStart={} publishedAt={} cutoff={} ageHours={} title='{}'",
@@ -537,7 +564,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     }
                     continue;
                 }
-                if (!isRelevantForMacroNews(cleanedTitle, cleanedDescription)) {
+                if (!relevant) {
                     filteredByRelevanceCount++;
                     continue;
                 }
@@ -562,9 +589,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 mapped.add(new NaverCandidate(mappedItem, originalLink, fallbackLink, dedupTitle));
             }
             log.info("[NAVER] bucket={} query='{}' pageStart={} rawItems={}", bucket, query, pageStart, rawItemCount);
-            log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} filteredByRelevance={} missingUsableLink={} emptyTitle={} fallbackRetained={}",
+            log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} filteredByRelevance={} missingUsableLink={} emptyTitle={} fallbackRetained={} staleAndIrrelevant={} staleButRelevant={} freshButIrrelevant={} freshAndRelevant={}",
                     bucket, query, pageStart, mapped.size(), nullPublishedAtCount, invalidPubDateCount, staleItemCount,
-                    filteredByRelevanceCount, missingUrlCount, emptyTitleCount, fallbackRetainedCount);
+                    filteredByRelevanceCount, missingUrlCount, emptyTitleCount, fallbackRetainedCount,
+                    staleAndIrrelevantCount, staleButRelevantCount, freshButIrrelevantCount, freshAndRelevantCount);
             if (mapped.isEmpty() && rawItemCount > 0) {
                 String reason = staleItemCount == rawItemCount
                         ? "stale-only-input"
@@ -577,10 +605,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                         reason, bucket, query, pageStart, rawItemCount, staleItemCount, nullPublishedAtCount,
                         invalidPubDateCount, filteredByRelevanceCount, missingUrlCount, emptyTitleCount);
             }
-            return new NaverParseResult(mapped, rawItemCount, staleItemCount, filteredByRelevanceCount, nullPublishedAtCount);
+            return new NaverParseResult(mapped, rawItemCount, staleItemCount, filteredByRelevanceCount, nullPublishedAtCount,
+                    staleAndIrrelevantCount, staleButRelevantCount, freshButIrrelevantCount, freshAndRelevantCount);
         } catch (Exception ex) {
             log.warn("[NAVER] failed to parse response bucket={} query='{}' pageStart={}", bucket, query, pageStart, ex);
-            return new NaverParseResult(List.of(), 0, 0, 0, 0);
+            return new NaverParseResult(List.of(), 0, 0, 0, 0, 0, 0, 0, 0);
         }
     }
 
@@ -834,12 +863,18 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     ) {
     }
 
-    private record NaverParseResult(
+    // Package-private so diagnostics (the freshness x relevance breakdown) can be asserted directly
+    // in unit tests without parsing log output, which would be brittle.
+    record NaverParseResult(
             List<NaverCandidate> items,
             int rawItemCount,
             int staleItemCount,
             int filteredByRelevanceCount,
-            int unusableItemCount
+            int unusableItemCount,
+            int staleAndIrrelevantCount,
+            int staleButRelevantCount,
+            int freshButIrrelevantCount,
+            int freshAndRelevantCount
     ) {
     }
 

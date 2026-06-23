@@ -151,7 +151,7 @@ class NewsIngestionServiceImplTest {
                 Instant.parse("2026-03-01T00:00:00Z"));
         given(newsSourceProviderSelector.fetchTopHeadlines(3)).willReturn(List.of(staleItem));
 
-        List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(3);
+        List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(3).events();
 
         assertThat(ingested).isEmpty();
         assertThat(newsIngestionService.buildSelectionSummaryLog(
@@ -185,7 +185,7 @@ class NewsIngestionServiceImplTest {
         given(newsEventRepository.findByUrl("https://example.com/recovered")).willReturn(Optional.empty());
         given(newsEventRepository.save(any(NewsEvent.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(3);
+        List<NewsEvent> ingested = newsIngestionService.ingestTopHeadlines(3).events();
 
         assertThat(ingested).hasSize(1);
         assertThat(ingested.get(0).source()).isEqualTo("NAVER");
@@ -235,6 +235,91 @@ class NewsIngestionServiceImplTest {
         assertThat(submitted).isZero();
         verify(newsEventRepository, never()).save(any(NewsEvent.class));
         verify(macroAiService, never()).interpretAndSave(any());
+    }
+
+    @Test
+    @DisplayName("ingestTopHeadlines should report duplicates and persist nothing when all selected items already exist")
+    void ingestTopHeadlines_reportsDuplicatesWhenAllSelectedItemsAlreadyExist() {
+        Instant now = Instant.now();
+        ExternalNewsItem item1 = new ExternalNewsItem("dup-1", "Reuters", "Title 1", "Summary 1",
+                "https://example.com/dup-1", now);
+        ExternalNewsItem item2 = new ExternalNewsItem("dup-2", "Reuters", "Title 2", "Summary 2",
+                "https://example.com/dup-2", now);
+        given(newsSourceProviderSelector.fetchTopHeadlines(5)).willReturn(List.of(item1, item2));
+        given(newsEventRepository.findByExternalId("dup-1"))
+                .willReturn(Optional.of(existingEvent("existing-1", "dup-1")));
+        given(newsEventRepository.findByExternalId("dup-2"))
+                .willReturn(Optional.of(existingEvent("existing-2", "dup-2")));
+
+        NewsIngestionSummary summary = newsIngestionService.ingestTopHeadlines(5);
+
+        assertThat(summary.selected()).isEqualTo(2);
+        assertThat(summary.returned()).isEqualTo(2);
+        assertThat(summary.newlyPersisted()).isZero();
+        assertThat(summary.duplicates()).isEqualTo(2);
+        assertThat(summary.submittedForAnalysis()).isZero();
+        verify(newsEventRepository, never()).save(any(NewsEvent.class));
+        verifyNoInteractions(ingestionExecutor);
+        verify(macroAiService, never()).interpretAndSave(any());
+    }
+
+    @Test
+    @DisplayName("ingestTopHeadlines should report newly persisted items and submit them for analysis")
+    void ingestTopHeadlines_reportsNewlyPersistedAndSubmitsAnalysisForNewItems() {
+        Instant now = Instant.now();
+        ExternalNewsItem newItem = new ExternalNewsItem("new-1", "Reuters", "Fresh headline", "Fresh summary",
+                "https://example.com/new-1", now);
+        given(newsSourceProviderSelector.fetchTopHeadlines(5)).willReturn(List.of(newItem));
+        given(newsEventRepository.findByExternalId("new-1")).willReturn(Optional.empty());
+        given(newsEventRepository.findByUrl("https://example.com/new-1")).willReturn(Optional.empty());
+        given(newsEventRepository.save(any(NewsEvent.class))).willAnswer(invocation -> {
+            NewsEvent e = invocation.getArgument(0);
+            // Return a persisted event with a non-null id so it qualifies as an async analysis target.
+            return new NewsEvent("saved-1", e.externalId(), e.title(), e.summary(), e.source(), e.url(),
+                    e.publishedAt(), e.ingestedAt(), e.status(), e.analysisResult(),
+                    e.analysisRetryCount(), e.analysisLastAttemptAt());
+        });
+
+        NewsIngestionSummary summary = newsIngestionService.ingestTopHeadlines(5);
+
+        assertThat(summary.selected()).isEqualTo(1);
+        assertThat(summary.returned()).isEqualTo(1);
+        assertThat(summary.newlyPersisted()).isEqualTo(1);
+        assertThat(summary.duplicates()).isZero();
+        assertThat(summary.submittedForAnalysis()).isEqualTo(1);
+        verify(newsEventRepository).save(any(NewsEvent.class));
+        verify(ingestionExecutor).execute(any(Runnable.class));
+    }
+
+    @Test
+    @DisplayName("buildBatchSummaryLog should expose newly persisted, duplicate and analysis counts")
+    void buildBatchSummaryLog_containsDuplicateAwareFields() {
+        String summary = newsIngestionService.buildBatchSummaryLog(5, 5, 5, 0, 5, 0);
+
+        assertThat(summary)
+                .contains("requested=5")
+                .contains("selected=5")
+                .contains("returned=5")
+                .contains("newlyPersisted=0")
+                .contains("duplicates=5")
+                .contains("submittedForAnalysis=0");
+    }
+
+    private NewsEvent existingEvent(String id, String externalId) {
+        return new NewsEvent(
+                id,
+                externalId,
+                "Existing title",
+                "Existing summary",
+                "Reuters",
+                "https://example.com/" + externalId,
+                Instant.parse("2026-03-13T00:00:00Z"),
+                Instant.parse("2026-03-13T00:01:00Z"),
+                NewsStatus.ANALYZED,
+                null,
+                null,
+                null
+        );
     }
 
     private NewsEvent failedEvent(String id, Integer retryCount, Instant lastAttemptAt) {
