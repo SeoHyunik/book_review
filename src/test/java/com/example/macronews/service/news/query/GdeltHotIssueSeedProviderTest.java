@@ -4,11 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,8 +28,8 @@ class GdeltHotIssueSeedProviderTest {
 
     // First two deterministic local seeds, used to assert that any failure path degrades to the
     // stable fallback list defined in the provider.
-    private static final String FIRST_FALLBACK_SEED = "Federal Reserve interest rate decision";
-    private static final String SECOND_FALLBACK_SEED = "US CPI inflation report";
+    private static final String FIRST_FALLBACK_SEED = "Bank of Korea base rate decision";
+    private static final String SECOND_FALLBACK_SEED = "US Federal Reserve FOMC rate decision";
 
     @Mock
     private ExternalApiUtils externalApiUtils;
@@ -223,5 +228,116 @@ class GdeltHotIssueSeedProviderTest {
 
         assertThat(seeds).hasSize(6);
         assertThat(seeds).startsWith(FIRST_FALLBACK_SEED, SECOND_FALLBACK_SEED);
+    }
+
+    @Test
+    @DisplayName("Serves cached remote seeds within the success TTL without a second remote call")
+    void returnsCachedRemoteSeedsWithinSuccessTtl() {
+        // The success cache must short-circuit a closely spaced second resolve so the same ingestion
+        // flow does not re-query GDELT for an answer it already has.
+        ReflectionTestUtils.setField(provider, "successTtl", "30m");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "articles": [
+                    { "title": "Fed signals patience on rate cuts" },
+                    { "title": "Oil climbs on supply worries" }
+                  ]
+                }
+                """));
+
+        List<String> first = provider.resolveHotIssueSeeds(3);
+        List<String> second = provider.resolveHotIssueSeeds(3);
+
+        assertThat(first).containsExactly(
+                "Fed signals patience on rate cuts",
+                "Oil climbs on supply worries");
+        assertThat(second).isEqualTo(first);
+        // Exactly one remote call: the second resolve was served from the success cache.
+        verify(externalApiUtils, times(1)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("HTTP 429 arms a rate-limit cooldown and skips the remote call while it is active")
+    void rateLimitsAfterHttp429AndSkipsRemoteDuringCooldown() {
+        // GDELT rate-limits its DOC API with HTTP 429; the first 429 must classify distinctly and arm
+        // a cooldown so the next resolve in the same window returns fallback without another call.
+        ReflectionTestUtils.setField(provider, "rateLimitCooldown", "60m");
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(429, "rate limit exceeded"));
+
+        List<String> first = provider.resolveHotIssueSeeds(5);
+        List<String> second = provider.resolveHotIssueSeeds(5);
+
+        assertThat(first).hasSize(5);
+        assertThat(first).startsWith(FIRST_FALLBACK_SEED, SECOND_FALLBACK_SEED);
+        assertThat(second).isEqualTo(first);
+        // Only the first resolve hit the upstream; the cooldown skipped the remote call on the second.
+        verify(externalApiUtils, times(1)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("Uses the default rate-limit cooldown because Retry-After headers are not exposed")
+    void usesDefaultRateLimitCooldownWhenRetryAfterUnavailable() {
+        // The shared ExternalApiResult abstraction exposes only status + body, never response headers,
+        // so Retry-After cannot be honoured; the configured default cooldown is the back-off instead.
+        // Here a zero-length cooldown proves the window is driven purely by the configured duration:
+        // with no cooldown armed, the second resolve issues a fresh remote call.
+        ReflectionTestUtils.setField(provider, "rateLimitCooldown", "0s");
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(429, "rate limit exceeded"));
+
+        List<String> first = provider.resolveHotIssueSeeds(4);
+        List<String> second = provider.resolveHotIssueSeeds(4);
+
+        assertThat(first).startsWith(FIRST_FALLBACK_SEED);
+        assertThat(second).startsWith(FIRST_FALLBACK_SEED);
+        // A zero cooldown arms no window, so the second resolve calls the upstream again.
+        verify(externalApiUtils, times(2)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("Retries the remote call once the rate-limit cooldown has expired")
+    void expiresCooldownAndRetriesRemote() {
+        ReflectionTestUtils.setField(provider, "rateLimitCooldown", "60m");
+        Instant start = Instant.parse("2026-06-24T00:00:00Z");
+        ReflectionTestUtils.setField(provider, "clock", Clock.fixed(start, ZoneOffset.UTC));
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(429, "rate limit exceeded"))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "articles": [
+                            { "title": "Fed resumes signalling after cooldown" }
+                          ]
+                        }
+                        """));
+
+        List<String> duringCooldown = provider.resolveHotIssueSeeds(3);
+        assertThat(duringCooldown).startsWith(FIRST_FALLBACK_SEED);
+
+        // Advance the clock past the 60m cooldown; the next resolve must re-enter the remote call.
+        ReflectionTestUtils.setField(provider, "clock",
+                Clock.fixed(start.plus(Duration.ofMinutes(61)), ZoneOffset.UTC));
+        List<String> afterExpiry = provider.resolveHotIssueSeeds(3);
+
+        assertThat(afterExpiry).containsExactly("Fed resumes signalling after cooldown");
+        verify(externalApiUtils, times(2)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("Malformed and empty responses keep returning safe fallback seeds")
+    void keepsFallbackForMalformedAndEmptyResponses() {
+        // A short fallback-ttl window is armed after the first malformed body, so the second resolve in
+        // the same cycle returns fallback without re-entering the remote call.
+        ReflectionTestUtils.setField(provider, "fallbackTtl", "10m");
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, "Your query was too short or too broad."));
+
+        List<String> first = provider.resolveHotIssueSeeds(6);
+        List<String> second = provider.resolveHotIssueSeeds(6);
+
+        assertThat(first).hasSize(6);
+        assertThat(first).startsWith(FIRST_FALLBACK_SEED, SECOND_FALLBACK_SEED);
+        assertThat(second).isEqualTo(first);
+        verify(externalApiUtils, times(1)).callAPI(any());
     }
 }

@@ -147,6 +147,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     // static safe defaults, so the dynamic path can never fan out unbounded upstream calls.
     private static final int DYNAMIC_SEED_LIMIT = 10;
     private static final int DYNAMIC_QUERY_LIMIT = 10;
+    // Caps the merged (generated-ahead-of-default) query list so the dynamic path stays within a sane
+    // per-cycle Naver query budget. Generated queries lead and the static defaults fill the remainder,
+    // so the highest-intent hot-issue queries are always retained while the long default tail is
+    // trimmed. Kept below the generated+default sum (10 + 18) to avoid an oversized fan-out.
+    private static final int MAX_MERGED_DYNAMIC_QUERIES = 24;
 
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
@@ -384,7 +389,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             LinkedHashSet<String> merged = new LinkedHashSet<>(generatedQueries);
             merged.addAll(DEFAULT_QUERIES);
             List<String> mergedQueries = merged.stream()
-                    .limit(MAX_CONFIGURED_QUERIES)
+                    .limit(MAX_MERGED_DYNAMIC_QUERIES)
                     .toList();
 
             log.info("[NAVER] query-source resolved source=merged rawQueriesPresent={} defaultOnly=false seedCount={} "

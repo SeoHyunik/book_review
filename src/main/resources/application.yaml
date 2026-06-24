@@ -212,6 +212,20 @@ app:
       query: ${APP_NEWS_GDELT_QUERY:inflation OR "interest rate" OR "central bank" OR "federal reserve" OR "oil price"}
       timespan: 24h
       max-records: 25
+      # In-memory cache + cooldown so a rate-limited (HTTP 429) or unavailable GDELT upstream is not
+      # hammered within a single ingestion flow. Retry-After is NOT honoured because the shared
+      # ExternalApiResult abstraction exposes only status + body, never response headers; the
+      # cooldown windows below act as the conservative default back-off instead.
+      cache:
+        # Successful remote seeds are served from cache (no remote call) for this long.
+        success-ttl: ${APP_NEWS_GDELT_CACHE_SUCCESS_TTL:30m}
+        # Malformed/empty remote responses arm this short window to stop same-cycle re-entry.
+        fallback-ttl: ${APP_NEWS_GDELT_CACHE_FALLBACK_TTL:10m}
+      cooldown:
+        # HTTP 429 (rate-limited): skip the remote call for this long and serve safe fallback seeds.
+        rate-limit: ${APP_NEWS_GDELT_COOLDOWN_RATE_LIMIT:60m}
+        # 5xx / timeout / connect failure: shorter back-off for transient upstream outages.
+        upstream-failure: ${APP_NEWS_GDELT_COOLDOWN_UPSTREAM_FAILURE:15m}
   market:
     fx:
       enabled: false

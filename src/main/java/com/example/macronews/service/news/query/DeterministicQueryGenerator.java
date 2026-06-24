@@ -37,19 +37,23 @@ public class DeterministicQueryGenerator {
 
     // Deterministic keyword -> Korean event-phrase mapping. Keys are matched on whole-word/token
     // boundaries against each seed (so "oil" does not match "roils"), and iteration order is stable
-    // so generated queries are reproducible.
-    private static final Map<Pattern, String> KEYWORD_QUERIES = buildKeywordQueries();
+    // so generated queries are reproducible. Each keyword maps to one or more event/entity-specific
+    // Korean queries (for example "한국은행 기준금리 동결" rather than the broad "기준금리 발표"); broad
+    // abstract phrases such as "금융 시장 동향"/"물가 상승률" are deliberately avoided because they
+    // surface mostly stale-and-irrelevant Naver results.
+    private static final Map<Pattern, List<String>> KEYWORD_QUERIES = buildKeywordQueries();
 
     // Stable Korean default queries used whenever no seed keyword matches, so output is never empty.
+    // Kept event/entity-specific for the same reason as the keyword mapping above.
     private static final List<String> DEFAULT_QUERIES = List.of(
-            "미국 기준금리 발표",
-            "소비자물가 상승률",
-            "연준 통화정책 회의",
-            "국제 유가 동향",
-            "환율 원달러 환율",
-            "반도체 업황 전망",
-            "국채 금리 시장",
-            "글로벌 증시 급락"
+            "한국은행 기준금리 동결",
+            "미국 CPI 물가 발표",
+            "FOMC 금리 동결",
+            "WTI 유가 상승",
+            "원달러 환율 마감",
+            "삼성전자 주가 전망",
+            "미국 국채금리 상승",
+            "코스피 마감 시황"
     );
 
     /**
@@ -63,24 +67,25 @@ public class DeterministicQueryGenerator {
 
         LinkedHashSet<String> queries = new LinkedHashSet<>();
         if (seeds != null) {
+            collect:
             for (String seed : seeds) {
                 if (!StringUtils.hasText(seed)) {
                     continue;
                 }
                 String normalizedSeed = seed.toLowerCase(Locale.ROOT);
-                for (Map.Entry<Pattern, String> entry : KEYWORD_QUERIES.entrySet()) {
-                    if (entry.getKey().matcher(normalizedSeed).find()) {
-                        String query = normalizeQuery(entry.getValue());
+                for (Map.Entry<Pattern, List<String>> entry : KEYWORD_QUERIES.entrySet()) {
+                    if (!entry.getKey().matcher(normalizedSeed).find()) {
+                        continue;
+                    }
+                    for (String phrase : entry.getValue()) {
+                        String query = normalizeQuery(phrase);
                         if (query != null) {
                             queries.add(query);
                         }
+                        if (queries.size() >= resolvedLimit) {
+                            break collect;
+                        }
                     }
-                    if (queries.size() >= resolvedLimit) {
-                        break;
-                    }
-                }
-                if (queries.size() >= resolvedLimit) {
-                    break;
                 }
             }
         }
@@ -112,35 +117,46 @@ public class DeterministicQueryGenerator {
         return trimmed;
     }
 
-    private static Map<Pattern, String> buildKeywordQueries() {
-        // LinkedHashMap preserves insertion order so query generation stays reproducible.
-        Map<String, String> map = new LinkedHashMap<>();
-        map.put("interest rate", "기준금리 발표");
-        map.put("federal reserve", "연준 통화정책");
-        map.put("fomc", "FOMC 회의 결과");
-        map.put("powell", "파월 발언 통화정책");
-        map.put("monetary policy", "통화정책 방향");
-        map.put("inflation", "물가 상승률");
-        map.put("cpi", "소비자물가 지수");
-        map.put("jobs", "미국 고용지표");
-        map.put("payrolls", "비농업 고용지표");
-        map.put("oil", "국제 유가 동향");
-        map.put("crude", "원유 가격 변동");
-        map.put("dollar", "원달러 환율");
-        map.put("exchange rate", "환율 동향");
-        map.put("semiconductor", "반도체 업황 전망");
-        map.put("treasury", "미국 국채 금리");
-        map.put("bond", "채권 시장 동향");
-        map.put("yield", "국채 수익률");
-        map.put("equity", "글로벌 증시 동향");
-        map.put("stock", "주식 시장 전망");
-        map.put("market", "금융 시장 동향");
-        map.put("central bank", "중앙은행 정책");
+    private static Map<Pattern, List<String>> buildKeywordQueries() {
+        // LinkedHashMap preserves insertion order so query generation stays reproducible. Event/entity
+        // specific keywords are listed first so they take priority over the broader index/market terms
+        // when a single seed matches several keys. Every value is a concrete Korean search phrase that
+        // a real macro/market article headline is likely to contain.
+        Map<String, List<String>> map = new LinkedHashMap<>();
+        map.put("interest rate", List.of("한국은행 기준금리 동결", "금통위 기준금리 결정"));
+        map.put("base rate", List.of("한국은행 기준금리 동결"));
+        map.put("federal reserve", List.of("미국 연준 금리 결정", "FOMC 금리 동결"));
+        map.put("fomc", List.of("FOMC 금리 동결"));
+        map.put("powell", List.of("파월 금리 인하 발언"));
+        map.put("monetary policy", List.of("미국 연준 통화정책"));
+        map.put("central bank", List.of("한국은행 기준금리 동결"));
+        map.put("inflation", List.of("미국 CPI 물가 발표", "미국 PCE 물가 발표"));
+        map.put("cpi", List.of("미국 CPI 물가 발표"));
+        map.put("pce", List.of("미국 PCE 물가 발표"));
+        map.put("jobs", List.of("미국 고용지표 발표"));
+        map.put("payrolls", List.of("비농업 고용 발표"));
+        map.put("oil", List.of("WTI 유가 상승", "브렌트유 유가 상승"));
+        map.put("crude", List.of("WTI 유가 상승"));
+        map.put("wti", List.of("WTI 유가 상승"));
+        map.put("brent", List.of("브렌트유 유가 상승"));
+        map.put("dollar", List.of("원달러 환율 마감", "달러인덱스 환율"));
+        map.put("exchange rate", List.of("원달러 환율 마감"));
+        map.put("semiconductor", List.of("삼성전자 주가 전망", "SK하이닉스 주가 전망", "반도체 수출 증가"));
+        map.put("samsung", List.of("삼성전자 주가 전망"));
+        map.put("hynix", List.of("SK하이닉스 주가 전망"));
+        map.put("treasury", List.of("미국 국채금리 상승"));
+        map.put("yield", List.of("국채금리 상승"));
+        map.put("bond", List.of("국채금리 상승"));
+        map.put("kospi", List.of("코스피 마감 시황"));
+        map.put("kosdaq", List.of("코스닥 마감 시황"));
+        map.put("equity", List.of("코스피 마감 시황"));
+        map.put("stock", List.of("코스피 마감 시황"));
+        map.put("market", List.of("코스피 마감 시황"));
 
         // Compile each keyword to a whole-word/token-boundary pattern so substrings inside larger
         // words (for example "oil" within "roils") no longer produce false matches.
-        Map<Pattern, String> patterns = new LinkedHashMap<>();
-        for (Map.Entry<String, String> entry : map.entrySet()) {
+        Map<Pattern, List<String>> patterns = new LinkedHashMap<>();
+        for (Map.Entry<String, List<String>> entry : map.entrySet()) {
             Pattern pattern = Pattern.compile("\\b" + Pattern.quote(entry.getKey()) + "\\b");
             patterns.put(pattern, entry.getValue());
         }

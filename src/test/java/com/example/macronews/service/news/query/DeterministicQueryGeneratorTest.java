@@ -17,7 +17,14 @@ import org.junit.jupiter.api.Test;
 class DeterministicQueryGeneratorTest {
 
     // The first stable Korean default query returned whenever no seed keyword matches.
-    private static final String FIRST_DEFAULT_QUERY = "미국 기준금리 발표";
+    private static final String FIRST_DEFAULT_QUERY = "한국은행 기준금리 동결";
+
+    // Broad/abstract phrases that previously surfaced stale-and-irrelevant Naver results. The generator
+    // must never emit these; specific event/entity phrases replace them.
+    private static final List<String> BANNED_BROAD_QUERIES = List.of(
+            "금융 시장 동향", "물가 상승률", "기준금리 발표", "국제 유가 동향",
+            "주식 시장 전망", "글로벌 증시 동향", "통화정책 방향", "소비자물가 지수",
+            "채권 시장 동향", "반도체 업황 전망", "중앙은행 정책", "환율 동향");
 
     private DeterministicQueryGenerator generator;
 
@@ -27,22 +34,38 @@ class DeterministicQueryGeneratorTest {
     }
 
     @Test
-    @DisplayName("Maps a matching English seed keyword to its Korean event phrase (mapped mode)")
+    @DisplayName("Maps a matching English seed keyword to specific Korean event phrases (mapped mode)")
     void generateQueries_mapsKeywordToKoreanEventPhrase() {
         List<String> queries = generator.generateQueries(List.of("US interest rate decision"), 10);
 
-        assertThat(queries).containsExactly("기준금리 발표");
+        // "interest rate" now yields concrete central-bank-decision phrases, not the broad "기준금리 발표".
+        assertThat(queries).containsExactly("한국은행 기준금리 동결", "금통위 기준금리 결정");
+        assertThat(queries).doesNotContainAnyElementsOf(BANNED_BROAD_QUERIES);
     }
 
     @Test
-    @DisplayName("Orders event-specific phrases ahead of generic noun-list phrases for one seed")
+    @DisplayName("Maps oil and semiconductor seeds to entity-specific Korean queries")
+    void generateQueries_mapsOilAndSemiconductorToEntitySpecificQueries() {
+        List<String> oilQueries = generator.generateQueries(List.of("WTI Brent crude oil price"), 10);
+        assertThat(oilQueries).contains("WTI 유가 상승", "브렌트유 유가 상승");
+        assertThat(oilQueries).doesNotContain("국제 유가 동향");
+
+        List<String> chipQueries =
+                generator.generateQueries(List.of("Samsung Electronics SK Hynix semiconductor"), 10);
+        assertThat(chipQueries).contains("삼성전자 주가 전망", "SK하이닉스 주가 전망", "반도체 수출 증가");
+        assertThat(chipQueries).doesNotContain("반도체 업황 전망");
+    }
+
+    @Test
+    @DisplayName("Orders event-specific phrases ahead of generic index phrases for one seed")
     void generateQueries_eventPhrasePriorityOverGenericNouns() {
         // A single seed matches the specific "inflation" keyword and the generic "market" keyword.
-        // Keyword iteration order is stable, so the event-specific phrase must precede the generic one.
+        // Keyword iteration order is stable, so the event-specific phrases must precede the generic one.
         List<String> queries = generator.generateQueries(List.of("inflation roils the market"), 10);
 
-        assertThat(queries).containsExactly("물가 상승률", "금융 시장 동향");
-        assertThat(queries.indexOf("물가 상승률")).isLessThan(queries.indexOf("금융 시장 동향"));
+        assertThat(queries).containsExactly("미국 CPI 물가 발표", "미국 PCE 물가 발표", "코스피 마감 시황");
+        assertThat(queries.indexOf("미국 CPI 물가 발표")).isLessThan(queries.indexOf("코스피 마감 시황"));
+        assertThat(queries).doesNotContainAnyElementsOf(BANNED_BROAD_QUERIES);
     }
 
     @Test
@@ -83,8 +106,12 @@ class DeterministicQueryGeneratorTest {
         List<String> second = generator.generateQueries(seeds, 10);
 
         assertThat(first).isEqualTo(second);
-        // Mapped mode keeps the stable keyword iteration order, independent of seed ordering.
-        assertThat(first).containsExactly("기준금리 발표", "연준 통화정책", "국제 유가 동향");
+        // Mapped mode keeps the stable keyword iteration order, independent of seed ordering: the
+        // "interest rate" phrases lead, then "federal reserve", then "oil".
+        assertThat(first).containsExactly(
+                "한국은행 기준금리 동결", "금통위 기준금리 결정",
+                "미국 연준 금리 결정", "FOMC 금리 동결",
+                "WTI 유가 상승", "브렌트유 유가 상승");
     }
 
     @Test
@@ -95,16 +122,18 @@ class DeterministicQueryGeneratorTest {
         List<String> queries = generator.generateQueries(seeds, 2);
 
         assertThat(queries).hasSize(2);
-        assertThat(queries).containsExactly("기준금리 발표", "연준 통화정책");
+        // The two leading "interest rate" phrases fill the limit, even mid-keyword-list.
+        assertThat(queries).containsExactly("한국은행 기준금리 동결", "금통위 기준금리 결정");
     }
 
     @Test
-    @DisplayName("De-duplicates queries when multiple seeds map to the same Korean phrase")
+    @DisplayName("De-duplicates queries when multiple seeds map to the same Korean phrases")
     void generateQueries_deduplicatesRepeatedPhrases() {
         List<String> seeds = List.of("inflation surges", "more inflation data");
 
         List<String> queries = generator.generateQueries(seeds, 10);
 
-        assertThat(queries).containsExactly("물가 상승률");
+        // Both seeds map to the same two inflation-release phrases; the result stays de-duplicated.
+        assertThat(queries).containsExactly("미국 CPI 물가 발표", "미국 PCE 물가 발표");
     }
 }
