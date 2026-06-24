@@ -54,6 +54,49 @@ public class OpenAiUsageLoggingService {
         }
     }
 
+    /**
+     * Records usage from an OpenAI Responses API response body, which reports
+     * {@code usage.input_tokens}/{@code output_tokens}/{@code total_tokens} instead of the Chat
+     * Completions {@code prompt_tokens}/{@code completion_tokens} shape handled by
+     * {@link #recordUsage}. Input tokens map to {@code promptTokens} and output tokens to
+     * {@code completionTokens} on the shared {@link OpenAiUsageRecord}. Missing/malformed usage is
+     * skipped quietly; this never throws so a caller's primary flow is never affected.
+     */
+    public void recordResponsesUsage(OpenAiUsageFeatureType featureType, String model, String responseBody) {
+        if (featureType == null || !StringUtils.hasText(responseBody)) {
+            return;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode usage = root.path("usage");
+            if (usage.isMissingNode() || usage.isNull()) {
+                return;
+            }
+
+            int inputTokens = Math.max(usage.path("input_tokens").asInt(0), 0);
+            int outputTokens = Math.max(usage.path("output_tokens").asInt(0), 0);
+            int totalTokens = usage.has("total_tokens")
+                    ? Math.max(usage.path("total_tokens").asInt(inputTokens + outputTokens), 0)
+                    : inputTokens + outputTokens;
+
+            if (inputTokens == 0 && outputTokens == 0 && totalTokens == 0) {
+                return;
+            }
+
+            openAiUsageRecordRepository.save(new OpenAiUsageRecord(
+                    null,
+                    Instant.now(),
+                    resolveRecordedModel(root, model),
+                    featureType,
+                    inputTokens,
+                    outputTokens,
+                    totalTokens
+            ));
+        } catch (Exception ex) {
+            log.debug("[OPENAI-USAGE] responses usage capture skipped", ex);
+        }
+    }
+
     private String resolveRecordedModel(JsonNode root, String configuredModel) {
         String responseModel = root.path("model").asText("").trim();
         if (StringUtils.hasText(responseModel)) {

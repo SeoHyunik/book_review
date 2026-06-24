@@ -2,14 +2,21 @@ package com.example.macronews.service.news.query;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.example.macronews.domain.OpenAiUsageFeatureType;
+import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Duration;
@@ -19,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -37,11 +45,15 @@ class OpenAiMarketIssueSeedProviderTest {
     @Mock
     private ExternalApiUtils externalApiUtils;
 
+    @Mock
+    private OpenAiUsageLoggingService openAiUsageLoggingService;
+
     private OpenAiMarketIssueSeedProvider provider;
 
     @BeforeEach
     void setUp() {
-        provider = new OpenAiMarketIssueSeedProvider(externalApiUtils, new ObjectMapper());
+        provider = new OpenAiMarketIssueSeedProvider(
+                externalApiUtils, new ObjectMapper(), openAiUsageLoggingService);
         ReflectionTestUtils.setField(provider, "enabled", true);
         ReflectionTestUtils.setField(provider, "apiKey", "openai-key");
         ReflectionTestUtils.setField(provider, "responsesUrl", "https://api.openai.com/v1/responses");
@@ -305,6 +317,90 @@ class OpenAiMarketIssueSeedProviderTest {
         verify(externalApiUtils, times(1)).callAPI(any());
     }
 
+    @Test
+    @DisplayName("Request payload targets the Responses API web_search tool with the configured model")
+    void requestPayloadUsesResponsesApiWebSearchTool() throws Exception {
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, outputTextEnvelope(validSingleSeedJson())));
+
+        provider.resolveMarketIssueSeeds();
+
+        ArgumentCaptor<ExternalApiRequest> captor = ArgumentCaptor.forClass(ExternalApiRequest.class);
+        verify(externalApiUtils).callAPI(captor.capture());
+        JsonNode payload = OBJECT_MAPPER.readTree(captor.getValue().body());
+        assertThat(payload.path("model").asText()).isEqualTo("gpt-5.5");
+        assertThat(payload.path("tools").path(0).path("type").asText()).isEqualTo("web_search");
+        String input = payload.path("input").asText();
+        assertThat(input).contains("JSON");
+        assertThat(input).contains("evidenceTitles");
+        assertThat(input).contains("sourceUrls");
+        assertThat(input).contains("투자 조언");
+        assertThat(input).contains("OR");
+    }
+
+    @Test
+    @DisplayName("Responses API usage is recorded for the MARKET_ISSUE_SEED feature on a 2xx response")
+    void parsesResponsesUsageAndRecordsMarketIssueSeedUsage() {
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200,
+                outputTextEnvelopeWithUsage(validSingleSeedJson(), 120, 30, 150)));
+
+        MarketIssueSeedResult result = provider.resolveMarketIssueSeeds();
+
+        assertThat(result.origin()).isEqualTo(MarketIssueSeedOrigin.OPENAI_WEB_SEARCH);
+        verify(openAiUsageLoggingService).recordResponsesUsage(
+                eq(OpenAiUsageFeatureType.MARKET_ISSUE_SEED), eq("gpt-5.5"), anyString());
+    }
+
+    @Test
+    @DisplayName("A usage-logging failure does not fail seed resolution")
+    void usageLoggingFailureDoesNotFailSeedResolution() {
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, outputTextEnvelope(validSingleSeedJson())));
+        willThrow(new RuntimeException("usage logging boom"))
+                .given(openAiUsageLoggingService).recordResponsesUsage(any(), any(), any());
+
+        MarketIssueSeedResult result = provider.resolveMarketIssueSeeds();
+
+        assertThat(result.origin()).isEqualTo(MarketIssueSeedOrigin.OPENAI_WEB_SEARCH);
+        assertThat(result.isDynamic()).isTrue();
+    }
+
+    @Test
+    @DisplayName("A 2xx response with malformed usage still resolves seeds successfully")
+    void malformedUsageDoesNotFailSeedResolution() {
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200,
+                outputTextEnvelopeWithMalformedUsage(validSingleSeedJson())));
+
+        MarketIssueSeedResult result = provider.resolveMarketIssueSeeds();
+
+        assertThat(result.origin()).isEqualTo(MarketIssueSeedOrigin.OPENAI_WEB_SEARCH);
+        verify(openAiUsageLoggingService).recordResponsesUsage(any(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("Disabled provider never records usage")
+    void disabledDoesNotRecordUsage() {
+        ReflectionTestUtils.setField(provider, "enabled", false);
+
+        provider.resolveMarketIssueSeeds();
+
+        verify(openAiUsageLoggingService, never()).recordResponsesUsage(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("A cache hit does not record usage a second time")
+    void cacheHitDoesNotRecordUsageTwice() {
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, outputTextEnvelope(validSingleSeedJson())));
+
+        provider.resolveMarketIssueSeeds();
+        provider.resolveMarketIssueSeeds();
+
+        // Only the first (live) call recorded usage; the second was served from cache.
+        verify(openAiUsageLoggingService, times(1)).recordResponsesUsage(any(), any(), anyString());
+        verify(externalApiUtils, times(1)).callAPI(any());
+    }
+
     private static String validSingleSeedJson() {
         return """
                 {
@@ -334,6 +430,26 @@ class OpenAiMarketIssueSeedProviderTest {
         try {
             String text = OBJECT_MAPPER.writeValueAsString(innerJson);
             return "{\"output\":[{\"content\":[{\"type\":\"output_text\",\"text\":" + text + "}]}]}";
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    private static String outputTextEnvelopeWithUsage(String innerJson, int inputTokens, int outputTokens,
+            int totalTokens) {
+        try {
+            return "{\"output_text\":" + OBJECT_MAPPER.writeValueAsString(innerJson)
+                    + ",\"usage\":{\"input_tokens\":" + inputTokens + ",\"output_tokens\":" + outputTokens
+                    + ",\"total_tokens\":" + totalTokens + "}}";
+        } catch (Exception ex) {
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    private static String outputTextEnvelopeWithMalformedUsage(String innerJson) {
+        try {
+            return "{\"output_text\":" + OBJECT_MAPPER.writeValueAsString(innerJson)
+                    + ",\"usage\":{\"input_tokens\":\"abc\"}}";
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
         }

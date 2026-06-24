@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,20 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
     private static final int NAVER_MAX_START = 1000;
     private static final int STALE_LOG_SAMPLE_LIMIT = 3;
     private static final int STALE_LOG_TITLE_MAX_LENGTH = 80;
+    // Query tokens shorter than this are too generic to be a meaningful match signal and are ignored.
+    private static final int MIN_QUERY_TOKEN_LENGTH = 2;
+    // Domains that repeatedly surfaced stale lifestyle/entertainment noise for market queries. Used for
+    // diagnostics and the stale-heavy first-page short-circuit ONLY; never as a hard drop filter. General
+    // press domains (khan.co.kr, news.sbs.co.kr, ...) are intentionally NOT listed, since they mix in
+    // genuine market coverage and must be judged together with the query-token match signal.
+    private static final Set<String> SUSPICIOUS_DOMAINS = Set.of(
+            "allurekorea.com",
+            "news.maxmovie.com");
+    // Stale-heavy first-page short-circuit thresholds (fractions of rawItems). When pageStart=1 is
+    // stale-only with no fresh candidate AND mostly weak-match or suspicious-domain, the pageStart=6
+    // fetch is skipped. This trims a wasteful second page; it never changes a drop/freshness decision.
+    private static final double WEAK_MATCH_SHORT_CIRCUIT_RATIO = 0.8;
+    private static final double SUSPICIOUS_DOMAIN_SHORT_CIRCUIT_RATIO = 0.5;
     // When the FRESH pass returns nothing because every candidate was stale, run a bounded recovery
     // pass that re-queries the leading (highest-intent) queries within the SAME freshness bucket as
     // the caller. It refines query intent without widening the freshness window, so the FRESH path
@@ -437,6 +452,15 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             if (parsed.rawItemCount() <= 0) {
                 break;
             }
+            // Stale-heavy first page: if pageStart=1 returned only stale, weak-match / suspicious-domain
+            // noise with no fresh candidate, a pageStart=6 fetch would almost certainly return the same.
+            // Skip it. This trims a wasteful second page only; it never lets a stale item through.
+            if (pageIndex == 0 && shouldShortCircuitStaleWeakFirstPage(parsed)) {
+                log.info("[NAVER] query short-circuit reason=stale-weak-match-first-page bucket={} query='{}' pageStart={} rawItems={} staleItems={} weakQueryMatchCount={} suspiciousDomainCount={}",
+                        bucket, query, pageStart, parsed.rawItemCount(), parsed.staleItemCount(),
+                        parsed.weakQueryMatchCount(), parsed.suspiciousDomainCount());
+                break;
+            }
         }
         return new NaverQueryOutcome(collected, rawItems, staleItems, filteredByRelevance, unusableItems);
     }
@@ -446,7 +470,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         if (!StringUtils.hasText(body)) {
             log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 bodyEmpty=true",
                     bucket, query, pageStart);
-            return new NaverParseResult(List.of(), 0, 0, 0, 0, 0, 0, 0, 0);
+            return new NaverParseResult(List.of(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         }
 
         try {
@@ -455,7 +479,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             if (!items.isArray()) {
                 log.info("[NAVER] provider empty reason=upstream-empty-response bucket={} query='{}' pageStart={} rawItems=0 itemsArray=false",
                         bucket, query, pageStart);
-                return new NaverParseResult(List.of(), 0, 0, 0, 0, 0, 0, 0, 0);
+                return new NaverParseResult(List.of(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
             }
 
             int rawItemCount = items.size();
@@ -476,6 +500,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             int staleButRelevantCount = 0;
             int freshButIrrelevantCount = 0;
             int freshAndRelevantCount = 0;
+            // Diagnostic-only raw-quality counters over every raw item (including unusable ones), used
+            // for the stale-heavy first-page short-circuit. They never gate parsed/fresh/relevance.
+            int weakQueryMatchCount = 0;
+            int suspiciousDomainCount = 0;
+            List<String> queryTokens = extractQueryTokens(query);
             Instant now = Instant.now(clock);
             Instant cutoff = now.minus(Duration.ofHours(maxAgeHours));
             // FRESH-window cutoff used only to observe (never to filter) how many retained items
@@ -502,6 +531,16 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 String originalLinkDomain = extractDomain(originalLink);
                 String linkDomain = extractDomain(fallbackLink);
                 String sourceDomain = StringUtils.hasText(originalLinkDomain) ? originalLinkDomain : linkDomain;
+                // Diagnostic-only raw-quality signals computed for every raw item (before any drop).
+                int queryMatchCount = countQueryTokenMatches(queryTokens, cleanedTitle, cleanedDescription);
+                boolean weakQueryMatch = queryMatchCount == 0;
+                boolean suspiciousDomain = isSuspiciousDomain(sourceDomain);
+                if (weakQueryMatch) {
+                    weakQueryMatchCount++;
+                }
+                if (suspiciousDomain) {
+                    suspiciousDomainCount++;
+                }
                 String dedupTitle = normalizeTitle(cleanedTitle);
                 if (StringUtils.hasText(rawPubDate) && publishedAt == null) {
                     invalidPubDateCount++;
@@ -531,9 +570,10 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 if (!fresh) {
                     staleItemCount++;
                     if (staleLoggedCount < STALE_LOG_SAMPLE_LIMIT) {
-                        log.info("[NAVER] stale item sample bucket={} query='{}' pageStart={} publishedAt={} cutoff={} ageHours={} sourceDomain={} originalLinkDomain={} linkDomain={} title='{}'",
+                        log.info("[NAVER] stale item sample bucket={} query='{}' pageStart={} publishedAt={} cutoff={} ageHours={} sourceDomain={} suspiciousDomain={} queryMatchTokens={} weakQueryMatch={} originalLinkDomain={} linkDomain={} title='{}'",
                                 bucket, query, pageStart, publishedAt, cutoff, formatAgeHours(publishedAt, now),
-                                sourceDomain, originalLinkDomain, linkDomain, abbreviateForLog(cleanedTitle));
+                                sourceDomain, suspiciousDomain, queryMatchCount, weakQueryMatch, originalLinkDomain,
+                                linkDomain, abbreviateForLog(cleanedTitle));
                         staleLoggedCount++;
                     }
                     continue;
@@ -545,9 +585,9 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     // its source domain helps tell a too-broad query (lifestyle publisher) from a genuine
                     // market article the relevance filter simply did not recognise.
                     if (freshIrrelevantLoggedCount < STALE_LOG_SAMPLE_LIMIT) {
-                        log.info("[NAVER] fresh-irrelevant item sample bucket={} query='{}' pageStart={} publishedAt={} sourceDomain={} originalLinkDomain={} linkDomain={} title='{}'",
-                                bucket, query, pageStart, publishedAt, sourceDomain, originalLinkDomain, linkDomain,
-                                abbreviateForLog(cleanedTitle));
+                        log.info("[NAVER] fresh-irrelevant item sample bucket={} query='{}' pageStart={} publishedAt={} sourceDomain={} suspiciousDomain={} queryMatchTokens={} weakQueryMatch={} originalLinkDomain={} linkDomain={} title='{}'",
+                                bucket, query, pageStart, publishedAt, sourceDomain, suspiciousDomain, queryMatchCount,
+                                weakQueryMatch, originalLinkDomain, linkDomain, abbreviateForLog(cleanedTitle));
                         freshIrrelevantLoggedCount++;
                     }
                     continue;
@@ -573,10 +613,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 mapped.add(new NaverCandidate(mappedItem, originalLink, fallbackLink, dedupTitle));
             }
             log.info("[NAVER] bucket={} query='{}' pageStart={} rawItems={}", bucket, query, pageStart, rawItemCount);
-            log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} filteredByRelevance={} missingUsableLink={} emptyTitle={} fallbackRetained={} staleAndIrrelevant={} staleButRelevant={} freshButIrrelevant={} freshAndRelevant={}",
+            log.info("[NAVER] bucket={} query='{}' pageStart={} parsedItems={} nullPublishedAt={} invalidPubDate={} staleItems={} filteredByRelevance={} missingUsableLink={} emptyTitle={} fallbackRetained={} staleAndIrrelevant={} staleButRelevant={} freshButIrrelevant={} freshAndRelevant={} weakQueryMatchCount={} suspiciousDomainCount={}",
                     bucket, query, pageStart, mapped.size(), nullPublishedAtCount, invalidPubDateCount, staleItemCount,
                     filteredByRelevanceCount, missingUrlCount, emptyTitleCount, fallbackRetainedCount,
-                    staleAndIrrelevantCount, staleButRelevantCount, freshButIrrelevantCount, freshAndRelevantCount);
+                    staleAndIrrelevantCount, staleButRelevantCount, freshButIrrelevantCount, freshAndRelevantCount,
+                    weakQueryMatchCount, suspiciousDomainCount);
             if (mapped.isEmpty() && rawItemCount > 0) {
                 String reason = staleItemCount == rawItemCount
                         ? "stale-only-input"
@@ -590,10 +631,11 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                         invalidPubDateCount, filteredByRelevanceCount, missingUrlCount, emptyTitleCount);
             }
             return new NaverParseResult(mapped, rawItemCount, staleItemCount, filteredByRelevanceCount, nullPublishedAtCount,
-                    staleAndIrrelevantCount, staleButRelevantCount, freshButIrrelevantCount, freshAndRelevantCount);
+                    staleAndIrrelevantCount, staleButRelevantCount, freshButIrrelevantCount, freshAndRelevantCount,
+                    weakQueryMatchCount, suspiciousDomainCount);
         } catch (Exception ex) {
             log.warn("[NAVER] failed to parse response bucket={} query='{}' pageStart={}", bucket, query, pageStart, ex);
-            return new NaverParseResult(List.of(), 0, 0, 0, 0, 0, 0, 0, 0);
+            return new NaverParseResult(List.of(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         }
     }
 
@@ -775,6 +817,64 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         }
     }
 
+    // Splits a query into meaningful (>= 2 char) tokens, preserving original case for readable logs.
+    static List<String> extractQueryTokens(String query) {
+        if (!StringUtils.hasText(query)) {
+            return List.of();
+        }
+        List<String> tokens = new ArrayList<>();
+        for (String token : query.trim().split("\\s+")) {
+            String trimmed = token.trim();
+            if (trimmed.length() >= MIN_QUERY_TOKEN_LENGTH && !tokens.contains(trimmed)) {
+                tokens.add(trimmed);
+            }
+        }
+        return List.copyOf(tokens);
+    }
+
+    // Counts how many query tokens appear (case-insensitive) in the item's title or description. A count
+    // of 0 marks a weak query match: the item barely relates to what was searched for.
+    static int countQueryTokenMatches(List<String> queryTokens, String title, String description) {
+        if (queryTokens.isEmpty()) {
+            return 0;
+        }
+        String haystack = (defaultText(title) + " " + defaultText(description)).toLowerCase(Locale.ROOT);
+        int matches = 0;
+        for (String token : queryTokens) {
+            if (haystack.contains(token.toLowerCase(Locale.ROOT))) {
+                matches++;
+            }
+        }
+        return matches;
+    }
+
+    // Diagnostic-only: whether a source domain is a known stale lifestyle/entertainment noise source.
+    static boolean isSuspiciousDomain(String domain) {
+        return StringUtils.hasText(domain) && SUSPICIOUS_DOMAINS.contains(domain.toLowerCase(Locale.ROOT));
+    }
+
+    private static String defaultText(String value) {
+        return value == null ? "" : value;
+    }
+
+    // True when pageStart=1 is stale-only with no fresh candidate AND dominated by weak query matches or
+    // suspicious domains, so a pageStart=6 fetch would almost certainly return more of the same noise.
+    private boolean shouldShortCircuitStaleWeakFirstPage(NaverParseResult parsed) {
+        int rawItems = parsed.rawItemCount();
+        if (rawItems <= 0 || !parsed.items().isEmpty()) {
+            return false;
+        }
+        if (parsed.staleItemCount() != rawItems) {
+            return false;
+        }
+        if (parsed.freshButIrrelevantCount() != 0 || parsed.freshAndRelevantCount() != 0) {
+            return false;
+        }
+        boolean weakHeavy = parsed.weakQueryMatchCount() >= rawItems * WEAK_MATCH_SHORT_CIRCUIT_RATIO;
+        boolean suspiciousHeavy = parsed.suspiciousDomainCount() >= rawItems * SUSPICIOUS_DOMAIN_SHORT_CIRCUIT_RATIO;
+        return weakHeavy || suspiciousHeavy;
+    }
+
     private long resolveMaxAgeHours(NewsFreshnessBucket bucket) {
         long freshMaxAge = maxAgeHours > 0 ? maxAgeHours : 12L;
         if (bucket == NewsFreshnessBucket.SEMI_FRESH) {
@@ -876,7 +976,9 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             int staleAndIrrelevantCount,
             int staleButRelevantCount,
             int freshButIrrelevantCount,
-            int freshAndRelevantCount
+            int freshAndRelevantCount,
+            int weakQueryMatchCount,
+            int suspiciousDomainCount
     ) {
     }
 

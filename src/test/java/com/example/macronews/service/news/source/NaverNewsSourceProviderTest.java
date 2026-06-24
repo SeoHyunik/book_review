@@ -1179,6 +1179,154 @@ class NaverNewsSourceProviderTest {
         assertThat(result.staleAndIrrelevantCount()).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("extractQueryTokens returns meaningful (>=2 char) tokens preserving case")
+    void extractQueryTokens_returnsMeaningfulTokens() {
+        assertThat(NaverNewsSourceProvider.extractQueryTokens("삼성전자 주가"))
+                .containsExactly("삼성전자", "주가");
+        assertThat(NaverNewsSourceProvider.extractQueryTokens("SK하이닉스 HBM"))
+                .containsExactly("SK하이닉스", "HBM");
+        assertThat(NaverNewsSourceProvider.extractQueryTokens("")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("countQueryTokenMatches counts tokens found in title or description case-insensitively")
+    void countsQueryTokenMatchesFromTitleAndDescription() {
+        List<String> tokens = NaverNewsSourceProvider.extractQueryTokens("삼성전자 주가");
+        assertThat(NaverNewsSourceProvider.countQueryTokenMatches(tokens, "삼성전자 강세", "주가 상승")).isEqualTo(2);
+        assertThat(NaverNewsSourceProvider.countQueryTokenMatches(tokens, "삼성전자 신제품", "실적 발표")).isEqualTo(1);
+        assertThat(NaverNewsSourceProvider.countQueryTokenMatches(tokens, "봄 여행 명소", "라이프스타일")).isZero();
+    }
+
+    @Test
+    @DisplayName("isSuspiciousDomain flags known lifestyle/entertainment noise sources only")
+    void detectsSuspiciousDomainForKnownLifestyleSources() {
+        assertThat(NaverNewsSourceProvider.isSuspiciousDomain("allurekorea.com")).isTrue();
+        assertThat(NaverNewsSourceProvider.isSuspiciousDomain("news.maxmovie.com")).isTrue();
+        assertThat(NaverNewsSourceProvider.isSuspiciousDomain("khan.co.kr")).isFalse();
+        assertThat(NaverNewsSourceProvider.isSuspiciousDomain("news.sbs.co.kr")).isFalse();
+        assertThat(NaverNewsSourceProvider.isSuspiciousDomain("")).isFalse();
+    }
+
+    @Test
+    @DisplayName("parseItems exposes weak-query-match and suspicious-domain counts without changing drops")
+    void parseItems_diagnosticsExposeWeakQueryMatchAndSuspiciousDomainWithoutChangingDrops() {
+        // query tokens: 삼성전자, 주가. Item A matches (삼성전자) on a normal domain; B/C are weak-match on
+        // suspicious lifestyle domains. All three are stale (2026-03-01) under the 12h FRESH window.
+        String body = """
+                {
+                  "items": [
+                    {
+                      "title": "삼성전자 강세",
+                      "description": "기관 매수",
+                      "originallink": "https://www.mk.co.kr/a",
+                      "link": "https://search.naver.com/a",
+                      "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900"
+                    },
+                    {
+                      "title": "학력평가 일정 안내",
+                      "description": "뷰티 트렌드",
+                      "originallink": "https://www.allurekorea.com/b",
+                      "link": "https://search.naver.com/b",
+                      "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900"
+                    },
+                    {
+                      "title": "세금 환급 가이드",
+                      "description": "영화 소식",
+                      "originallink": "https://news.maxmovie.com/c",
+                      "link": "https://search.naver.com/c",
+                      "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900"
+                    }
+                  ]
+                }
+                """;
+
+        NaverNewsSourceProvider.NaverParseResult result =
+                provider.parseItems("삼성전자 주가", 1, body, 12L, NewsFreshnessBucket.FRESH);
+
+        assertThat(result.rawItemCount()).isEqualTo(3);
+        assertThat(result.items()).isEmpty();
+        assertThat(result.staleItemCount()).isEqualTo(3);
+        assertThat(result.weakQueryMatchCount()).isEqualTo(2);
+        assertThat(result.suspiciousDomainCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Stale-only weak-match first page skips the pageStart=6 fetch")
+    void staleWeakMatchFirstPageSkipsSecondPage() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "삼성전자 주가");
+        // SEMI_FRESH avoids the FRESH-only recovery pass, isolating the page-level short-circuit.
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, staleWeakPageJson()));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5, NewsFreshnessBucket.SEMI_FRESH);
+
+        assertThat(results).isEmpty();
+        // Without the short-circuit, maxPages=3 would fetch start=1, start=6, start=11.
+        verify(externalApiUtils, times(1)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("A first page with any fresh candidate is not short-circuited")
+    void firstPageWithAnyFreshCandidateDoesNotShortCircuit() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "삼성전자 주가");
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "items": [
+                            {
+                              "title": "연예인 화보",
+                              "description": "패션",
+                              "originallink": "https://www.allurekorea.com/fresh-irrelevant",
+                              "link": "https://search.naver.com/fresh-irrelevant",
+                              "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                            },
+                            {
+                              "title": "학력평가 안내",
+                              "description": "세금",
+                              "originallink": "https://www.allurekorea.com/stale-1",
+                              "link": "https://search.naver.com/stale-1",
+                              "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900"
+                            }
+                          ]
+                        }
+                        """))
+                .willReturn(new ExternalApiResult(200, "{ \"items\": [] }"));
+
+        provider.fetchTopHeadlines(5, NewsFreshnessBucket.SEMI_FRESH);
+
+        // A fresh-but-irrelevant candidate on page one means staleItems != rawItems, so the short-circuit
+        // does not apply and the next page is still fetched.
+        verify(externalApiUtils, times(2)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("A first page with zero raw items does not short-circuit or fetch the next page")
+    void rawItemsZeroDoesNotShortCircuit() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "삼성전자 주가");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, "{ \"items\": [] }"));
+
+        List<ExternalNewsItem> results = provider.fetchTopHeadlines(5, NewsFreshnessBucket.SEMI_FRESH);
+
+        assertThat(results).isEmpty();
+        verify(externalApiUtils, times(1)).callAPI(any());
+    }
+
+    private static String staleWeakPageJson() {
+        // Five stale items (2026-03-01) whose titles/descriptions contain neither "삼성전자" nor "주가",
+        // so every item is a weak query match -> weakQueryMatchCount=5 >= 5 * 0.8.
+        return """
+                {
+                  "items": [
+                    { "title": "학력평가 발표", "description": "교육", "originallink": "https://www.khan.co.kr/1", "link": "https://search.naver.com/1", "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900" },
+                    { "title": "세금 환급 안내", "description": "행정", "originallink": "https://www.khan.co.kr/2", "link": "https://search.naver.com/2", "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900" },
+                    { "title": "뷰티 트렌드", "description": "패션", "originallink": "https://www.khan.co.kr/3", "link": "https://search.naver.com/3", "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900" },
+                    { "title": "봄 여행 명소", "description": "라이프스타일", "originallink": "https://www.khan.co.kr/4", "link": "https://search.naver.com/4", "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900" },
+                    { "title": "맛집 추천", "description": "음식", "originallink": "https://www.khan.co.kr/5", "link": "https://search.naver.com/5", "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900" }
+                  ]
+                }
+                """;
+    }
+
     private List<String> capturedRequestUrls() {
         ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
         verify(externalApiUtils, atLeastOnce()).callAPI(requestCaptor.capture());

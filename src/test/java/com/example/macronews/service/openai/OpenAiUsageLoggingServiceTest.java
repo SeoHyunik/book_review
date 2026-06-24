@@ -71,4 +71,46 @@ class OpenAiUsageLoggingServiceTest {
         verify(openAiUsageRecordRepository).save(captor.capture());
         Assertions.assertThat(captor.getValue().model()).isEqualTo("gpt-4o-mini-2026-03-01");
     }
+
+    @Test
+    @DisplayName("recordResponsesUsage maps input/output tokens from a Responses API body")
+    void recordResponsesUsage_savesFromInputOutputTokens() {
+        openAiUsageLoggingService.recordResponsesUsage(
+                OpenAiUsageFeatureType.MARKET_ISSUE_SEED,
+                "gpt-5.5",
+                "{\"usage\":{\"input_tokens\":120,\"output_tokens\":30,\"total_tokens\":150}}"
+        );
+
+        ArgumentCaptor<OpenAiUsageRecord> captor = ArgumentCaptor.forClass(OpenAiUsageRecord.class);
+        verify(openAiUsageRecordRepository).save(captor.capture());
+        Assertions.assertThat(captor.getValue().promptTokens()).isEqualTo(120);
+        Assertions.assertThat(captor.getValue().completionTokens()).isEqualTo(30);
+        Assertions.assertThat(captor.getValue().totalTokens()).isEqualTo(150);
+        Assertions.assertThat(captor.getValue().featureType())
+                .isEqualTo(OpenAiUsageFeatureType.MARKET_ISSUE_SEED);
+    }
+
+    @Test
+    @DisplayName("recordResponsesUsage skips persistence when the usage object is missing")
+    void recordResponsesUsage_skipsWhenUsageMissing() {
+        openAiUsageLoggingService.recordResponsesUsage(
+                OpenAiUsageFeatureType.MARKET_ISSUE_SEED,
+                "gpt-5.5",
+                "{\"output_text\":\"{}\"}"
+        );
+
+        verify(openAiUsageRecordRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("recordResponsesUsage degrades quietly on malformed usage without throwing or saving")
+    void recordResponsesUsage_malformedDoesNotThrowOrSave() {
+        openAiUsageLoggingService.recordResponsesUsage(
+                OpenAiUsageFeatureType.MARKET_ISSUE_SEED,
+                "gpt-5.5",
+                "{\"usage\":{\"input_tokens\":\"abc\"}}"
+        );
+
+        verify(openAiUsageRecordRepository, never()).save(any());
+    }
 }

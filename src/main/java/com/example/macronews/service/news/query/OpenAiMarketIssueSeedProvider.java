@@ -1,6 +1,8 @@
 package com.example.macronews.service.news.query;
 
+import com.example.macronews.domain.OpenAiUsageFeatureType;
 import com.example.macronews.dto.request.ExternalApiRequest;
+import com.example.macronews.service.openai.OpenAiUsageLoggingService;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -85,6 +87,7 @@ public class OpenAiMarketIssueSeedProvider {
 
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
+    private final OpenAiUsageLoggingService openAiUsageLoggingService;
 
     private final AtomicReference<SeedSnapshotState> state =
             new AtomicReference<>(SeedSnapshotState.empty());
@@ -174,6 +177,10 @@ public class OpenAiMarketIssueSeedProvider {
             return logged(MarketIssueSeedResult.failed("upstream-status-" + status, now), now);
         }
 
+        // Tokens were consumed on this 2xx call regardless of whether seeds parse; record usage best
+        // effort. A usage-logging failure must never turn a successful seed resolution into a failure.
+        recordUsageQuietly(apiResult.body());
+
         List<MarketIssueSeed> seeds = parseSeeds(apiResult.body());
         List<String> naverQueries = flattenQueries(seeds);
         if (seeds.isEmpty() || naverQueries.isEmpty()) {
@@ -203,6 +210,17 @@ public class OpenAiMarketIssueSeedProvider {
         } catch (Exception ex) {
             // Should not happen for a plain map; fall back to a minimal valid body.
             return "{\"model\":\"" + model + "\",\"tools\":[{\"type\":\"web_search\"}],\"input\":\"\"}";
+        }
+    }
+
+    // Best-effort Responses API usage logging. Swallows every failure so usage capture can never turn a
+    // successful seed resolution into a failure. No raw body is logged here.
+    private void recordUsageQuietly(String responseBody) {
+        try {
+            openAiUsageLoggingService.recordResponsesUsage(
+                    OpenAiUsageFeatureType.MARKET_ISSUE_SEED, model, responseBody);
+        } catch (Exception ex) {
+            log.warn("[OPENAI-SEED] usage logging skipped");
         }
     }
 
