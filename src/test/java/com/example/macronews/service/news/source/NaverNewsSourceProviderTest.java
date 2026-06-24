@@ -1019,43 +1019,61 @@ class NaverNewsSourceProviderTest {
         verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
     }
 
+    // Polluted queries that repeatedly produced stale/lifestyle noise or rawItems=0 in production; the
+    // curated Korea-market fallback pack must contain NONE of these.
+    private static final List<String> POLLUTED_FALLBACK_QUERIES = List.of(
+            "코스피 지수", "코스닥 지수", "코스피 마감", "코스닥 마감",
+            "한국은행 기준금리", "미국 연준 금리", "미국 고용지표 발표", "파월 의장 발언",
+            "브렌트유 가격", "FOMC 회의 결과", "미국 CPI 물가", "미국 PPI 물가");
+
+    // Korea-market reaction / major domestic ticker queries that the curated fallback pack must include.
+    private static final List<String> KOREA_MARKET_FALLBACK_QUERIES = List.of(
+            "삼성전자", "SK하이닉스", "원달러", "뉴욕증시", "나스닥", "반도체");
+
     @Test
-    @DisplayName("NAVER must NOT feed RATE_LIMIT_COOLDOWN fallback seeds to the generator (curated fallback only)")
-    void fetchTopHeadlines_rateLimitCooldownSeedsDoNotBecomeDynamicQueries() {
-        ReflectionTestUtils.setField(provider, "rawQueries", "");
-        ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
-        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
-                .willReturn(fallbackSeedResult(HotIssueSeedOrigin.RATE_LIMIT_COOLDOWN, "rate-limit-cooldown"));
-        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
-                { "items": [] }
-                """));
-
-        provider.fetchTopHeadlines(5);
-
-        // Curated fallback query pack only: the 18 built-in defaults, no GDELT-generated query.
-        assertThat(decodedRequestUrls()).hasSize(18)
-                .anySatisfy(url -> assertThat(url).contains("query=코스피 지수"))
-                .anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
-        // The synthetic cooldown seeds must never reach the deterministic generator.
-        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeedResult(10);
-        verifyNoInteractions(deterministicQueryGenerator);
+    @DisplayName("NAVER RATE_LIMIT_COOLDOWN origin uses the curated Korea-market fallback pack, not the generator")
+    void fetchTopHeadlines_rateLimitCooldownSeedsUseCuratedKoreaMarketFallback() {
+        assertCuratedFallbackPackUsed(
+                fallbackSeedResult(HotIssueSeedOrigin.RATE_LIMIT_COOLDOWN, "rate-limit-cooldown"));
     }
 
     @Test
-    @DisplayName("NAVER must NOT feed FALLBACK seeds to the generator (curated fallback only)")
-    void fetchTopHeadlines_fallbackSeedsDoNotBecomeDynamicQueries() {
+    @DisplayName("NAVER UPSTREAM_FAILURE_COOLDOWN origin uses the curated Korea-market fallback pack, not the generator")
+    void fetchTopHeadlines_upstreamFailureCooldownSeedsUseCuratedKoreaMarketFallback() {
+        assertCuratedFallbackPackUsed(
+                fallbackSeedResult(HotIssueSeedOrigin.UPSTREAM_FAILURE_COOLDOWN, "upstream-cooldown"));
+    }
+
+    @Test
+    @DisplayName("NAVER FALLBACK origin uses the curated Korea-market fallback pack, not the generator")
+    void fetchTopHeadlines_fallbackSeedsUseCuratedKoreaMarketFallback() {
+        assertCuratedFallbackPackUsed(
+                fallbackSeedResult(HotIssueSeedOrigin.FALLBACK, "malformed-body"));
+    }
+
+    private void assertCuratedFallbackPackUsed(HotIssueSeedResult nonDynamicSeedResult) {
         ReflectionTestUtils.setField(provider, "rawQueries", "");
         ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
-        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
-                .willReturn(fallbackSeedResult(HotIssueSeedOrigin.FALLBACK, "malformed-body"));
+        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10)).willReturn(nonDynamicSeedResult);
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
                 { "items": [] }
                 """));
 
         provider.fetchTopHeadlines(5);
 
-        assertThat(decodedRequestUrls()).hasSize(18)
-                .anySatisfy(url -> assertThat(url).contains("query=코스피 지수"));
+        List<String> urls = decodedRequestUrls();
+        // Curated Korea-market pack: count stays inside the 18-24 budget.
+        assertThat(urls.size()).isBetween(18, 24);
+        // None of the polluted stale/lifestyle-noise queries may appear.
+        for (String polluted : POLLUTED_FALLBACK_QUERIES) {
+            assertThat(urls).noneSatisfy(url -> assertThat(url).contains("query=" + polluted));
+        }
+        // Korea-market reaction / domestic ticker queries must be present.
+        for (String expected : KOREA_MARKET_FALLBACK_QUERIES) {
+            assertThat(urls).anySatisfy(url -> assertThat(url).contains("query=" + expected));
+        }
+        // The synthetic non-dynamic seeds must never reach the deterministic generator.
+        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeedResult(10);
         verifyNoInteractions(deterministicQueryGenerator);
     }
 

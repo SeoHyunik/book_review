@@ -139,6 +139,39 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             "\uC778\uD50C\uB808\uC774\uC158 \uAE08\uB9AC"
     );
 
+    // Curated fallback query pack used ONLY when the GDELT seed signal is NOT a genuine dynamic
+    // hot-issue feed (origin RATE_LIMIT_COOLDOWN / UPSTREAM_FAILURE_COOLDOWN / FALLBACK /
+    // NOT_CONFIGURED). The built-in DEFAULT_QUERIES above repeatedly produced stale/lifestyle-noise
+    // (\uCF54\uC2A4\uD53C \uC9C0\uC218/\uCF54\uC2A4\uB2E5 \uC9C0\uC218/\uCF54\uC2A4\uD53C \uB9C8\uAC10/...) or rawItems=0, so this pack is intentionally weighted
+    // toward Korea-market reaction terms and major domestic tickers/sectors. Market-reaction queries
+    // (\uCF54\uC2A4\uD53C \uC0C1\uC2B9/\uD558\uB77D, \uC6D0\uB2EC\uB7EC, \uD658\uC728 \uC0C1\uC2B9/\uD558\uB77D, \uB274\uC695\uC99D\uC2DC, \uB098\uC2A4\uB2E5) lead because they most reliably map to
+    // fresh, macro-relevant Naver articles; bare tickers follow. Each entry is 1-3 tokens, no OR
+    // syntax, and the count stays inside the 18-24 budget.
+    private static final List<String> CURATED_FALLBACK_QUERIES = List.of(
+            "\uC0BC\uC131\uC804\uC790",
+            "SK\uD558\uC774\uB2C9\uC2A4",
+            "\uCF54\uC2A4\uD53C \uC0C1\uC2B9",
+            "\uCF54\uC2A4\uD53C \uD558\uB77D",
+            "\uC6D0\uB2EC\uB7EC",
+            "\uD658\uC728 \uC0C1\uC2B9",
+            "\uD658\uC728 \uD558\uB77D",
+            "\uB274\uC695\uC99D\uC2DC",
+            "\uB098\uC2A4\uB2E5",
+            "\uBC18\uB3C4\uCCB4",
+            "2\uCC28\uC804\uC9C0",
+            "\uB450\uC0B0\uC5D0\uB108\uBE4C\uB9AC\uD2F0",
+            "\uD55C\uBBF8\uBC18\uB3C4\uCCB4",
+            "\uD604\uB300\uCC28",
+            "\uAE30\uC544",
+            "LG\uC5D0\uB108\uC9C0\uC194\uB8E8\uC158",
+            "NAVER",
+            "\uCE74\uCE74\uC624",
+            "\uCF54\uC2A4\uB2E5 \uC0C1\uC2B9",
+            "\uCF54\uC2A4\uB2E5 \uD558\uB77D",
+            "\uAD6D\uC81C\uC720\uAC00",
+            "\uBC29\uC0B0"
+    );
+
     // app.news.naver.queries may arrive comma, semicolon, or newline separated (env vs. yaml list
     // flattening), so accept all three delimiters. Caps guard against runaway/abusive bindings.
     private static final Pattern QUERY_DELIMITER = Pattern.compile("[,;\\r\\n]+");
@@ -384,13 +417,14 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             long seedAgeSeconds = resolveSeedAgeSeconds(seedResult.generatedAt());
 
             if (!seedResult.isDynamic()) {
-                // Synthetic fallback signal: do not feed it to the generator. Use the curated fallback
-                // query pack instead, and make the provenance explicit (generatedQueryCount=0).
+                // Synthetic fallback signal: do not feed it to the generator. Use the curated Korea-market
+                // fallback query pack instead (NOT the polluted built-in defaults), and make the
+                // provenance explicit (generatedQueryCount=0).
                 log.info("[NAVER] query-source resolved source=naver-curated-fallback rawQueriesPresent={} defaultOnly=true "
-                                + "seedOrigin={} gdeltReason={} gdeltStatus={} seedAgeSeconds={} generatedQueryCount=0 defaultQueryCount={} resolvedQueryCount={}",
+                                + "seedOrigin={} gdeltReason={} gdeltStatus={} seedAgeSeconds={} generatedQueryCount=0 curatedQueryCount={} resolvedQueryCount={}",
                         rawQueriesPresent, seedResult.origin(), seedResult.reason(), seedResult.status(), seedAgeSeconds,
-                        DEFAULT_QUERIES.size(), DEFAULT_QUERIES.size());
-                return DEFAULT_QUERIES;
+                        CURATED_FALLBACK_QUERIES.size(), CURATED_FALLBACK_QUERIES.size());
+                return CURATED_FALLBACK_QUERIES;
             }
 
             List<String> generatedQueries = deterministicQueryGenerator.generateQueries(seedResult.seeds(), DYNAMIC_QUERY_LIMIT).stream()
