@@ -229,6 +229,20 @@ app:
         rate-limit: ${APP_NEWS_GDELT_COOLDOWN_RATE_LIMIT:60m}
         # 5xx / timeout / connect failure: shorter back-off for transient upstream outages.
         upstream-failure: ${APP_NEWS_GDELT_COOLDOWN_UPSTREAM_FAILURE:15m}
+    openai-seed:
+      # Disabled-by-default secondary dynamic seed source: an OpenAI web-search call that proposes
+      # Korea-market issue seeds when GDELT cannot supply a REMOTE/CACHED_REMOTE signal. NOT yet wired
+      # into the Naver ingestion path (that happens in a later slice). Reuses the existing OPENAI_API_KEY
+      # secret; no new secret is introduced here. Keep enabled=false until the Responses API + web_search
+      # request/response schema and model availability are re-verified against current OpenAI docs.
+      enabled: ${APP_NEWS_OPENAI_SEED_ENABLED:false}
+      responses-url: ${APP_NEWS_OPENAI_SEED_RESPONSES_URL:https://api.openai.com/v1/responses}
+      model: ${APP_NEWS_OPENAI_SEED_MODEL:gpt-5.5}
+      max-queries: ${APP_NEWS_OPENAI_SEED_MAX_QUERIES:12}
+      confidence-threshold: ${APP_NEWS_OPENAI_SEED_CONFIDENCE_THRESHOLD:0.5}
+      success-ttl: ${APP_NEWS_OPENAI_SEED_SUCCESS_TTL:45m}
+      failure-cooldown: ${APP_NEWS_OPENAI_SEED_FAILURE_COOLDOWN:45m}
+      daily-call-limit: ${APP_NEWS_OPENAI_SEED_DAILY_CALL_LIMIT:24}
   market:
     fx:
       enabled: false
