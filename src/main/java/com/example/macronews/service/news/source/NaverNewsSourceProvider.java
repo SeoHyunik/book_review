@@ -4,6 +4,8 @@ import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.service.news.query.DeterministicQueryGenerator;
 import com.example.macronews.service.news.query.GdeltHotIssueSeedProvider;
+import com.example.macronews.service.news.query.HotIssueSeedOrigin;
+import com.example.macronews.service.news.query.HotIssueSeedResult;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.example.macronews.util.external.ExternalResponseTextNormalizer;
@@ -370,14 +372,28 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
         return DEFAULT_QUERIES;
     }
 
-    // Resolves the dynamic query source (GDELT hot-issue seeds -> deterministic Korean generator) and
-    // merges the generated queries ahead of the built-in defaults. Generated and default counts are
-    // logged separately from the merged total so the active query provenance stays observable. Any
-    // dynamic-source failure falls back to the built-in defaults, preserving the safe production path.
+    // Resolves the dynamic query source (GDELT hot-issue seeds -> deterministic Korean generator). The
+    // deterministic generator is used ONLY when the seed result is a genuine dynamic GDELT signal
+    // (origin REMOTE/CACHED_REMOTE); synthetic fallback/cooldown/not-configured seeds are never treated
+    // as dynamic and instead fall through to the curated Naver fallback query pack (the built-in
+    // defaults) with zero generated queries, so a rate-limit cooldown can no longer masquerade as a
+    // real dynamic query source. Any dynamic-source failure also degrades to the safe defaults.
     private List<String> resolveMergedDynamicQueries(boolean rawQueriesPresent) {
         try {
-            List<String> seeds = gdeltHotIssueSeedProvider.resolveHotIssueSeeds(DYNAMIC_SEED_LIMIT);
-            List<String> generatedQueries = deterministicQueryGenerator.generateQueries(seeds, DYNAMIC_QUERY_LIMIT).stream()
+            HotIssueSeedResult seedResult = gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(DYNAMIC_SEED_LIMIT);
+            long seedAgeSeconds = resolveSeedAgeSeconds(seedResult.generatedAt());
+
+            if (!seedResult.isDynamic()) {
+                // Synthetic fallback signal: do not feed it to the generator. Use the curated fallback
+                // query pack instead, and make the provenance explicit (generatedQueryCount=0).
+                log.info("[NAVER] query-source resolved source=naver-curated-fallback rawQueriesPresent={} defaultOnly=true "
+                                + "seedOrigin={} gdeltReason={} gdeltStatus={} seedAgeSeconds={} generatedQueryCount=0 defaultQueryCount={} resolvedQueryCount={}",
+                        rawQueriesPresent, seedResult.origin(), seedResult.reason(), seedResult.status(), seedAgeSeconds,
+                        DEFAULT_QUERIES.size(), DEFAULT_QUERIES.size());
+                return DEFAULT_QUERIES;
+            }
+
+            List<String> generatedQueries = deterministicQueryGenerator.generateQueries(seedResult.seeds(), DYNAMIC_QUERY_LIMIT).stream()
                     .map(this::normalizeConfiguredQuery)
                     .filter(StringUtils::hasText)
                     .distinct()
@@ -392,15 +408,26 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                     .limit(MAX_MERGED_DYNAMIC_QUERIES)
                     .toList();
 
-            log.info("[NAVER] query-source resolved source=merged rawQueriesPresent={} defaultOnly=false seedCount={} "
-                            + "generatedQueryCount={} defaultQueryCount={} resolvedQueryCount={}",
-                    rawQueriesPresent, seeds.size(), generatedQueries.size(), DEFAULT_QUERIES.size(), mergedQueries.size());
+            String source = seedResult.origin() == HotIssueSeedOrigin.REMOTE ? "gdelt-dynamic" : "gdelt-cached-dynamic";
+            log.info("[NAVER] query-source resolved source={} rawQueriesPresent={} defaultOnly=false seedOrigin={} gdeltReason={} "
+                            + "gdeltStatus={} seedAgeSeconds={} seedCount={} generatedQueryCount={} defaultQueryCount={} resolvedQueryCount={}",
+                    source, rawQueriesPresent, seedResult.origin(), seedResult.reason(), seedResult.status(), seedAgeSeconds,
+                    seedResult.seeds().size(), generatedQueries.size(), DEFAULT_QUERIES.size(), mergedQueries.size());
             return mergedQueries;
         } catch (Exception ex) {
             log.warn("[NAVER] dynamic query source failed; using safe defaults. rawQueriesPresent={} defaultOnly=true resolvedQueryCount={}",
                     rawQueriesPresent, DEFAULT_QUERIES.size(), ex);
             return DEFAULT_QUERIES;
         }
+    }
+
+    // Seed age in seconds from the GDELT signal's generation time to now, or -1 when unknown. Negative
+    // clock skew is clamped to 0 so the diagnostic stays sane.
+    private long resolveSeedAgeSeconds(Instant generatedAt) {
+        if (generatedAt == null) {
+            return -1;
+        }
+        return Math.max(0, Duration.between(generatedAt, Instant.now(clock)).getSeconds());
     }
 
     private List<String> parseConfiguredQueries() {

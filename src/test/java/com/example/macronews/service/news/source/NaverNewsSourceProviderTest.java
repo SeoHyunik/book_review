@@ -14,6 +14,8 @@ import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
 import com.example.macronews.service.news.query.DeterministicQueryGenerator;
 import com.example.macronews.service.news.query.GdeltHotIssueSeedProvider;
+import com.example.macronews.service.news.query.HotIssueSeedOrigin;
+import com.example.macronews.service.news.query.HotIssueSeedResult;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -948,8 +950,8 @@ class NaverNewsSourceProviderTest {
         ReflectionTestUtils.setField(provider, "rawQueries", "");
         ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
         ReflectionTestUtils.setField(provider, "maxPages", 1);
-        given(gdeltHotIssueSeedProvider.resolveHotIssueSeeds(10))
-                .willReturn(List.of("federal reserve rate decision"));
+        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
+                .willReturn(remoteSeedResult(List.of("federal reserve rate decision")));
         given(deterministicQueryGenerator.generateQueries(eq(List.of("federal reserve rate decision")), eq(10)))
                 .willReturn(List.of("연준 금리", "코스피 지수", "연준 금리"));
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
@@ -967,7 +969,7 @@ class NaverNewsSourceProviderTest {
         assertThat(urls).filteredOn(url -> url.contains("query=연준 금리")).hasSize(1);
         assertThat(urls).filteredOn(url -> url.contains("query=코스피 지수")).hasSize(1);
         assertThat(urls).anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
-        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeeds(10);
+        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeedResult(10);
         verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
     }
 
@@ -976,8 +978,8 @@ class NaverNewsSourceProviderTest {
     void fetchTopHeadlines_dynamicQueriesEnabledFallsBackToDefaultsWhenGeneratorFails() {
         ReflectionTestUtils.setField(provider, "rawQueries", "");
         ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
-        given(gdeltHotIssueSeedProvider.resolveHotIssueSeeds(10))
-                .willReturn(List.of("federal reserve rate decision"));
+        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
+                .willReturn(remoteSeedResult(List.of("federal reserve rate decision")));
         given(deterministicQueryGenerator.generateQueries(any(), eq(10)))
                 .willThrow(new IllegalStateException("generator unavailable"));
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
@@ -991,8 +993,88 @@ class NaverNewsSourceProviderTest {
         assertThat(decodedRequestUrls()).hasSize(18)
                 .anySatisfy(url -> assertThat(url).contains("query=코스피 지수"))
                 .anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
-        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeeds(10);
+        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeedResult(10);
         verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
+    }
+
+    @Test
+    @DisplayName("NAVER dynamic CACHED_REMOTE seeds still drive the deterministic generator")
+    void fetchTopHeadlines_dynamicQueriesUsesGeneratorForCachedRemoteOrigin() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+        ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
+        ReflectionTestUtils.setField(provider, "maxPages", 1);
+        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
+                .willReturn(cachedRemoteSeedResult(List.of("federal reserve rate decision")));
+        given(deterministicQueryGenerator.generateQueries(eq(List.of("federal reserve rate decision")), eq(10)))
+                .willReturn(List.of("연준 금리"));
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                { "items": [] }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        List<String> urls = decodedRequestUrls();
+        assertThat(urls.get(0)).contains("query=연준 금리");
+        assertThat(urls).anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
+        verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
+    }
+
+    @Test
+    @DisplayName("NAVER must NOT feed RATE_LIMIT_COOLDOWN fallback seeds to the generator (curated fallback only)")
+    void fetchTopHeadlines_rateLimitCooldownSeedsDoNotBecomeDynamicQueries() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+        ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
+        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
+                .willReturn(fallbackSeedResult(HotIssueSeedOrigin.RATE_LIMIT_COOLDOWN, "rate-limit-cooldown"));
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                { "items": [] }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        // Curated fallback query pack only: the 18 built-in defaults, no GDELT-generated query.
+        assertThat(decodedRequestUrls()).hasSize(18)
+                .anySatisfy(url -> assertThat(url).contains("query=코스피 지수"))
+                .anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
+        // The synthetic cooldown seeds must never reach the deterministic generator.
+        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeedResult(10);
+        verifyNoInteractions(deterministicQueryGenerator);
+    }
+
+    @Test
+    @DisplayName("NAVER must NOT feed FALLBACK seeds to the generator (curated fallback only)")
+    void fetchTopHeadlines_fallbackSeedsDoNotBecomeDynamicQueries() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+        ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
+        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
+                .willReturn(fallbackSeedResult(HotIssueSeedOrigin.FALLBACK, "malformed-body"));
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                { "items": [] }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        assertThat(decodedRequestUrls()).hasSize(18)
+                .anySatisfy(url -> assertThat(url).contains("query=코스피 지수"));
+        verifyNoInteractions(deterministicQueryGenerator);
+    }
+
+    private static HotIssueSeedResult remoteSeedResult(List<String> seeds) {
+        return new HotIssueSeedResult(seeds, HotIssueSeedOrigin.REMOTE, "ok", 200, false, true, seeds.size(),
+                Instant.parse("2026-03-13T03:00:00Z"));
+    }
+
+    private static HotIssueSeedResult cachedRemoteSeedResult(List<String> seeds) {
+        return new HotIssueSeedResult(seeds, HotIssueSeedOrigin.CACHED_REMOTE, "cached-remote", -1, false, true,
+                seeds.size(), Instant.parse("2026-03-13T02:30:00Z"));
+    }
+
+    private static HotIssueSeedResult fallbackSeedResult(HotIssueSeedOrigin origin, String reason) {
+        // Mirrors the provider's synthetic fallback seed list; these must never be treated as dynamic.
+        return new HotIssueSeedResult(
+                List.of("Bank of Korea base rate decision", "US Federal Reserve FOMC rate decision"),
+                origin, reason, origin == HotIssueSeedOrigin.RATE_LIMIT_COOLDOWN ? -1 : 200, true, true, 0,
+                Instant.parse("2026-03-13T03:30:00Z"));
     }
 
     @Test

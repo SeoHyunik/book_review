@@ -340,4 +340,151 @@ class GdeltHotIssueSeedProviderTest {
         assertThat(second).isEqualTo(first);
         verify(externalApiUtils, times(1)).callAPI(any());
     }
+
+    @Test
+    @DisplayName("Remote success yields a dynamic REMOTE seed result")
+    void resolveHotIssueSeedResult_remoteSuccessIsDynamicRemote() {
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "articles": [
+                    { "title": "Fed signals patience on rate cuts" }
+                  ]
+                }
+                """));
+
+        HotIssueSeedResult result = provider.resolveHotIssueSeedResult(3);
+
+        assertThat(result.origin()).isEqualTo(HotIssueSeedOrigin.REMOTE);
+        assertThat(result.isDynamic()).isTrue();
+        assertThat(result.usedFallback()).isFalse();
+        assertThat(result.reason()).isEqualTo("ok");
+        assertThat(result.status()).isEqualTo(200);
+        assertThat(result.seeds()).containsExactly("Fed signals patience on rate cuts");
+    }
+
+    @Test
+    @DisplayName("Success cache hit yields a dynamic CACHED_REMOTE seed result")
+    void resolveHotIssueSeedResult_cacheHitIsCachedRemote() {
+        ReflectionTestUtils.setField(provider, "successTtl", "30m");
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "articles": [
+                    { "title": "Oil climbs on supply worries" }
+                  ]
+                }
+                """));
+
+        provider.resolveHotIssueSeedResult(3);
+        HotIssueSeedResult cached = provider.resolveHotIssueSeedResult(3);
+
+        assertThat(cached.origin()).isEqualTo(HotIssueSeedOrigin.CACHED_REMOTE);
+        assertThat(cached.isDynamic()).isTrue();
+        assertThat(cached.usedFallback()).isFalse();
+        assertThat(cached.reason()).isEqualTo("cached-remote");
+        assertThat(cached.seeds()).containsExactly("Oil climbs on supply worries");
+        verify(externalApiUtils, times(1)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("Rate-limit cooldown without prior remote cache yields a non-dynamic RATE_LIMIT_COOLDOWN result")
+    void resolveHotIssueSeedResult_rateLimitCooldownWithoutCacheIsNotDynamic() {
+        ReflectionTestUtils.setField(provider, "rateLimitCooldown", "60m");
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(429, "rate limit exceeded"));
+
+        // First resolve arms the cooldown (live 429 classification), second resolve is the skipped one.
+        provider.resolveHotIssueSeedResult(5);
+        HotIssueSeedResult cooled = provider.resolveHotIssueSeedResult(5);
+
+        assertThat(cooled.origin()).isEqualTo(HotIssueSeedOrigin.RATE_LIMIT_COOLDOWN);
+        assertThat(cooled.isDynamic()).isFalse();
+        assertThat(cooled.usedFallback()).isTrue();
+        assertThat(cooled.reason()).isEqualTo("rate-limit-cooldown");
+        assertThat(cooled.seeds()).startsWith(FIRST_FALLBACK_SEED, SECOND_FALLBACK_SEED);
+        verify(externalApiUtils, times(1)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("Rate-limit cooldown with a prior remote cache keeps serving dynamic CACHED_REMOTE seeds")
+    void resolveHotIssueSeedResult_rateLimitCooldownWithPriorCacheStaysDynamic() {
+        // Success TTL shorter than the rate-limit cooldown: after the success cache expires but while
+        // the cooldown is still active, the prior remote seeds must still be served as dynamic input.
+        ReflectionTestUtils.setField(provider, "successTtl", "30m");
+        ReflectionTestUtils.setField(provider, "rateLimitCooldown", "60m");
+        Instant start = Instant.parse("2026-06-24T00:00:00Z");
+        ReflectionTestUtils.setField(provider, "clock", Clock.fixed(start, ZoneOffset.UTC));
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, """
+                        {
+                          "articles": [
+                            { "title": "Fed holds rates amid inflation" }
+                          ]
+                        }
+                        """))
+                .willReturn(new ExternalApiResult(429, "rate limit exceeded"));
+
+        // 1) remote success caches seeds; 2) advance 31m so the success TTL expired -> a live 429 arms
+        // the 60m cooldown; 3) advance to 45m (cooldown still active, TTL still expired) -> cached-remote.
+        provider.resolveHotIssueSeedResult(3);
+        ReflectionTestUtils.setField(provider, "clock",
+                Clock.fixed(start.plus(Duration.ofMinutes(31)), ZoneOffset.UTC));
+        provider.resolveHotIssueSeedResult(3);
+        ReflectionTestUtils.setField(provider, "clock",
+                Clock.fixed(start.plus(Duration.ofMinutes(45)), ZoneOffset.UTC));
+        HotIssueSeedResult cooled = provider.resolveHotIssueSeedResult(3);
+
+        assertThat(cooled.origin()).isEqualTo(HotIssueSeedOrigin.CACHED_REMOTE);
+        assertThat(cooled.isDynamic()).isTrue();
+        assertThat(cooled.usedFallback()).isFalse();
+        assertThat(cooled.reason()).isEqualTo("rate-limit-cooldown-cached-remote");
+        assertThat(cooled.seeds()).containsExactly("Fed holds rates amid inflation");
+        // generatedAt is the original remote fetch time (start), so callers can derive a positive age.
+        assertThat(cooled.generatedAt()).isEqualTo(start);
+        // The third resolve served from cache during the cooldown made no third upstream call.
+        verify(externalApiUtils, times(2)).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("Not-configured yields a non-dynamic NOT_CONFIGURED result without any remote call")
+    void resolveHotIssueSeedResult_notConfiguredIsNotDynamic() {
+        ReflectionTestUtils.setField(provider, "enabled", false);
+
+        HotIssueSeedResult result = provider.resolveHotIssueSeedResult(5);
+
+        assertThat(result.origin()).isEqualTo(HotIssueSeedOrigin.NOT_CONFIGURED);
+        assertThat(result.isDynamic()).isFalse();
+        assertThat(result.usedFallback()).isTrue();
+        assertThat(result.seeds()).startsWith(FIRST_FALLBACK_SEED);
+        verify(externalApiUtils, never()).callAPI(any());
+    }
+
+    @Test
+    @DisplayName("Malformed body yields a non-dynamic FALLBACK result")
+    void resolveHotIssueSeedResult_malformedBodyIsFallback() {
+        given(externalApiUtils.callAPI(any()))
+                .willReturn(new ExternalApiResult(200, "Your query was too short or too broad."));
+
+        HotIssueSeedResult result = provider.resolveHotIssueSeedResult(4);
+
+        assertThat(result.origin()).isEqualTo(HotIssueSeedOrigin.FALLBACK);
+        assertThat(result.isDynamic()).isFalse();
+        assertThat(result.usedFallback()).isTrue();
+        assertThat(result.reason()).isEqualTo("malformed-body");
+        assertThat(result.seeds()).startsWith(FIRST_FALLBACK_SEED);
+    }
+
+    @Test
+    @DisplayName("Backward-compatible resolveHotIssueSeeds still returns the seed list")
+    void resolveHotIssueSeeds_backwardCompatibleSeedList() {
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                {
+                  "articles": [
+                    { "title": "Chip stocks rally after earnings" }
+                  ]
+                }
+                """));
+
+        assertThat(provider.resolveHotIssueSeeds(3))
+                .containsExactly("Chip stocks rally after earnings");
+    }
 }

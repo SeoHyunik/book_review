@@ -135,28 +135,52 @@ public class GdeltHotIssueSeedProvider {
     private String upstreamFailureCooldown = "15m";
 
     /**
-     * Resolves hot-issue seed phrases, preferring the remote GDELT signal and falling back to a
-     * deterministic local list on any failure. The returned list is never empty.
+     * Backward-compatible entry point that returns only the resolved seed phrases. Prefer
+     * {@link #resolveHotIssueSeedResult(int)} when the caller needs to know whether the seeds are a
+     * genuine dynamic GDELT signal or a synthetic fallback. The returned list is never empty.
      */
     public List<String> resolveHotIssueSeeds(int limit) {
-        int resolvedLimit = limit > 0 ? limit : DEFAULT_LIMIT;
+        return resolveHotIssueSeedResult(limit).seeds();
+    }
 
+    /**
+     * Resolves hot-issue seeds and reports their provenance (origin/reason/status/age). Only
+     * {@link HotIssueSeedOrigin#REMOTE}/{@link HotIssueSeedOrigin#CACHED_REMOTE} results are dynamic;
+     * every other origin is a synthetic safe fallback. The seed list is never empty.
+     */
+    public HotIssueSeedResult resolveHotIssueSeedResult(int limit) {
+        int resolvedLimit = limit > 0 ? limit : DEFAULT_LIMIT;
+        Instant now = clock.instant();
+        HotIssueSeedResult result = resolveInternal(resolvedLimit, now);
+        logResult(result, resolvedLimit, now);
+        return result;
+    }
+
+    private HotIssueSeedResult resolveInternal(int resolvedLimit, Instant now) {
         if (!enabled || !StringUtils.hasText(baseUrl)) {
-            return fallback(resolvedLimit, false, false, 0, -1, "not-configured");
+            return fallbackResult(resolvedLimit, HotIssueSeedOrigin.NOT_CONFIGURED, "not-configured", -1, now);
         }
 
-        Instant now = clock.instant();
         SeedCacheState state = cacheState.get();
+        boolean skipActive = state.skipActive(now);
 
         // Fresh successful remote seeds win in every state, including while a cooldown is armed: they
         // are strictly better data than fallback, and serving them costs no remote call.
         if (state.remoteValid(now)) {
-            return cachedRemote(state.remoteSeeds(), resolvedLimit);
+            String reason = skipActive ? state.skipReason() + "-cached-remote" : "cached-remote";
+            return remoteResult(state.remoteSeeds(), resolvedLimit, HotIssueSeedOrigin.CACHED_REMOTE,
+                    reason, -1, state.remoteSeedsFetchedAt());
         }
-        // A rate-limit / upstream / fallback cooldown is active: skip the remote call entirely and
-        // return the safe fallback. This is what prevents repeated 429s within one ingestion flow.
-        if (state.skipActive(now)) {
-            return fallback(resolvedLimit, false, false, 0, -1, state.skipReason());
+        if (skipActive) {
+            // A rate-limit / upstream / fallback cooldown is active: never call the upstream. If we
+            // still hold prior remote seeds (even past their success TTL) prefer them as cached-remote
+            // dynamic input; otherwise the seeds are genuinely synthetic fallback and must NOT be
+            // treated as dynamic. This is what prevents fake dynamic Naver queries during a cooldown.
+            if (state.hasStoredRemote()) {
+                return remoteResult(state.remoteSeeds(), resolvedLimit, HotIssueSeedOrigin.CACHED_REMOTE,
+                        state.skipReason() + "-cached-remote", -1, state.remoteSeedsFetchedAt());
+            }
+            return fallbackResult(resolvedLimit, cooldownOrigin(state.skipReason()), state.skipReason(), -1, now);
         }
 
         ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
@@ -174,13 +198,13 @@ public class GdeltHotIssueSeedProvider {
                 // ExternalApiResult abstraction exposes only status + body, never response headers.
                 armCooldown(now, resolveDuration(rateLimitCooldown, DEFAULT_RATE_LIMIT_COOLDOWN),
                         REASON_RATE_LIMIT_COOLDOWN);
-                return fallback(resolvedLimit, false, false, 0, statusCode, "rate-limited");
+                return fallbackResult(resolvedLimit, HotIssueSeedOrigin.RATE_LIMIT_COOLDOWN, "rate-limited", statusCode, now);
             }
             // 5xx, gateway timeout (504), connect failure (503) or any other non-2xx: arm a shorter
             // upstream-failure cooldown so transient outages do not turn into a tight retry loop.
             armCooldown(now, resolveDuration(upstreamFailureCooldown, DEFAULT_UPSTREAM_FAILURE_COOLDOWN),
                     REASON_UPSTREAM_COOLDOWN);
-            return fallback(resolvedLimit, false, false, 0, statusCode, "upstream-unavailable");
+            return fallbackResult(resolvedLimit, HotIssueSeedOrigin.UPSTREAM_FAILURE_COOLDOWN, "upstream-unavailable", statusCode, now);
         }
 
         SeedParseResult parsed = parseSeeds(result.body(), candidateCap(resolvedLimit));
@@ -189,32 +213,53 @@ public class GdeltHotIssueSeedProvider {
             // empty result (no-articles) and from articles whose titles are unusable (no-usable-title),
             // so the post-deploy log pinpoints exactly why remote seeds were not extracted. Arm a short
             // fallback window so the same cycle does not immediately re-enter the remote call.
-            boolean parsedJson = parsed.status() != SeedParseStatus.MALFORMED_BODY;
             armCooldown(now, resolveDuration(fallbackTtl, DEFAULT_FALLBACK_TTL), REASON_FALLBACK_CACHED);
-            return fallback(resolvedLimit, true, parsedJson, 0, statusCode, parsed.status().reason());
+            return fallbackResult(resolvedLimit, HotIssueSeedOrigin.FALLBACK, parsed.status().reason(), statusCode, now);
         }
 
         // Cache the full candidate set (pre-limit) so a later, larger request can still be served from
         // cache; apply the requested limit only on the returned view.
         storeRemoteSeeds(now, parsed.seeds());
-        List<String> seeds = parsed.seeds().stream().limit(resolvedLimit).toList();
-        log.info("[GDELT] hot-issue seeds mode={} source=remote remoteEnabled=true httpOk=true status={} parsed=true parsedSeeds={} returnedSeeds={} usedFallback=false limit={} reason=ok",
-                MODE_REMOTE, statusCode, parsed.seeds().size(), seeds.size(), resolvedLimit);
-        return seeds;
+        return remoteResult(parsed.seeds(), resolvedLimit, HotIssueSeedOrigin.REMOTE, "ok", statusCode, now);
     }
 
-    private List<String> cachedRemote(List<String> cached, int limit) {
-        List<String> seeds = cached.stream().limit(limit).toList();
-        log.info("[GDELT] hot-issue seeds mode={} source=cache remoteEnabled=true parsed=true cachedSeeds={} returnedSeeds={} usedFallback=false limit={} reason=cached-remote",
-                MODE_REMOTE, cached.size(), seeds.size(), limit);
-        return seeds;
+    private HotIssueSeedResult remoteResult(List<String> candidates, int limit, HotIssueSeedOrigin origin,
+            String reason, int status, Instant fetchedAt) {
+        List<String> seeds = candidates.stream().limit(limit).toList();
+        Instant generatedAt = fetchedAt != null ? fetchedAt : clock.instant();
+        return new HotIssueSeedResult(seeds, origin, reason, status, false, true, candidates.size(), generatedAt);
+    }
+
+    private HotIssueSeedResult fallbackResult(int limit, HotIssueSeedOrigin origin, String reason, int status,
+            Instant now) {
+        List<String> seeds = FALLBACK_SEEDS.stream().limit(limit).toList();
+        return new HotIssueSeedResult(seeds, origin, reason, status, true, enabled, 0, now);
+    }
+
+    private HotIssueSeedOrigin cooldownOrigin(String skipReason) {
+        if (REASON_RATE_LIMIT_COOLDOWN.equals(skipReason)) {
+            return HotIssueSeedOrigin.RATE_LIMIT_COOLDOWN;
+        }
+        if (REASON_UPSTREAM_COOLDOWN.equals(skipReason)) {
+            return HotIssueSeedOrigin.UPSTREAM_FAILURE_COOLDOWN;
+        }
+        return HotIssueSeedOrigin.FALLBACK;
+    }
+
+    private void logResult(HotIssueSeedResult result, int limit, Instant now) {
+        long seedAgeSeconds = Math.max(0, Duration.between(result.generatedAt(), now).getSeconds());
+        log.info("[GDELT] hot-issue seeds seedOrigin={} mode={} dynamic={} remoteEnabled={} status={} parsedSeeds={} returnedSeeds={} usedFallback={} seedAgeSeconds={} limit={} reason={}",
+                result.origin(), result.usedFallback() ? MODE_FALLBACK : MODE_REMOTE, result.isDynamic(),
+                result.remoteEnabled(), result.status(), result.parsedSeeds(), result.seeds().size(),
+                result.usedFallback(), seedAgeSeconds, limit, result.reason());
     }
 
     private void storeRemoteSeeds(Instant now, List<String> seeds) {
         Duration ttl = resolveDuration(successTtl, DEFAULT_SUCCESS_TTL);
         Instant expireAt = now.plus(ttl);
-        // A fresh success clears any prior cooldown: the success cache now guards re-entry.
-        cacheState.set(new SeedCacheState(List.copyOf(seeds), expireAt, null, null));
+        // A fresh success clears any prior cooldown: the success cache now guards re-entry. The fetch
+        // timestamp is retained so a later cached-remote result can report an honest seed age.
+        cacheState.set(new SeedCacheState(List.copyOf(seeds), now, expireAt, null, null));
     }
 
     private void armCooldown(Instant now, Duration cooldown, String reason) {
@@ -222,7 +267,7 @@ public class GdeltHotIssueSeedProvider {
         Instant until = (cooldown == null || cooldown.isZero() || cooldown.isNegative())
                 ? null : now.plus(cooldown);
         cacheState.updateAndGet(prev -> new SeedCacheState(
-                prev.remoteSeeds(), prev.remoteSeedsExpireAt(), until, reason));
+                prev.remoteSeeds(), prev.remoteSeedsFetchedAt(), prev.remoteSeedsExpireAt(), until, reason));
     }
 
     private Duration resolveDuration(String value, Duration fallback) {
@@ -295,14 +340,6 @@ public class GdeltHotIssueSeedProvider {
         return trimmed;
     }
 
-    private List<String> fallback(int limit, boolean httpOk, boolean parsed, int parsedSeeds, int statusCode,
-            String reason) {
-        List<String> seeds = FALLBACK_SEEDS.stream().limit(limit).toList();
-        log.info("[GDELT] hot-issue seeds mode={} remoteEnabled={} httpOk={} status={} parsed={} parsedSeeds={} returnedSeeds={} usedFallback={} limit={} reason={}",
-                MODE_FALLBACK, enabled, httpOk, statusCode, parsed, parsedSeeds, seeds.size(), true, limit, reason);
-        return seeds;
-    }
-
     private enum SeedParseStatus {
         OK("ok"),
         MALFORMED_BODY("malformed-body"),
@@ -324,23 +361,28 @@ public class GdeltHotIssueSeedProvider {
     }
 
     /**
-     * Immutable cache/cooldown snapshot. {@code remoteSeeds}/{@code remoteSeedsExpireAt} hold the last
-     * successful (pre-limit) candidate list and its success-TTL expiry; {@code skipRemoteUntil}/
-     * {@code skipReason} describe an armed window during which the remote call is skipped.
+     * Immutable cache/cooldown snapshot. {@code remoteSeeds}/{@code remoteSeedsFetchedAt}/
+     * {@code remoteSeedsExpireAt} hold the last successful (pre-limit) candidate list, its fetch time
+     * and its success-TTL expiry; {@code skipRemoteUntil}/{@code skipReason} describe an armed window
+     * during which the remote call is skipped.
      */
     private record SeedCacheState(
             List<String> remoteSeeds,
+            Instant remoteSeedsFetchedAt,
             Instant remoteSeedsExpireAt,
             Instant skipRemoteUntil,
             String skipReason) {
 
         static SeedCacheState empty() {
-            return new SeedCacheState(null, null, null, null);
+            return new SeedCacheState(null, null, null, null, null);
+        }
+
+        boolean hasStoredRemote() {
+            return remoteSeeds != null && !remoteSeeds.isEmpty();
         }
 
         boolean remoteValid(Instant now) {
-            return remoteSeeds != null && !remoteSeeds.isEmpty()
-                    && remoteSeedsExpireAt != null && now.isBefore(remoteSeedsExpireAt);
+            return hasStoredRemote() && remoteSeedsExpireAt != null && now.isBefore(remoteSeedsExpireAt);
         }
 
         boolean skipActive(Instant now) {
