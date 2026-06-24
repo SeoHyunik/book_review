@@ -191,7 +191,10 @@ app:
       enabled: true
       base-url: https://gnews.io/api/v4/search
       api-key: ${APP_NEWS_GNEWS_API_KEY:}
-      query: market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR sanctions
+      # GNews returns HTTP 400 for overly broad boolean OR expressions, so the query is a list of short,
+      # simple candidate queries tried in order (comma separated). No "a OR b" expression is sent to the
+      # `q` parameter; any legacy OR value bound via APP_NEWS_GNEWS_QUERY is split into simple queries.
+      query: ${APP_NEWS_GNEWS_QUERY:stock market, federal reserve, inflation, oil prices, semiconductors}
       lang: en
       country: us
       max-age-hours: 24

@@ -13,7 +13,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +31,16 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Slf4j
 public class GNewsSourceProvider implements NewsSourceProvider {
 
+    // GNews rejects (HTTP 400) overly broad, multi-term boolean expressions in its `q` parameter, so
+    // the query config is treated as a list of short, simple candidate queries that are tried in turn.
+    // Entries may arrive comma/semicolon/newline separated (env vs. yaml list flattening); any legacy
+    // "a OR b OR c" value is additionally split on the OR token so a stale configuration degrades into
+    // individual simple queries instead of being sent verbatim and rejected.
+    private static final Pattern QUERY_DELIMITER = Pattern.compile("[,;\\r\\n]+");
+    private static final Pattern OR_SPLITTER = Pattern.compile("(?i)\\s+OR\\s+");
+    private static final int MAX_QUERIES = 6;
+    private static final int MAX_QUERY_LENGTH = 60;
+
     private final ExternalApiUtils externalApiUtils;
     private final ObjectMapper objectMapper;
 
@@ -40,7 +53,8 @@ public class GNewsSourceProvider implements NewsSourceProvider {
     @Value("${app.news.gnews.api-key:}")
     private String apiKey;
 
-    @Value("${app.news.gnews.query:market OR stocks OR inflation OR fed OR tariff OR oil OR semiconductor OR usd OR kospi OR sanctions}")
+    // Simple, short candidate queries tried sequentially. No boolean OR expression is sent to GNews.
+    @Value("${app.news.gnews.query:stock market, federal reserve, inflation, oil prices, semiconductors}")
     private String query;
 
     @Value("${app.news.gnews.lang:en}")
@@ -79,15 +93,110 @@ public class GNewsSourceProvider implements NewsSourceProvider {
                     enabled, StringUtils.hasText(apiKey), normalizeConfiguredBaseUrl(baseUrl));
             return List.of();
         }
-        if (!StringUtils.hasText(query)) {
+        List<String> queries = resolveQueries();
+        if (queries.isEmpty()) {
             log.warn("[GNEWS] query is blank; skipping provider");
             return List.of();
         }
 
         int resolvedLimit = Math.max(limit, 1);
         String normalizedBaseUrl = normalizeConfiguredBaseUrl(baseUrl);
-        String url = UriComponentsBuilder.fromUriString(normalizedBaseUrl)
-                .queryParam("q", query)
+        String requestFamily = resolveRequestFamily(normalizedBaseUrl);
+        int attempted = 0;
+        int rejected = 0;
+        boolean anyUpstreamOk = false;
+
+        // Try each simple query in turn. A single broad query previously failed the whole provider with
+        // HTTP 400; now a 400 only retires that one query and the next candidate is attempted. A 429 is
+        // treated as terminal so we never amplify rate-limiting by fanning out across the remaining
+        // queries.
+        for (String candidate : queries) {
+            attempted++;
+            String url = buildSearchUrl(normalizedBaseUrl, candidate, resolvedLimit);
+            String sanitizedUrl = sanitizeUrl(url);
+
+            ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
+                    HttpMethod.GET,
+                    new HttpHeaders(),
+                    url,
+                    null
+            ));
+            int status = result == null ? -1 : result.statusCode();
+            boolean httpOk = result != null && status >= 200 && status < 300;
+            if (!httpOk) {
+                if (status == 429) {
+                    log.warn("[GNEWS] provider empty reason=rate-limit bucket={} enabled={} requestFamily={} status={} attemptedQueries={} totalQueries={} configuredBaseUrl={} requestUrl={}",
+                            bucket, enabled, requestFamily, status, attempted, queries.size(), normalizedBaseUrl, sanitizedUrl);
+                    return List.of();
+                }
+                rejected++;
+                log.warn("[GNEWS] query rejected reason=upstream-rejection bucket={} requestFamily={} status={} queryIndex={} totalQueries={} requestUrl={}",
+                        bucket, requestFamily, status, attempted, queries.size(), sanitizedUrl);
+                continue;
+            }
+
+            anyUpstreamOk = true;
+            List<ExternalNewsItem> items = parseArticles(result.body(), resolvedLimit, bucket);
+            if (!items.isEmpty()) {
+                log.info("[GNEWS] resolved usableItems={} bucket={} requestFamily={} queryIndex={} totalQueries={}",
+                        items.size(), bucket, requestFamily, attempted, queries.size());
+                return items;
+            }
+            // HTTP 2xx but nothing usable (empty/stale): move on to the next candidate so the foreign
+            // fallback still has a chance to surface at least one item.
+        }
+
+        // Every candidate was exhausted. Distinguish an all-rejected outcome (query family unusable)
+        // from one where the upstream accepted a query but had no eligible articles.
+        String reason = anyUpstreamOk ? "no-eligible-articles" : "upstream-rejection";
+        log.warn("[GNEWS] provider empty reason={} bucket={} enabled={} requestFamily={} attemptedQueries={} rejectedQueries={} totalQueries={} configuredBaseUrl={}",
+                reason, bucket, enabled, requestFamily, attempted, rejected, queries.size(), normalizedBaseUrl);
+        return List.of();
+    }
+
+    // Resolves the configured query string into an ordered, de-duplicated list of short simple queries.
+    // Splits on list delimiters and defensively on any boolean OR token, trims, caps length, and bounds
+    // the total count so the sequential fan-out can never run away.
+    private List<String> resolveQueries() {
+        if (!StringUtils.hasText(query)) {
+            return List.of();
+        }
+        LinkedHashSet<String> seenLower = new LinkedHashSet<>();
+        List<String> resolved = new ArrayList<>();
+        for (String part : QUERY_DELIMITER.split(query)) {
+            for (String term : OR_SPLITTER.split(part)) {
+                String normalized = normalizeQuery(term);
+                if (normalized == null) {
+                    continue;
+                }
+                if (seenLower.add(normalized.toLowerCase(Locale.ROOT)) && resolved.size() < MAX_QUERIES) {
+                    resolved.add(normalized);
+                }
+                if (resolved.size() >= MAX_QUERIES) {
+                    return List.copyOf(resolved);
+                }
+            }
+        }
+        return List.copyOf(resolved);
+    }
+
+    private String normalizeQuery(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        String trimmed = raw.replaceAll("\\s+", " ").trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > MAX_QUERY_LENGTH) {
+            trimmed = trimmed.substring(0, MAX_QUERY_LENGTH).trim();
+        }
+        return trimmed;
+    }
+
+    private String buildSearchUrl(String normalizedBaseUrl, String candidateQuery, int resolvedLimit) {
+        return UriComponentsBuilder.fromUriString(normalizedBaseUrl)
+                .queryParam("q", candidateQuery)
                 .queryParam("lang", language)
                 .queryParam("country", country)
                 .queryParam("sortby", "publishedAt")
@@ -96,22 +205,6 @@ public class GNewsSourceProvider implements NewsSourceProvider {
                 .build()
                 .encode()
                 .toUriString();
-        String sanitizedUrl = sanitizeUrl(url);
-
-        ExternalApiResult result = externalApiUtils.callAPI(new ExternalApiRequest(
-                HttpMethod.GET,
-                new HttpHeaders(),
-                url,
-                null
-        ));
-        if (result == null || result.statusCode() < 200 || result.statusCode() >= 300) {
-            String reason = result != null && result.statusCode() == 429 ? "rate-limit" : "upstream-rejection";
-            log.warn("[GNEWS] provider empty reason={} bucket={} enabled={} requestFamily={} status={} configuredBaseUrl={} requestUrl={}",
-                    reason, bucket, enabled, resolveRequestFamily(normalizedBaseUrl),
-                    result == null ? -1 : result.statusCode(), normalizedBaseUrl, sanitizedUrl);
-            return List.of();
-        }
-        return parseArticles(result.body(), resolvedLimit, bucket);
     }
 
     @Override
