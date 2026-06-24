@@ -141,8 +141,11 @@ class MarketIssueSeedServiceTest {
         ResolvedMarketIssueQueries resolved = service.resolve();
 
         assertThat(resolved.queries())
-                .doesNotContain("코스피 지수", "코스닥 지수", "코스피 마감", "한국은행 기준금리", "미국 연준 금리", "파월 의장 발언")
-                .contains("삼성전자", "SK하이닉스", "원달러", "뉴욕증시", "나스닥", "반도체");
+                // Bare single-noun queries and the old polluted defaults must be gone.
+                .doesNotContain("삼성전자", "SK하이닉스", "원달러", "반도체", "2차전지", "방산",
+                        "코스피 지수", "코스닥 지수", "한국은행 기준금리", "미국 연준 금리")
+                // Market-context queries must be present.
+                .contains("삼성전자 주가", "SK하이닉스 주가", "원달러 환율", "뉴욕증시 마감", "나스닥 마감", "반도체 주가");
     }
 
     @Test

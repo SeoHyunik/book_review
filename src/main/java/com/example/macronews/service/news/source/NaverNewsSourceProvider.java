@@ -10,6 +10,7 @@ import com.example.macronews.util.external.ExternalResponseTextNormalizer;
 import com.example.macronews.util.external.ExternalResponseValueParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -462,6 +463,7 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             int nullPublishedAtCount = 0;
             int staleItemCount = 0;
             int staleLoggedCount = 0;
+            int freshIrrelevantLoggedCount = 0;
             int filteredByRelevanceCount = 0;
             int missingUrlCount = 0;
             int emptyTitleCount = 0;
@@ -494,6 +496,12 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 Instant publishedAt = ExternalResponseValueParser.parseInstant(
                         rawPubDate, NAVER_PUB_DATE_FORMATTER, NAVER_PUB_DATE_FALLBACK_FORMATTERS);
                 String resolvedUrl = StringUtils.hasText(originalLink) ? originalLink : fallbackLink;
+                // Diagnostic-only source provenance: which publisher domain a curated-fallback query
+                // actually surfaced. Used to tell macro/market publishers apart from lifestyle/jab noise
+                // without changing any drop decision in this slice.
+                String originalLinkDomain = extractDomain(originalLink);
+                String linkDomain = extractDomain(fallbackLink);
+                String sourceDomain = StringUtils.hasText(originalLinkDomain) ? originalLinkDomain : linkDomain;
                 String dedupTitle = normalizeTitle(cleanedTitle);
                 if (StringUtils.hasText(rawPubDate) && publishedAt == null) {
                     invalidPubDateCount++;
@@ -523,15 +531,25 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
                 if (!fresh) {
                     staleItemCount++;
                     if (staleLoggedCount < STALE_LOG_SAMPLE_LIMIT) {
-                        log.info("[NAVER] stale item sample bucket={} query='{}' pageStart={} publishedAt={} cutoff={} ageHours={} title='{}'",
+                        log.info("[NAVER] stale item sample bucket={} query='{}' pageStart={} publishedAt={} cutoff={} ageHours={} sourceDomain={} originalLinkDomain={} linkDomain={} title='{}'",
                                 bucket, query, pageStart, publishedAt, cutoff, formatAgeHours(publishedAt, now),
-                                abbreviateForLog(cleanedTitle));
+                                sourceDomain, originalLinkDomain, linkDomain, abbreviateForLog(cleanedTitle));
                         staleLoggedCount++;
                     }
                     continue;
                 }
                 if (!relevant) {
                     filteredByRelevanceCount++;
+                    // Fresh-but-irrelevant items are the other half of the curated-fallback miss: a fresh
+                    // article whose title/description carried no macro/market relevance keyword. Sampling
+                    // its source domain helps tell a too-broad query (lifestyle publisher) from a genuine
+                    // market article the relevance filter simply did not recognise.
+                    if (freshIrrelevantLoggedCount < STALE_LOG_SAMPLE_LIMIT) {
+                        log.info("[NAVER] fresh-irrelevant item sample bucket={} query='{}' pageStart={} publishedAt={} sourceDomain={} originalLinkDomain={} linkDomain={} title='{}'",
+                                bucket, query, pageStart, publishedAt, sourceDomain, originalLinkDomain, linkDomain,
+                                abbreviateForLog(cleanedTitle));
+                        freshIrrelevantLoggedCount++;
+                    }
                     continue;
                 }
                 if (!StringUtils.hasText(resolvedUrl)) {
@@ -737,6 +755,24 @@ public class NaverNewsSourceProvider implements NewsSourceProvider {
             return title;
         }
         return title.substring(0, STALE_LOG_TITLE_MAX_LENGTH - 3) + "...";
+    }
+
+    // Extracts the lowercased host (minus a leading "www.") from a Naver item link for diagnostics only.
+    // Returns "" for blank or malformed URLs; never throws, so it is safe to call on every raw item.
+    static String extractDomain(String url) {
+        if (!StringUtils.hasText(url)) {
+            return "";
+        }
+        try {
+            String host = URI.create(url.trim()).getHost();
+            if (host == null) {
+                return "";
+            }
+            String normalized = host.toLowerCase(Locale.ROOT);
+            return normalized.startsWith("www.") ? normalized.substring(4) : normalized;
+        } catch (Exception ex) {
+            return "";
+        }
     }
 
     private long resolveMaxAgeHours(NewsFreshnessBucket bucket) {

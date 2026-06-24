@@ -1124,6 +1124,61 @@ class NaverNewsSourceProviderTest {
         assertThat(results.get(0).url()).isEqualTo("https://news.example.com/fresh-relevant");
     }
 
+    @Test
+    @DisplayName("extractDomain safely returns the lowercased host without www and tolerates bad input")
+    void extractDomain_returnsSafeHostForDiagnostics() {
+        assertThat(NaverNewsSourceProvider.extractDomain("https://www.mk.co.kr/news/123")).isEqualTo("mk.co.kr");
+        assertThat(NaverNewsSourceProvider.extractDomain("https://news.naver.com/main/x")).isEqualTo("news.naver.com");
+        assertThat(NaverNewsSourceProvider.extractDomain("HTTPS://News.Example.COM/a")).isEqualTo("news.example.com");
+        assertThat(NaverNewsSourceProvider.extractDomain("")).isEmpty();
+        assertThat(NaverNewsSourceProvider.extractDomain(null)).isEmpty();
+        assertThat(NaverNewsSourceProvider.extractDomain("not a valid url")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Source-domain diagnostics do not change which stale/irrelevant items are dropped")
+    void parseItems_sourceDomainDiagnosticsDoNotChangeDrops() {
+        // One fresh+relevant (kept), one fresh+irrelevant (dropped, sampled with domain), one stale
+        // (dropped, sampled with domain). The returned item set and counters must be unchanged.
+        String body = """
+                {
+                  "items": [
+                    {
+                      "title": "코스피 지수 상승",
+                      "description": "기관 매수세 확대",
+                      "originallink": "https://www.mk.co.kr/fresh-relevant",
+                      "link": "https://search.naver.com/fresh-relevant",
+                      "pubDate": "Fri, 13 Mar 2026 09:15:00 +0900"
+                    },
+                    {
+                      "title": "연예인 화보 공개",
+                      "description": "패션 트렌드 정리",
+                      "originallink": "https://www.fashion.example.com/fresh-irrelevant",
+                      "link": "https://search.naver.com/fresh-irrelevant",
+                      "pubDate": "Fri, 13 Mar 2026 11:00:00 +0900"
+                    },
+                    {
+                      "title": "봄 여행 명소 추천",
+                      "description": "라이프스타일 가이드",
+                      "originallink": "https://www.travel.example.com/stale-irrelevant",
+                      "link": "https://search.naver.com/stale-irrelevant",
+                      "pubDate": "Sun, 01 Mar 2026 10:00:00 +0900"
+                    }
+                  ]
+                }
+                """;
+
+        NaverNewsSourceProvider.NaverParseResult result =
+                provider.parseItems("진단", 1, body, 12L, NewsFreshnessBucket.FRESH);
+
+        assertThat(result.rawItemCount()).isEqualTo(3);
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.filteredByRelevanceCount()).isEqualTo(1);
+        assertThat(result.staleItemCount()).isEqualTo(1);
+        assertThat(result.freshButIrrelevantCount()).isEqualTo(1);
+        assertThat(result.staleAndIrrelevantCount()).isEqualTo(1);
+    }
+
     private List<String> capturedRequestUrls() {
         ArgumentCaptor<ExternalApiRequest> requestCaptor = ArgumentCaptor.forClass(ExternalApiRequest.class);
         verify(externalApiUtils, atLeastOnce()).callAPI(requestCaptor.capture());
