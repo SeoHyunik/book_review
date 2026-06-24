@@ -2,7 +2,6 @@ package com.example.macronews.service.news.source;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
@@ -12,10 +11,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.example.macronews.dto.external.ExternalNewsItem;
 import com.example.macronews.dto.request.ExternalApiRequest;
-import com.example.macronews.service.news.query.DeterministicQueryGenerator;
-import com.example.macronews.service.news.query.GdeltHotIssueSeedProvider;
-import com.example.macronews.service.news.query.HotIssueSeedOrigin;
-import com.example.macronews.service.news.query.HotIssueSeedResult;
+import com.example.macronews.service.news.query.MarketIssueSeedService;
+import com.example.macronews.service.news.query.NaverCuratedFallbackQueries;
+import com.example.macronews.service.news.query.ResolvedMarketIssueQueries;
 import com.example.macronews.util.ExternalApiResult;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,17 +39,14 @@ class NaverNewsSourceProviderTest {
     private ExternalApiUtils externalApiUtils;
 
     @Mock
-    private GdeltHotIssueSeedProvider gdeltHotIssueSeedProvider;
-
-    @Mock
-    private DeterministicQueryGenerator deterministicQueryGenerator;
+    private MarketIssueSeedService marketIssueSeedService;
 
     private NaverNewsSourceProvider provider;
 
     @BeforeEach
     void setUp() {
         provider = new NaverNewsSourceProvider(
-                externalApiUtils, new ObjectMapper(), gdeltHotIssueSeedProvider, deterministicQueryGenerator);
+                externalApiUtils, new ObjectMapper(), marketIssueSeedService);
         ReflectionTestUtils.setField(provider, "enabled", true);
         ReflectionTestUtils.setField(provider, "baseUrl", "https://openapi.naver.com");
         ReflectionTestUtils.setField(provider, "clientId", "client-id");
@@ -911,7 +906,7 @@ class NaverNewsSourceProviderTest {
 
         // Characterization: the configured query source is the only one resolved here. Exactly the two
         // configured queries reach the upstream call and their candidates flow into the shared merge,
-        // newest first, while the GDELT seed and deterministic generator collaborators stay untouched.
+        // newest first, while the market-issue seed service stays untouched.
         assertThat(decodedRequestUrls())
                 .hasSize(2)
                 .anySatisfy(url -> assertThat(url).contains("query=코스피"))
@@ -920,11 +915,11 @@ class NaverNewsSourceProviderTest {
                 .containsExactly(
                         "https://news.example.com/configured-fx",
                         "https://news.example.com/configured-kospi");
-        verifyNoInteractions(gdeltHotIssueSeedProvider, deterministicQueryGenerator);
+        verifyNoInteractions(marketIssueSeedService);
     }
 
     @Test
-    @DisplayName("NAVER provider should fall back to built-in default queries without consulting the GDELT seed or deterministic generator")
+    @DisplayName("NAVER provider should fall back to built-in default queries without consulting the seed service when dynamic is disabled")
     void fetchTopHeadlines_resolvesDefaultQueriesWithoutGeneratedQuerySource() {
         ReflectionTestUtils.setField(provider, "rawQueries", "");
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
@@ -935,78 +930,22 @@ class NaverNewsSourceProviderTest {
 
         provider.fetchTopHeadlines(5);
 
-        // Characterization: when configured queries are blank the provider resolves its own built-in
-        // default query list rather than seeding from GDELT or generating queries, so the default path
-        // remains separated from the generated query source and neither collaborator is consulted.
+        // Characterization: with dynamic disabled (default) and blank configured queries, the provider
+        // resolves its own built-in default query list and never consults the market-issue seed service.
         assertThat(decodedRequestUrls()).hasSize(18)
                 .anySatisfy(url -> assertThat(url).contains("query=코스피 지수"))
                 .anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
-        verifyNoInteractions(gdeltHotIssueSeedProvider, deterministicQueryGenerator);
+        verifyNoInteractions(marketIssueSeedService);
     }
 
     @Test
-    @DisplayName("NAVER provider should merge generated queries before default queries when dynamic query source is enabled")
-    void fetchTopHeadlines_dynamicQueriesEnabledMergesGeneratedQueriesBeforeDefaults() {
+    @DisplayName("NAVER provider should issue the MarketIssueSeedService resolved queries in order when dynamic is enabled")
+    void fetchTopHeadlines_dynamicQueriesEnabledUsesResolvedServiceQueries() {
         ReflectionTestUtils.setField(provider, "rawQueries", "");
         ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
         ReflectionTestUtils.setField(provider, "maxPages", 1);
-        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
-                .willReturn(remoteSeedResult(List.of("federal reserve rate decision")));
-        given(deterministicQueryGenerator.generateQueries(eq(List.of("federal reserve rate decision")), eq(10)))
-                .willReturn(List.of("연준 금리", "코스피 지수", "연준 금리"));
-        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
-                {
-                  "items": []
-                }
-                """));
-
-        provider.fetchTopHeadlines(5);
-
-        List<String> urls = decodedRequestUrls();
-        assertThat(urls).hasSize(19);
-        assertThat(urls.get(0)).contains("query=연준 금리");
-        assertThat(urls.get(1)).contains("query=코스피 지수");
-        assertThat(urls).filteredOn(url -> url.contains("query=연준 금리")).hasSize(1);
-        assertThat(urls).filteredOn(url -> url.contains("query=코스피 지수")).hasSize(1);
-        assertThat(urls).anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
-        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeedResult(10);
-        verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
-    }
-
-    @Test
-    @DisplayName("NAVER provider should keep safe default fallback when dynamic query generation fails")
-    void fetchTopHeadlines_dynamicQueriesEnabledFallsBackToDefaultsWhenGeneratorFails() {
-        ReflectionTestUtils.setField(provider, "rawQueries", "");
-        ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
-        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
-                .willReturn(remoteSeedResult(List.of("federal reserve rate decision")));
-        given(deterministicQueryGenerator.generateQueries(any(), eq(10)))
-                .willThrow(new IllegalStateException("generator unavailable"));
-        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
-                {
-                  "items": []
-                }
-                """));
-
-        provider.fetchTopHeadlines(5);
-
-        assertThat(decodedRequestUrls()).hasSize(18)
-                .anySatisfy(url -> assertThat(url).contains("query=코스피 지수"))
-                .anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
-        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeedResult(10);
-        verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
-    }
-
-    @Test
-    @DisplayName("NAVER dynamic CACHED_REMOTE seeds still drive the deterministic generator")
-    void fetchTopHeadlines_dynamicQueriesUsesGeneratorForCachedRemoteOrigin() {
-        ReflectionTestUtils.setField(provider, "rawQueries", "");
-        ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
-        ReflectionTestUtils.setField(provider, "maxPages", 1);
-        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10))
-                .willReturn(cachedRemoteSeedResult(List.of("federal reserve rate decision")));
-        given(deterministicQueryGenerator.generateQueries(eq(List.of("federal reserve rate decision")), eq(10)))
-                .willReturn(List.of("연준 금리"));
+        given(marketIssueSeedService.resolve()).willReturn(resolved(
+                List.of("연준 금리", "코스피 상승", "원달러"), "gdelt-dynamic", "GDELT_REMOTE", "ok", 3, 0, 0));
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
                 { "items": [] }
                 """));
@@ -1014,9 +953,31 @@ class NaverNewsSourceProviderTest {
         provider.fetchTopHeadlines(5);
 
         List<String> urls = decodedRequestUrls();
+        assertThat(urls).hasSize(3);
         assertThat(urls.get(0)).contains("query=연준 금리");
-        assertThat(urls).anySatisfy(url -> assertThat(url).contains("query=미국 연준 금리"));
-        verify(deterministicQueryGenerator).generateQueries(List.of("federal reserve rate decision"), 10);
+        assertThat(urls.get(1)).contains("query=코스피 상승");
+        assertThat(urls.get(2)).contains("query=원달러");
+        verify(marketIssueSeedService).resolve();
+    }
+
+    @Test
+    @DisplayName("NAVER provider should issue OpenAI web-search dynamic queries resolved by the seed service")
+    void fetchTopHeadlines_dynamicQueriesEnabledUsesOpenAiResolvedQueries() {
+        ReflectionTestUtils.setField(provider, "rawQueries", "");
+        ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
+        ReflectionTestUtils.setField(provider, "maxPages", 1);
+        given(marketIssueSeedService.resolve()).willReturn(resolved(
+                List.of("삼성전자 HBM", "SK하이닉스 실적"), "openai-web-search-dynamic", "OPENAI_WEB_SEARCH", "ok", 2, 0, 1));
+        given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
+                { "items": [] }
+                """));
+
+        provider.fetchTopHeadlines(5);
+
+        List<String> urls = decodedRequestUrls();
+        assertThat(urls.get(0)).contains("query=삼성전자 HBM");
+        assertThat(urls).anySatisfy(url -> assertThat(url).contains("query=SK하이닉스 실적"));
+        verify(marketIssueSeedService).resolve();
     }
 
     // Polluted queries that repeatedly produced stale/lifestyle noise or rawItems=0 in production; the
@@ -1031,30 +992,14 @@ class NaverNewsSourceProviderTest {
             "삼성전자", "SK하이닉스", "원달러", "뉴욕증시", "나스닥", "반도체");
 
     @Test
-    @DisplayName("NAVER RATE_LIMIT_COOLDOWN origin uses the curated Korea-market fallback pack, not the generator")
-    void fetchTopHeadlines_rateLimitCooldownSeedsUseCuratedKoreaMarketFallback() {
-        assertCuratedFallbackPackUsed(
-                fallbackSeedResult(HotIssueSeedOrigin.RATE_LIMIT_COOLDOWN, "rate-limit-cooldown"));
-    }
-
-    @Test
-    @DisplayName("NAVER UPSTREAM_FAILURE_COOLDOWN origin uses the curated Korea-market fallback pack, not the generator")
-    void fetchTopHeadlines_upstreamFailureCooldownSeedsUseCuratedKoreaMarketFallback() {
-        assertCuratedFallbackPackUsed(
-                fallbackSeedResult(HotIssueSeedOrigin.UPSTREAM_FAILURE_COOLDOWN, "upstream-cooldown"));
-    }
-
-    @Test
-    @DisplayName("NAVER FALLBACK origin uses the curated Korea-market fallback pack, not the generator")
-    void fetchTopHeadlines_fallbackSeedsUseCuratedKoreaMarketFallback() {
-        assertCuratedFallbackPackUsed(
-                fallbackSeedResult(HotIssueSeedOrigin.FALLBACK, "malformed-body"));
-    }
-
-    private void assertCuratedFallbackPackUsed(HotIssueSeedResult nonDynamicSeedResult) {
+    @DisplayName("NAVER provider should issue the curated Korea-market fallback pack when the seed service resolves it")
+    void fetchTopHeadlines_dynamicQueriesEnabledUsesCuratedFallback() {
         ReflectionTestUtils.setField(provider, "rawQueries", "");
         ReflectionTestUtils.setField(provider, "dynamicQueriesEnabled", true);
-        given(gdeltHotIssueSeedProvider.resolveHotIssueSeedResult(10)).willReturn(nonDynamicSeedResult);
+        given(marketIssueSeedService.resolve()).willReturn(new ResolvedMarketIssueQueries(
+                NaverCuratedFallbackQueries.QUERIES, "naver-curated-fallback", "CURATED_FALLBACK", "disabled",
+                0, NaverCuratedFallbackQueries.QUERIES.size(), 0, 0L,
+                Instant.parse("2026-03-13T03:30:00Z")));
         given(externalApiUtils.callAPI(any())).willReturn(new ExternalApiResult(200, """
                 { "items": [] }
                 """));
@@ -1062,37 +1007,20 @@ class NaverNewsSourceProviderTest {
         provider.fetchTopHeadlines(5);
 
         List<String> urls = decodedRequestUrls();
-        // Curated Korea-market pack: count stays inside the 18-24 budget.
         assertThat(urls.size()).isBetween(18, 24);
-        // None of the polluted stale/lifestyle-noise queries may appear.
         for (String polluted : POLLUTED_FALLBACK_QUERIES) {
             assertThat(urls).noneSatisfy(url -> assertThat(url).contains("query=" + polluted));
         }
-        // Korea-market reaction / domestic ticker queries must be present.
         for (String expected : KOREA_MARKET_FALLBACK_QUERIES) {
             assertThat(urls).anySatisfy(url -> assertThat(url).contains("query=" + expected));
         }
-        // The synthetic non-dynamic seeds must never reach the deterministic generator.
-        verify(gdeltHotIssueSeedProvider).resolveHotIssueSeedResult(10);
-        verifyNoInteractions(deterministicQueryGenerator);
+        verify(marketIssueSeedService).resolve();
     }
 
-    private static HotIssueSeedResult remoteSeedResult(List<String> seeds) {
-        return new HotIssueSeedResult(seeds, HotIssueSeedOrigin.REMOTE, "ok", 200, false, true, seeds.size(),
-                Instant.parse("2026-03-13T03:00:00Z"));
-    }
-
-    private static HotIssueSeedResult cachedRemoteSeedResult(List<String> seeds) {
-        return new HotIssueSeedResult(seeds, HotIssueSeedOrigin.CACHED_REMOTE, "cached-remote", -1, false, true,
-                seeds.size(), Instant.parse("2026-03-13T02:30:00Z"));
-    }
-
-    private static HotIssueSeedResult fallbackSeedResult(HotIssueSeedOrigin origin, String reason) {
-        // Mirrors the provider's synthetic fallback seed list; these must never be treated as dynamic.
-        return new HotIssueSeedResult(
-                List.of("Bank of Korea base rate decision", "US Federal Reserve FOMC rate decision"),
-                origin, reason, origin == HotIssueSeedOrigin.RATE_LIMIT_COOLDOWN ? -1 : 200, true, true, 0,
-                Instant.parse("2026-03-13T03:30:00Z"));
+    private static ResolvedMarketIssueQueries resolved(List<String> queries, String source, String seedOrigin,
+            String reason, int generatedQueryCount, int curatedQueryCount, int evidenceCount) {
+        return new ResolvedMarketIssueQueries(queries, source, seedOrigin, reason, generatedQueryCount,
+                curatedQueryCount, evidenceCount, 0L, Instant.parse("2026-03-13T03:30:00Z"));
     }
 
     @Test

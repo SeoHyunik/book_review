@@ -3,8 +3,7 @@ package com.example.macronews.service.news.source;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import com.example.macronews.service.news.query.DeterministicQueryGenerator;
-import com.example.macronews.service.news.query.GdeltHotIssueSeedProvider;
+import com.example.macronews.service.news.query.MarketIssueSeedService;
 import com.example.macronews.util.ExternalApiUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
@@ -30,8 +29,7 @@ class NaverNewsSourceProviderBindingTest {
 
             context.registerBean(ExternalApiUtils.class, () -> mock(ExternalApiUtils.class));
             context.registerBean(ObjectMapper.class, () -> new ObjectMapper());
-            context.registerBean(GdeltHotIssueSeedProvider.class, () -> mock(GdeltHotIssueSeedProvider.class));
-            context.registerBean(DeterministicQueryGenerator.class, DeterministicQueryGenerator::new);
+            context.registerBean(MarketIssueSeedService.class, () -> mock(MarketIssueSeedService.class));
             context.registerBean(NaverNewsSourceProvider.class);
             context.refresh();
 
